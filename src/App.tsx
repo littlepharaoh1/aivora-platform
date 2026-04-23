@@ -226,7 +226,7 @@ export default function App() {
             ['qc', 'QC Center', CheckCircle2],
             ['audio', 'Audio Adjust', Wrench],
             ['export', 'Export', Download],
-          ].map(([id, label, Icon]) => {
+          ].map((item) => { const [id, label, Icon] = item as [TabKey,string,any];
             const Cmp = Icon as any
             return <button key={id} onClick={() => setTab(id as TabKey)} className={tab === id ? 'nav-btn active' : 'nav-btn'}><Cmp size={16} /><span>{label}</span></button>
           })}
