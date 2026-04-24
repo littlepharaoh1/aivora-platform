@@ -190,6 +190,7 @@ export default function App() {
     setSelected(enriched);
     setRecords(old => old.map(r => r.id === record.id ? enriched : r));
     drawWave(decoded);
+setTimeout(() => drawWave(decoded), 120);
   }
 
   function drawWave(buffer: AudioBuffer) {
