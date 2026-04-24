@@ -1,625 +1,319 @@
-import { useMemo, useState } from 'react'
-import {
-  LayoutDashboard,
-  FolderKanban,
-  Upload,
-  ShieldCheck,
-  SlidersHorizontal,
-  Download,
-  Users,
-  Building2,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  FileAudio,
-  Clock3,
-  BadgeCheck,
-} from 'lucide-react'
-import './styles.css'
+import { useMemo, useState } from "react";
+import "./styles.css";
 
-type TabKey =
-  | 'dashboard'
-  | 'projects'
-  | 'upload'
-  | 'qc'
-  | 'audio'
-  | 'export'
-  | 'team'
-  | 'client'
+type Tab = "dashboard" | "qc" | "naming" | "audio" | "exports" | "team" | "client";
+type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 
-type ProjectType = 'German Recording' | 'Wake Word' | 'ASR' | 'TTS'
+type AudioStats = {
+  fileName: string;
+  duration: number;
+  sampleRate: number;
+  channels: number;
+  bitDepth: number;
+  peakDb: number;
+  rmsDb: number;
+  noiseFloorDb: number;
+  verdict: string;
+  objectUrl: string;
+  bars: number[];
+};
 
-type Project = {
-  id: string
-  name: string
-  client: string
-  language: string
-  country: string
-  type: ProjectType
-  required: number
-  uploaded: number
-  review: number
-  approved: number
-  rejected: number
-  deadline: string
-  namingPattern: string
-  sampleRateTarget: string
-}
-
-type UploadItem = {
-  originalName: string
-  generatedName: string
-  status: 'uploaded' | 'review' | 'approved' | 'rejected'
-  validNaming: boolean
-  reason?: string
-}
-
-type QCStatus = 'approved' | 'review' | 'rejected'
-
-const projects: Project[] = [
-  {
-    id: 'german-recording',
-    name: 'German Recording Batch 01',
-    client: 'Aivora Internal',
-    language: 'German',
-    country: 'Germany',
-    type: 'German Recording',
-    required: 200,
-    uploaded: 42,
-    review: 9,
-    approved: 28,
-    rejected: 5,
-    deadline: '2026-05-05',
-    namingPattern: 'DE-DE_D0001_S0001_recording_normal.wav',
-    sampleRateTarget: '48 kHz / 32-bit',
-  },
-  {
-    id: 'wake-word',
-    name: 'Wake Word QA Set',
-    client: 'Confidential Client',
-    language: 'German',
-    country: 'Germany',
-    type: 'Wake Word',
-    required: 120,
-    uploaded: 18,
-    review: 6,
-    approved: 9,
-    rejected: 3,
-    deadline: '2026-05-10',
-    namingPattern: 'DE-DE_D0001_S0001_dkws_normal.wav',
-    sampleRateTarget: '48 kHz / 32-bit',
-  },
-  {
-    id: 'asr-ar',
-    name: 'Arabic ASR Pilot',
-    client: 'Enterprise Buyer',
-    language: 'Arabic',
-    country: 'Egypt',
-    type: 'ASR',
-    required: 500,
-    uploaded: 123,
-    review: 20,
-    approved: 84,
-    rejected: 19,
-    deadline: '2026-05-20',
-    namingPattern: 'AR-EG_A0001_S0001_asr_normal.wav',
-    sampleRateTarget: '48 kHz / 24-bit',
-  },
-]
-
-const navItems: [TabKey, string, any][] = [
-  ['dashboard', 'Dashboard', LayoutDashboard],
-  ['projects', 'Projects', FolderKanban],
-  ['upload', 'Upload Center', Upload],
-  ['qc', 'QC Center', ShieldCheck],
-  ['audio', 'Audio Lab', SlidersHorizontal],
-  ['export', 'Exports', Download],
-  ['team', 'Team', Users],
-  ['client', 'Client Portal', Building2],
-]
-
-const seedUploads: UploadItem[] = [
-  {
-    originalName: '1. Hi BYD (slow).wav',
-    generatedName: 'DE-DE_D0001_S0001_recording_normal.wav',
-    status: 'uploaded',
-    validNaming: true,
-  },
-  {
-    originalName: 'DE-DE_D1099_S0002_dkws_slow.wav',
-    generatedName: 'DE-DE_D1099_S0002_dkws_slow.wav',
-    status: 'review',
-    validNaming: true,
-  },
-]
-
-function validateWavFileName(name: string): boolean {
-  return /^[A-Z]{2}-[A-Z]{2}_[A-Z]\d{4}_S\d{4}_(recording|dkws|asr|tts)_(slow|normal|fast)\.wav$/i.test(
-    name,
-  )
-}
-
-function badgeClass(status: UploadItem['status'] | QCStatus) {
-  if (status === 'approved') return 'badge success'
-  if (status === 'review') return 'badge warn'
-  if (status === 'rejected') return 'badge danger'
-  return 'badge info'
-}
-
-function progressPercent(project: Project) {
-  return Math.min(100, Math.round((project.uploaded / project.required) * 100))
-}
-
-function buildSuggestedName(project: Project, speakerId: string, sentenceId: string, speed: string) {
-  const prefix =
-    project.language === 'German'
-      ? 'DE-DE'
-      : project.language === 'Arabic'
-      ? 'AR-EG'
-      : 'XX-XX'
-  const family =
-    project.type === 'Wake Word'
-      ? 'dkws'
-      : project.type === 'ASR'
-      ? 'asr'
-      : project.type === 'TTS'
-      ? 'tts'
-      : 'recording'
-
-  return `${prefix}_${speakerId}_${sentenceId}_${family}_${speed}.wav`
-}
-
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  tone = 'default',
-}: {
-  title: string
-  value: string
-  icon: any
-  tone?: 'default' | 'success' | 'danger' | 'warn'
-}) {
-  return (
-    <div className={`stat-card ${tone}`}>
-      <div className="stat-top">
-        <span>{title}</span>
-        <Icon size={18} />
-      </div>
-      <div className="stat-value">{value}</div>
-    </div>
-  )
-}
+const germanPatterns = {
+  dkws: /^DE-DE_D\d{4}_S\d{4}_dkws_(slow|normal|fast)\.wav$/i,
+  recording: /^DE-DE_D\d{4}_S\d{4}_recording_(slow|normal|fast)\.wav$/i,
+  oneshot: /^DE-DE_D\d{4}_S\d{4}_oneshot\d+_(slow|normal|fast)\.wav$/i,
+};
 
 export default function App() {
-  const [tab, setTab] = useState<TabKey>('dashboard')
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0].id)
-  const [uploads, setUploads] = useState<UploadItem[]>(seedUploads)
-  const [qcIndex, setQcIndex] = useState<number>(0)
-  const [speakerId, setSpeakerId] = useState('D0001')
-  const [sentenceId, setSentenceId] = useState('S0001')
-  const [speed, setSpeed] = useState<'slow' | 'normal' | 'fast'>('normal')
-  const [auditLog, setAuditLog] = useState<string[]>([
-    'Production platform initialized',
-    'Branding mode: Aivora AI',
-  ])
+  const [tab, setTab] = useState<Tab>("qc");
+  const [stats, setStats] = useState<AudioStats | null>(null);
+  const [decision, setDecision] = useState<Decision>("Pending");
+  const [notes, setNotes] = useState("");
+  const [speaker, setSpeaker] = useState("D0001");
+  const [sentence, setSentence] = useState("S0001");
+  const [task, setTask] = useState<"dkws" | "recording" | "oneshot200">("dkws");
+  const [speed, setSpeed] = useState<"slow" | "normal" | "fast">("normal");
 
-  const selectedProject = useMemo(
-    () => projects.find((p) => p.id === selectedProjectId) ?? projects[0],
-    [selectedProjectId],
-  )
+  const generatedName = useMemo(() => {
+    return task === "oneshot200"
+      ? `DE-DE_${speaker}_${sentence}_oneshot200_${speed}.wav`
+      : `DE-DE_${speaker}_${sentence}_${task}_${speed}.wav`;
+  }, [speaker, sentence, task, speed]);
 
-  const totalStats = useMemo(() => {
-    const totalRequired = projects.reduce((sum, p) => sum + p.required, 0)
-    const totalUploaded = projects.reduce((sum, p) => sum + p.uploaded, 0)
-    const totalApproved = projects.reduce((sum, p) => sum + p.approved, 0)
-    const totalRejected = projects.reduce((sum, p) => sum + p.rejected, 0)
-    const approvalRate = totalApproved + totalRejected > 0
-      ? Math.round((totalApproved / (totalApproved + totalRejected)) * 100)
-      : 0
-
-    return {
-      totalRequired,
-      totalUploaded,
-      totalApproved,
-      totalRejected,
-      approvalRate,
-      activeProjects: projects.length,
-    }
-  }, [])
-
-  const currentQC = uploads[qcIndex] ?? null
-
-  const suggestedName = buildSuggestedName(selectedProject, speakerId, sentenceId, speed)
-
-  function onUploadFiles(fileList: FileList | null) {
-    if (!fileList?.length) return
-
-    const newItems: UploadItem[] = Array.from(fileList).map((file, idx) => {
-      const generated = buildSuggestedName(
-        selectedProject,
-        `D${String(1000 + uploads.length + idx).padStart(4, '0')}`,
-        `S${String(uploads.length + idx + 1).padStart(4, '0')}`,
-        selectedProject.type === 'Wake Word' ? 'slow' : 'normal',
-      )
-
-      return {
-        originalName: file.name,
-        generatedName: file.name.toLowerCase().endsWith('.wav') ? file.name : generated,
-        status: 'uploaded',
-        validNaming: validateWavFileName(file.name),
-        reason: validateWavFileName(file.name) ? undefined : 'Naming format mismatch',
-      }
-    })
-
-    setUploads((prev) => [...newItems, ...prev])
-    setAuditLog((prev) => [
-      `Uploaded ${newItems.length} file(s) into ${selectedProject.name}`,
-      ...prev,
-    ])
-  }
-
-  function updateQC(status: QCStatus, reason?: string) {
-    if (!currentQC) return
-    const next = [...uploads]
-    next[qcIndex] = {
-      ...currentQC,
-      status,
-      reason: reason ?? currentQC.reason,
-    }
-    setUploads(next)
-    setAuditLog((prev) => [
-      `QC ${status.toUpperCase()} → ${currentQC.generatedName}${reason ? ` | ${reason}` : ''}`,
-      ...prev,
-    ])
+  async function handleAudioUpload(file: File) {
+    const buffer = await file.arrayBuffer();
+    const result = analyzeWav(buffer, file.name);
+    const objectUrl = URL.createObjectURL(file);
+    setStats({ ...result, objectUrl });
+    setDecision("Pending");
   }
 
   return (
-    <div className="shell">
+    <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">AI</div>
+          <img src="/logo.png" onError={(e) => ((e.currentTarget.style.display = "none"))} />
+          <div className="brandMark">AI</div>
           <div>
-            <div className="brand-title">Aivora AI</div>
-            <div className="brand-sub">Data Operations Platform</div>
+            <h1>Aivora AI</h1>
+            <p>AI · DATA · VISION</p>
           </div>
         </div>
 
-        <div className="logo-box">
-          <img
-            src="/logo.png"
-            alt="Aivora AI"
-            onError={(e) => {
-              ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-            }}
-          />
-          <div className="logo-fallback">Upload /public/logo.png to show company logo</div>
-        </div>
-
-        <nav className="nav-list">
-          {navItems.map((item) => {
-            const [id, label, Icon] = item as [TabKey, string, any]
-            const Cmp = Icon
-            return (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={tab === id ? 'nav-btn active' : 'nav-btn'}
-              >
-                <Cmp size={16} />
-                <span>{label}</span>
-              </button>
-            )
-          })}
-        </nav>
+        {[
+          ["dashboard", "Dashboard"],
+          ["qc", "QC Audio Analyzer"],
+          ["naming", "German Naming"],
+          ["audio", "Audio Lab"],
+          ["exports", "Exports"],
+          ["team", "Team"],
+          ["client", "Client Portal"],
+        ].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id as Tab)} className={tab === id ? "nav active" : "nav"}>
+            {label}
+          </button>
+        ))}
       </aside>
 
-      <main className="content">
+      <main className="main">
         <section className="hero">
           <div>
-            <div className="eyebrow">AIVORA AI · AI DATA VISION</div>
-            <h1>Aivora AI Production Platform</h1>
-            <p>
-              Voice data operations, bulk upload, naming control, QC decisions, exports, and
-              client-facing project visibility.
-            </p>
-          </div>
-
-          <div className="hero-actions">
-            <select
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="select"
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-
-            <label className="upload-btn">
-              <Upload size={16} />
-              Bulk Upload
-              <input
-                type="file"
-                accept="audio/*"
-                multiple
-                hidden
-                onChange={(e) => onUploadFiles(e.target.files)}
-              />
-            </label>
+            <span>AIVORA AI · ENTERPRISE OPERATIONS</span>
+            <h2>German Recording QC Engine</h2>
+            <p>Real browser-based WAV playback, noise estimation, naming validation and reviewer decision control.</p>
           </div>
         </section>
 
-        {tab === 'dashboard' && (
-          <section className="panel-stack">
-            <div className="grid stats-grid">
-              <StatCard title="Active Projects" value={String(totalStats.activeProjects)} icon={FolderKanban} />
-              <StatCard title="Uploaded Files" value={String(totalStats.totalUploaded)} icon={FileAudio} />
-              <StatCard title="Approved" value={String(totalStats.totalApproved)} icon={CheckCircle2} tone="success" />
-              <StatCard title="Rejected" value={String(totalStats.totalRejected)} icon={XCircle} tone="danger" />
-              <StatCard title="Approval Rate" value={`${totalStats.approvalRate}%`} icon={BadgeCheck} tone="success" />
-              <StatCard title="Due Soon" value={selectedProject.deadline} icon={Clock3} tone="warn" />
-            </div>
+        {tab === "dashboard" && (
+          <section className="cards">
+            <Metric title="Current File" value={stats?.fileName || "No file"} />
+            <Metric title="Noise Floor" value={stats ? `${stats.noiseFloorDb.toFixed(1)} dB` : "-"} />
+            <Metric title="Peak Level" value={stats ? `${stats.peakDb.toFixed(1)} dB` : "-"} />
+            <Metric title="Decision" value={decision} />
+          </section>
+        )}
 
-            <div className="grid two-col">
-              <section className="panel">
-                <h3>Project Rules</h3>
-                <div className="stack">
-                  <div className="info-box">{selectedProject.name}</div>
-                  <div className="info-box">
-                    {selectedProject.language} · {selectedProject.country} · {selectedProject.type}
-                  </div>
-                  <div className="info-box">{selectedProject.sampleRateTarget}</div>
-                  <div className="info-box break">{selectedProject.namingPattern}</div>
-                </div>
-              </section>
+        {tab === "qc" && (
+          <section className="panel">
+            <h3>QC Audio Analyzer</h3>
+            <label className="uploadBox">
+              Upload WAV Recording
+              <input
+                type="file"
+                accept=".wav,audio/wav,audio/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleAudioUpload(file);
+                }}
+              />
+            </label>
 
-              <section className="panel">
-                <h3>Audit Log</h3>
-                <div className="stack small">
-                  {auditLog.slice(0, 8).map((entry, i) => (
-                    <div className="log-row" key={`${entry}-${i}`}>
-                      {entry}
-                    </div>
+            {stats ? (
+              <>
+                <div className="fileName">{stats.fileName}</div>
+                <audio className="player" controls src={stats.objectUrl} />
+
+                <div className="meter">
+                  {stats.bars.map((b, i) => (
+                    <div key={i} className="bar" style={{ height: `${Math.max(8, b * 100)}%` }} />
                   ))}
                 </div>
-              </section>
-            </div>
+
+                <div className="cards small">
+                  <Metric title="Duration" value={`${stats.duration.toFixed(2)}s`} />
+                  <Metric title="Sample Rate" value={`${stats.sampleRate} Hz`} />
+                  <Metric title="Channels" value={String(stats.channels)} />
+                  <Metric title="Bit Depth" value={`${stats.bitDepth}-bit`} />
+                  <Metric title="Peak" value={`${stats.peakDb.toFixed(1)} dBFS`} />
+                  <Metric title="RMS" value={`${stats.rmsDb.toFixed(1)} dBFS`} />
+                  <Metric title="Noise Floor" value={`${stats.noiseFloorDb.toFixed(1)} dBFS`} />
+                  <Metric title="Verdict" value={stats.verdict} />
+                </div>
+
+                <div className="decision">
+                  <button onClick={() => setDecision("Approved")} className="approve">Approve</button>
+                  <button onClick={() => setDecision("Review")} className="review">Review</button>
+                  <button onClick={() => setDecision("Rejected")} className="reject">Reject</button>
+                </div>
+
+                <textarea placeholder="Reviewer notes..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </>
+            ) : (
+              <div className="empty">Upload a WAV file to start playback and noise analysis.</div>
+            )}
           </section>
         )}
 
-        {tab === 'projects' && (
+        {tab === "naming" && (
           <section className="panel">
-            <h3>Active Projects</h3>
-            <div className="project-grid">
-              {projects.map((project) => (
-                <div className="project-card" key={project.id}>
-                  <div className="project-head">
-                    <div>
-                      <div className="project-title">{project.name}</div>
-                      <div className="project-sub">{project.client}</div>
-                    </div>
-                    <div className="badge info">{project.type}</div>
-                  </div>
+            <h3>German Project Naming Reference</h3>
+            <div className="formGrid">
+              <input value={speaker} onChange={(e) => setSpeaker(e.target.value.toUpperCase())} placeholder="D0001" />
+              <input value={sentence} onChange={(e) => setSentence(e.target.value.toUpperCase())} placeholder="S0001" />
+              <select value={task} onChange={(e) => setTask(e.target.value as any)}>
+                <option value="dkws">Wake Word / dkws</option>
+                <option value="recording">Recording</option>
+                <option value="oneshot200">One Shot 200</option>
+              </select>
+              <select value={speed} onChange={(e) => setSpeed(e.target.value as any)}>
+                <option value="slow">slow</option>
+                <option value="normal">normal</option>
+                <option value="fast">fast</option>
+              </select>
+            </div>
 
-                  <div className="project-meta">
-                    <span>{project.language}</span>
-                    <span>{project.country}</span>
-                    <span>Deadline: {project.deadline}</span>
-                  </div>
+            <div className="generated">{generatedName}</div>
+            <div className="valid">Approved German naming format</div>
 
-                  <div className="progress-wrap">
-                    <div className="progress-label">
-                      <span>Progress</span>
-                      <span>{progressPercent(project)}%</span>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${progressPercent(project)}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="mini-stats">
-                    <div>Required: {project.required}</div>
-                    <div>Uploaded: {project.uploaded}</div>
-                    <div>Review: {project.review}</div>
-                    <div>Approved: {project.approved}</div>
-                    <div>Rejected: {project.rejected}</div>
-                  </div>
-                </div>
-              ))}
+            <div className="rules">
+              <h4>Accepted German Naming Rules</h4>
+              <p>Wake Word: DE-DE_D0001_S0001_dkws_slow.wav</p>
+              <p>Recording: DE-DE_D0001_S0001_recording_normal.wav</p>
+              <p>One Shot: DE-DE_D0001_S0001_oneshot200_fast.wav</p>
+              <p>Speaker ID must be D + 4 digits. Sentence ID must be S + 4 digits.</p>
             </div>
           </section>
         )}
 
-        {tab === 'upload' && (
-          <section className="panel">
-            <h3>Upload Center</h3>
-            <div className="toolbar">
-              <label className="upload-btn">
-                <Upload size={16} />
-                Upload Files / ZIP
-                <input
-                  type="file"
-                  accept=".wav,.zip,audio/*"
-                  multiple
-                  hidden
-                  onChange={(e) => onUploadFiles(e.target.files)}
-                />
-              </label>
-
-              <div className="info-box break">
-                Bulk upload enabled. Naming validator runs immediately after selection.
-              </div>
-            </div>
-
-            <div className="table">
-              <div className="table-row head">
-                <div>Original File</div>
-                <div>Generated / Uploaded Name</div>
-                <div>Naming Check</div>
-                <div>Status</div>
-              </div>
-
-              {uploads.map((item, i) => (
-                <div className="table-row" key={`${item.generatedName}-${i}`}>
-                  <div className="break">{item.originalName}</div>
-                  <div className="break">{item.generatedName}</div>
-                  <div>
-                    {item.validNaming ? (
-                      <span className="badge success">Valid</span>
-                    ) : (
-                      <span className="badge danger">Invalid</span>
-                    )}
-                  </div>
-                  <div>
-                    <span className={badgeClass(item.status)}>{item.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {tab === 'qc' && (
-          <section className="panel-stack">
-            <section className="panel">
-              <h3>QC Center</h3>
-              {currentQC ? (
-                <div className="stack">
-                  <div className="info-box break">{currentQC.generatedName}</div>
-                  <div className="info-box">Original: {currentQC.originalName}</div>
-                  <div className="grid qc-grid">
-                    <div className="info-box">Duration: 4.2s</div>
-                    <div className="info-box">Sample Rate: 48000 Hz</div>
-                    <div className="info-box">Channels: 1</div>
-                    <div className="info-box">Noise Hint: Low</div>
-                  </div>
-                  <div className="action-row">
-                    <button className="btn success" onClick={() => updateQC('approved')}>
-                      Approve
-                    </button>
-                    <button className="btn warn" onClick={() => updateQC('review', 'Needs manual listen')}>
-                      Review
-                    </button>
-                    <button className="btn danger" onClick={() => updateQC('rejected', 'Noise / naming / silence')}>
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="empty">No file available for QC.</div>
-              )}
-            </section>
-
-            <section className="panel">
-              <h3>Noise / Reject Examples</h3>
-              <div className="noise-grid">
-                <div className="noise-card">Background noise spike</div>
-                <div className="noise-card">Long silence gap</div>
-                <div className="noise-card">Clipping / over-peak</div>
-                <div className="noise-card">Wrong speed / delivery</div>
-              </div>
-            </section>
-          </section>
-        )}
-
-        {tab === 'audio' && (
+        {tab === "audio" && (
           <section className="panel">
             <h3>Audio Lab</h3>
-            <div className="grid form-grid">
-              <label>
-                Speaker ID
-                <input value={speakerId} onChange={(e) => setSpeakerId(e.target.value)} />
-              </label>
-              <label>
-                Sentence ID
-                <input value={sentenceId} onChange={(e) => setSentenceId(e.target.value)} />
-              </label>
-              <label>
-                Speed
-                <select value={speed} onChange={(e) => setSpeed(e.target.value as any)}>
-                  <option value="slow">slow</option>
-                  <option value="normal">normal</option>
-                  <option value="fast">fast</option>
-                </select>
-              </label>
-              <label>
-                Naming Preview
-                <input value={suggestedName} readOnly />
-              </label>
-            </div>
-
-            <div className="stack">
-              <div className={validateWavFileName(suggestedName) ? 'info-box success-line' : 'info-box danger-line'}>
-                {validateWavFileName(suggestedName) ? 'Naming format valid' : 'Naming format invalid'}
-              </div>
-              <div className="info-box">Use this preview as the reference naming for contributors and team leaders.</div>
-            </div>
+            <p>Use QC Analyzer first. Current browser version analyzes and validates audio locally without uploading to a server.</p>
+            <p>Next real backend step: server-side WAV conversion, ZIP export and permanent storage.</p>
           </section>
         )}
 
-        {tab === 'export' && (
-          <section className="panel">
-            <h3>Exports</h3>
-            <div className="stack">
-              <div className="info-box">Ready for handoff when approved files reach target threshold.</div>
-              <div className="info-box">Export format: WAV / metadata sheet / client-ready package.</div>
-              <button className="btn primary">Prepare Export Package</button>
-            </div>
-          </section>
-        )}
-
-        {tab === 'team' && (
-          <section className="panel">
-            <h3>Team Management</h3>
-            <div className="team-grid">
-              <div className="member-card">
-                <div className="member-name">Zakaria Ahmed</div>
-                <div className="member-role">Founder & Admin</div>
-              </div>
-              <div className="member-card">
-                <div className="member-name">Hanan Youssef</div>
-                <div className="member-role">Operations Manager</div>
-              </div>
-              <div className="member-card">
-                <div className="member-name">QA Team</div>
-                <div className="member-role">Review / Approve / Reject</div>
-              </div>
-              <div className="member-card">
-                <div className="member-name">Client View</div>
-                <div className="member-role">Read-only progress access</div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {tab === 'client' && (
-          <section className="panel">
-            <h3>Client Portal</h3>
-            <div className="stack">
-              <div className="info-box">Client: {selectedProject.client}</div>
-              <div className="info-box">Project: {selectedProject.name}</div>
-              <div className="progress-wrap">
-                <div className="progress-label">
-                  <span>Delivery Progress</span>
-                  <span>{progressPercent(selectedProject)}%</span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${progressPercent(selectedProject)}%` }} />
-                </div>
-              </div>
-              <div className="grid qc-grid">
-                <div className="info-box">Uploaded: {selectedProject.uploaded}</div>
-                <div className="info-box">Approved: {selectedProject.approved}</div>
-                <div className="info-box">Rejected: {selectedProject.rejected}</div>
-                <div className="info-box">Deadline: {selectedProject.deadline}</div>
-              </div>
-            </div>
-          </section>
-        )}
+        {tab === "exports" && <Panel title="Exports" text="Prepare approved WAV files, metadata sheet and client delivery package." />}
+        {tab === "team" && <Panel title="Team" text="Zakaria Ahmed — Founder. Hanan Youssef — Operations Manager. QA Team — Review / Approve / Reject." />}
+        {tab === "client" && <Panel title="Client Portal" text="Client read-only progress view for German Recording Batch 01." />}
       </main>
     </div>
-  )
+  );
+}
+
+function Metric({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="metric">
+      <span>{title}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function Panel({ title, text }: { title: string; text: string }) {
+  return (
+    <section className="panel">
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </section>
+  );
+}
+
+function analyzeWav(buffer: ArrayBuffer, fileName: string): Omit<AudioStats, "objectUrl"> {
+  const view = new DataView(buffer);
+  let offset = 12;
+  let channels = 1;
+  let sampleRate = 48000;
+  let bitDepth = 16;
+  let audioFormat = 1;
+  let dataOffset = 0;
+  let dataSize = 0;
+
+  while (offset < view.byteLength - 8) {
+    const id = readStr(view, offset, 4);
+    const size = view.getUint32(offset + 4, true);
+    if (id === "fmt ") {
+      audioFormat = view.getUint16(offset + 8, true);
+      channels = view.getUint16(offset + 10, true);
+      sampleRate = view.getUint32(offset + 12, true);
+      bitDepth = view.getUint16(offset + 22, true);
+    }
+    if (id === "data") {
+      dataOffset = offset + 8;
+      dataSize = size;
+      break;
+    }
+    offset += 8 + size + (size % 2);
+  }
+
+  if (!dataOffset || !dataSize) {
+    throw new Error("Invalid WAV file: data chunk not found.");
+  }
+
+  const bytesPerSample = bitDepth / 8;
+  const totalSamples = Math.floor(dataSize / bytesPerSample);
+  const frames = Math.floor(totalSamples / channels);
+  const samples: number[] = [];
+
+  for (let i = 0; i < frames; i++) {
+    let sum = 0;
+    for (let ch = 0; ch < channels; ch++) {
+      const pos = dataOffset + (i * channels + ch) * bytesPerSample;
+      sum += readSample(view, pos, bitDepth, audioFormat);
+    }
+    samples.push(sum / channels);
+  }
+
+  let peak = 0;
+  let totalSq = 0;
+  for (const s of samples) {
+    const a = Math.abs(s);
+    if (a > peak) peak = a;
+    totalSq += s * s;
+  }
+
+  const rms = Math.sqrt(totalSq / Math.max(1, samples.length));
+  const blockSize = Math.max(256, Math.floor(sampleRate * 0.05));
+  const blockRms: number[] = [];
+
+  for (let i = 0; i < samples.length; i += blockSize) {
+    const block = samples.slice(i, i + blockSize);
+    const value = Math.sqrt(block.reduce((a, b) => a + b * b, 0) / Math.max(1, block.length));
+    blockRms.push(value);
+  }
+
+  const sorted = [...blockRms].sort((a, b) => a - b);
+  const quietCount = Math.max(1, Math.floor(sorted.length * 0.15));
+  const noise = sorted.slice(0, quietCount).reduce((a, b) => a + b, 0) / quietCount;
+
+  const bars = blockRms.slice(0, 80).map((v) => Math.min(1, v * 18));
+  const noiseDb = toDb(noise);
+  const verdict =
+    noiseDb <= -60 ? "Excellent / Pass" :
+    noiseDb <= -50 ? "Good / Review recommended" :
+    "High Noise / Reject risk";
+
+  return {
+    fileName,
+    duration: frames / sampleRate,
+    sampleRate,
+    channels,
+    bitDepth,
+    peakDb: toDb(peak),
+    rmsDb: toDb(rms),
+    noiseFloorDb: noiseDb,
+    verdict,
+    bars,
+  };
+}
+
+function readSample(view: DataView, pos: number, bitDepth: number, format: number) {
+  if (format === 3 && bitDepth === 32) return view.getFloat32(pos, true);
+  if (bitDepth === 8) return (view.getUint8(pos) - 128) / 128;
+  if (bitDepth === 16) return view.getInt16(pos, true) / 32768;
+  if (bitDepth === 24) {
+    let v = view.getUint8(pos) | (view.getUint8(pos + 1) << 8) | (view.getUint8(pos + 2) << 16);
+    if (v & 0x800000) v |= 0xff000000;
+    return v / 8388608;
+  }
+  if (bitDepth === 32) return view.getInt32(pos, true) / 2147483648;
+  return 0;
+}
+
+function readStr(view: DataView, offset: number, len: number) {
+  return Array.from({ length: len }, (_, i) => String.fromCharCode(view.getUint8(offset + i))).join("");
+}
+
+function toDb(v: number) {
+  return 20 * Math.log10(Math.max(v, 1e-9));
 }
