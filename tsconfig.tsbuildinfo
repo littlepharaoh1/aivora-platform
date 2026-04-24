@@ -1,1 +1,1 @@
-{"root":["./src/App.backup.tsx","./src/App.tsx","./src/main.tsx","./src/audio/audioEngine.ts","./src/audio/spectrogramRenderer.ts","./src/audio/waveformRenderer.ts"],"version":"5.9.3"}
+{"root":["./src/App.backup.tsx","./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/audio/audioEngine.ts","./src/audio/spectrogramRenderer.ts","./src/audio/waveformRenderer.ts","./src/lib/supabase.ts"],"version":"5.9.3"}
