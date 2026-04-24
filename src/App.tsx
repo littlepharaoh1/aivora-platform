@@ -326,7 +326,7 @@ if (nextRecord) {
     return header + rows.join("\n");
   }
 
-  const tabs: [Tab, string][] = [["dashboard","Dashboard"],["upload","Upload Center"],["qc","QC Workstation"],["contributors","Contributors"],["naming","German Naming 1–200"],["export","Export Package"]];
+  const tabs: [Tab, string][] = [["dashboard","Dashboard"],["upload","Upload Center"],["qc","QC Workstation"],["contributors","Contributors"],["naming","German Naming 1–200"],["control","Control Center"],["export","Export Package"]];
 
   return <div className={`app ${theme}`}>
     <aside className="sidebar">
