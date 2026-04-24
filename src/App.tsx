@@ -4,6 +4,19 @@ import "./styles.css";
 type Tab = "dashboard" | "upload" | "qc" | "contributors" | "naming" | "control" | "export";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
+type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
+
+type ProjectTemplate = {
+  name: string;
+  language: string;
+  locale: string;
+  totalFiles: number;
+  sampleRate: number;
+  bitDepth: number;
+  channels: number;
+  maxNoiseDb: number;
+  namingTemplate: string;
+};
 type ProjectConfig = {
   projectName: string;
   clientName: string;
@@ -34,6 +47,12 @@ type FileRecord = {
   rmsDb?: number;
   noiseDb?: number;
 };
+const projectTemplates: ProjectTemplate[] = [
+  { name: "German Wake Word", language: "German", locale: "DE-DE", totalFiles: 200, sampleRate: 44100, bitDepth: 16, channels: 1, maxNoiseDb: -60, namingTemplate: "{locale}_{speaker}_S{index}_{task}_{speed}.wav" },
+  { name: "Italian TTS", language: "Italian", locale: "IT-IT", totalFiles: 300, sampleRate: 48000, bitDepth: 24, channels: 1, maxNoiseDb: -55, namingTemplate: "{locale}_{speaker}_S{index}_{task}_{speed}.wav" },
+  { name: "Arabic ASR", language: "Arabic", locale: "AR-EG", totalFiles: 500, sampleRate: 16000, bitDepth: 16, channels: 1, maxNoiseDb: -50, namingTemplate: "{locale}_{speaker}_S{index}_{task}_{speed}.wav" },
+  { name: "UK English Batch", language: "English", locale: "UK", totalFiles: 800, sampleRate: 44100, bitDepth: 16, channels: 1, maxNoiseDb: -60, namingTemplate: "{locale}_{speaker}_S{index}_{task}_{speed}.wav" }
+];
 const defaultConfig: ProjectConfig = {
   projectName: "German Wake Word",
   clientName: "Appen",
