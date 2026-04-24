@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./styles.css";
 
 type Tab = "dashboard" | "upload" | "qc" | "contributors" | "naming" | "export";
@@ -156,6 +156,13 @@ export default function App() {
   const [notes, setNotes] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveRef = useRef<HTMLCanvasElement | null>(null);
+
+useEffect(() => {
+  const buffer = (selected as any)?.buffer;
+  if (buffer) {
+    setTimeout(() => drawWave(buffer), 80);
+  }
+}, [selected]);
 
   const namingRows = useMemo(() => Array.from({ length: 200 }, (_, i) => expectedName(speaker, i + 1, speed)), [speaker, speed]);
   const validCount = records.filter(r => r.status === "Valid").length;
