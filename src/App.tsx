@@ -155,6 +155,9 @@ export default function App() {
   const [meter, setMeter] = useState(0);
   const [channelMode, setChannelMode] = useState<"mix" | "left" | "right">("mix");
   const [notes, setNotes] = useState("");
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [sessionDone, setSessionDone] = useState(0);
+  const [sessionTarget, setSessionTarget] = useState(50);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -250,12 +253,17 @@ setTimeout(() => drawWave(decoded), 120);
     requestAnimationFrame(animateMeter);
   }
 
-  function setDecision(decision: Decision) {
-    if (!selected) return;
-    const updated = { ...selected, decision };
-    setSelected(updated);
-    setRecords(old => old.map(r => r.id === selected.id ? updated : r));
-  }
+function setDecision(decision: Decision) {
+  if (!selected) return;
+
+  const updated = { ...selected, decision, notes };
+
+  setSelected(updated);
+  setRecords(old => old.map(r => r.id === selected.id ? updated : r));
+
+  setSessionDone(v => v + 1);
+  setCurrentIndex(v => v + 1);
+}  
 
   function downloadText(name: string, text: string, type = "text/plain") {
     const blob = new Blob([text], { type });
