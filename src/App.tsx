@@ -186,7 +186,17 @@ export default function App() {
     const decoded = await ctx.decodeAudioData(arr.slice(0));
     setAudioBuffer(decoded);
     const m = analyze(decoded, header.bitDepth || 0);
-    const enriched = { ...record, duration: m.duration, sampleRate: m.sampleRate, channels: m.channels, bitDepth: m.bitDepth || header.bitDepth, peakDb: m.peakDb, rmsDb: m.rmsDb, noiseDb: m.noiseDb, reason: record.status === "Invalid" ? record.reason : m.verdict };
+const enriched = {
+  ...record,
+  buffer: decoded,
+  duration: m.duration,
+  sampleRate: m.sampleRate,
+  channels: m.channels,
+  bitDepth: header.bitDepth || 0,
+  peakDb: m.peakDb,
+  rmsDb: m.rmsDb,
+  noiseDb: m.noiseDb,
+};
     setSelected(enriched);
     setRecords(old => old.map(r => r.id === record.id ? enriched : r));
     drawWave(decoded);
