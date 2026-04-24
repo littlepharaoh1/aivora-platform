@@ -263,9 +263,14 @@ function setDecision(decision: Decision) {
 
   setSessionDone(v => v + 1);
   setCurrentIndex(v => v + 1);
-}  
 
-  function downloadText(name: string, text: string, type = "text/plain") {
+const idx = records.findIndex(r => r.id === selected.id);
+const nextRecord = records[idx + 1];
+if (nextRecord) {
+  selectRecord(nextRecord);
+}
+}
+ function downloadText(name: string, text: string, type = "text/plain") {
     const blob = new Blob([text], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
