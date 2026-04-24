@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./styles.css";
 
-type Tab = "dashboard" | "upload" | "qc" | "contributors" | "naming" | "export";
+type Tab = "dashboard" | "upload" | "qc" | "contributors" | "naming" | "control" | "export";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type ProjectConfig = {
