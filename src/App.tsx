@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "./lib/supabase";
 import "./styles.css";
 
 type Tab = "dashboard" | "upload" | "qc" | "contributors" | "naming" | "control" | "export";
