@@ -198,6 +198,21 @@ useEffect(() => {
 }, [config]); 
  const [theme, setTheme] = useState<"dark" | "clean">("dark");
   const [tab, setTab] = useState<Tab>("dashboard");
+
+const [files, setFiles] = useState<any[]>([]);
+
+useEffect(() => {
+  const loadFiles = async () => {
+    const { data, error } = await supabase
+      .from("uploads")
+      .select("*")
+      .order("id", { ascending: true });
+
+    if (!error) setFiles(data || []);
+  };
+
+  loadFiles();
+}, []);
   const [speaker, setSpeaker] = useState("D0001");
   const [speed, setSpeed] = useState<Speed>("normal");
   const [records, setRecords] = useState<FileRecord[]>([]);
