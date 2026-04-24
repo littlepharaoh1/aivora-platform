@@ -1,319 +1,367 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./styles.css";
 
-type Tab = "dashboard" | "qc" | "naming" | "audio" | "exports" | "team" | "client";
-type Decision = "Pending" | "Approved" | "Review" | "Rejected";
+type Tab = "qc" | "naming" | "audio" | "export";
+type Speed = "slow" | "normal" | "fast";
 
-type AudioStats = {
-  fileName: string;
-  duration: number;
-  sampleRate: number;
-  channels: number;
-  bitDepth: number;
-  peakDb: number;
-  rmsDb: number;
-  noiseFloorDb: number;
-  verdict: string;
-  objectUrl: string;
-  bars: number[];
-};
-
-const germanPatterns = {
-  dkws: /^DE-DE_D\d{4}_S\d{4}_dkws_(slow|normal|fast)\.wav$/i,
-  recording: /^DE-DE_D\d{4}_S\d{4}_recording_(slow|normal|fast)\.wav$/i,
-  oneshot: /^DE-DE_D\d{4}_S\d{4}_oneshot\d+_(slow|normal|fast)\.wav$/i,
-};
+const speedMap = { slow: 0.75, normal: 1, fast: 1.25 };
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("qc");
-  const [stats, setStats] = useState<AudioStats | null>(null);
-  const [decision, setDecision] = useState<Decision>("Pending");
-  const [notes, setNotes] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
+  const [duration, setDuration] = useState(0);
+  const [sampleRate, setSampleRate] = useState(0);
+  const [channels, setChannels] = useState(0);
+  const [bitDepth, setBitDepth] = useState(0);
+  const [peakDb, setPeakDb] = useState(0);
+  const [rmsDb, setRmsDb] = useState(0);
+  const [noiseDb, setNoiseDb] = useState(0);
+  const [decision, setDecision] = useState("Pending");
+  const [speed, setSpeed] = useState<Speed>("normal");
   const [speaker, setSpeaker] = useState("D0001");
-  const [sentence, setSentence] = useState("S0001");
-  const [task, setTask] = useState<"dkws" | "recording" | "oneshot200">("dkws");
-  const [speed, setSpeed] = useState<"slow" | "normal" | "fast">("normal");
+  const [task, setTask] = useState("dkws");
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
 
-  const generatedName = useMemo(() => {
-    return task === "oneshot200"
-      ? `DE-DE_${speaker}_${sentence}_oneshot200_${speed}.wav`
-      : `DE-DE_${speaker}_${sentence}_${task}_${speed}.wav`;
-  }, [speaker, sentence, task, speed]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const meterRef = useRef<HTMLDivElement | null>(null);
+  const waveRef = useRef<HTMLCanvasElement | null>(null);
 
-  async function handleAudioUpload(file: File) {
-    const buffer = await file.arrayBuffer();
-    const result = analyzeWav(buffer, file.name);
-    const objectUrl = URL.createObjectURL(file);
-    setStats({ ...result, objectUrl });
+  const namingRows = useMemo(() => {
+    return Array.from({ length: 200 }, (_, i) => {
+      const sid = `S${String(i + 1).padStart(4, "0")}`;
+      return `DE-DE_${speaker}_${sid}_${task}_${speed}.wav`;
+    });
+  }, [speaker, task, speed]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = speedMap[speed];
+  }, [speed, audioUrl]);
+
+  async function loadAudio(file: File) {
+    const arrayBuffer = await file.arrayBuffer();
+    const ctx = new AudioContext();
+    const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    const wavInfo = parseWav(arrayBuffer);
+
+    const values = analyze(decoded);
+    const url = URL.createObjectURL(file);
+
+    setFileName(file.name);
+    setAudioUrl(url);
+    setAudioBuffer(decoded);
+    setDuration(decoded.duration);
+    setSampleRate(decoded.sampleRate);
+    setChannels(decoded.numberOfChannels);
+    setBitDepth(wavInfo.bitDepth || 32);
+    setPeakDb(values.peakDb);
+    setRmsDb(values.rmsDb);
+    setNoiseDb(values.noiseDb);
     setDecision("Pending");
+
+    setTimeout(() => drawWave(decoded), 50);
+  }
+
+  function startLiveMeter() {
+    const audio = audioRef.current;
+    if (!audio || !meterRef.current) return;
+
+    const ctx = new AudioContext();
+    const source = ctx.createMediaElementSource(audio);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    analyser.connect(ctx.destination);
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    function loop() {
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length;
+      const percent = Math.min(100, Math.max(4, avg / 2.2));
+      if (meterRef.current) meterRef.current.style.width = `${percent}%`;
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  }
+
+  function drawWave(buffer: AudioBuffer) {
+    const canvas = waveRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const data = buffer.getChannelData(0);
+    canvas.width = canvas.clientWidth * 2;
+    canvas.height = 220;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#35e6ff";
+    ctx.lineWidth = 2;
+
+    const step = Math.ceil(data.length / canvas.width);
+    const mid = canvas.height / 2;
+
+    ctx.beginPath();
+    for (let x = 0; x < canvas.width; x++) {
+      let min = 1;
+      let max = -1;
+      for (let j = 0; j < step; j++) {
+        const v = data[x * step + j] || 0;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      ctx.moveTo(x, mid + min * mid);
+      ctx.lineTo(x, mid + max * mid);
+    }
+    ctx.stroke();
+  }
+
+  async function downloadProcessed(mode: "normalize" | "silence") {
+    if (!audioBuffer) return alert("Upload WAV first");
+
+    let processed = audioBuffer;
+    if (mode === "normalize") processed = normalizeBuffer(audioBuffer);
+    if (mode === "silence") processed = addSilence(audioBuffer, 0.5, 0.5);
+
+    const wav = audioBufferToWav(processed);
+    const blob = new Blob([wav], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName.replace(".wav", `_${mode}.wav`);
+    a.click();
   }
 
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <img src="/logo.png" onError={(e) => ((e.currentTarget.style.display = "none"))} />
-          <div className="brandMark">AI</div>
+    <div className="shell">
+      <aside>
+        <div className="logoRow">
+          <img src="/logo.png" onError={(e) => (e.currentTarget.style.display = "none")} />
           <div>
             <h1>Aivora AI</h1>
             <p>AI · DATA · VISION</p>
           </div>
         </div>
 
-        {[
-          ["dashboard", "Dashboard"],
-          ["qc", "QC Audio Analyzer"],
-          ["naming", "German Naming"],
-          ["audio", "Audio Lab"],
-          ["exports", "Exports"],
-          ["team", "Team"],
-          ["client", "Client Portal"],
-        ].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id as Tab)} className={tab === id ? "nav active" : "nav"}>
-            {label}
-          </button>
-        ))}
+        <button className={tab === "qc" ? "active" : ""} onClick={() => setTab("qc")}>QC Workstation</button>
+        <button className={tab === "naming" ? "active" : ""} onClick={() => setTab("naming")}>German Naming 1–200</button>
+        <button className={tab === "audio" ? "active" : ""} onClick={() => setTab("audio")}>Audio Tools</button>
+        <button className={tab === "export" ? "active" : ""} onClick={() => setTab("export")}>Export Package</button>
       </aside>
 
-      <main className="main">
+      <main>
         <section className="hero">
-          <div>
-            <span>AIVORA AI · ENTERPRISE OPERATIONS</span>
-            <h2>German Recording QC Engine</h2>
-            <p>Real browser-based WAV playback, noise estimation, naming validation and reviewer decision control.</p>
-          </div>
+          <span>AIVORA AI · REAL QC ENGINE</span>
+          <h2>German Recording QC Workstation</h2>
+          <p>Live playback, waveform, live noise meter, German naming, reviewer decision, normalize, silence tools and WAV download.</p>
         </section>
 
-        {tab === "dashboard" && (
-          <section className="cards">
-            <Metric title="Current File" value={stats?.fileName || "No file"} />
-            <Metric title="Noise Floor" value={stats ? `${stats.noiseFloorDb.toFixed(1)} dB` : "-"} />
-            <Metric title="Peak Level" value={stats ? `${stats.peakDb.toFixed(1)} dB` : "-"} />
-            <Metric title="Decision" value={decision} />
-          </section>
-        )}
-
         {tab === "qc" && (
-          <section className="panel">
+          <section className="card">
             <h3>QC Audio Analyzer</h3>
-            <label className="uploadBox">
+
+            <label className="upload">
               Upload WAV Recording
-              <input
-                type="file"
-                accept=".wav,audio/wav,audio/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleAudioUpload(file);
-                }}
-              />
+              <input type="file" accept=".wav,audio/*" onChange={(e) => e.target.files?.[0] && loadAudio(e.target.files[0])} />
             </label>
 
-            {stats ? (
+            {audioUrl && (
               <>
-                <div className="fileName">{stats.fileName}</div>
-                <audio className="player" controls src={stats.objectUrl} />
+                <div className="filename">{fileName}</div>
 
-                <div className="meter">
-                  {stats.bars.map((b, i) => (
-                    <div key={i} className="bar" style={{ height: `${Math.max(8, b * 100)}%` }} />
-                  ))}
+                <audio ref={audioRef} src={audioUrl} controls onPlay={startLiveMeter} />
+
+                <div className="speedRow">
+                  <label>Playback Speed</label>
+                  <select value={speed} onChange={(e) => setSpeed(e.target.value as Speed)}>
+                    <option value="slow">Slow 0.75x</option>
+                    <option value="normal">Normal 1x</option>
+                    <option value="fast">Fast 1.25x</option>
+                  </select>
                 </div>
 
-                <div className="cards small">
-                  <Metric title="Duration" value={`${stats.duration.toFixed(2)}s`} />
-                  <Metric title="Sample Rate" value={`${stats.sampleRate} Hz`} />
-                  <Metric title="Channels" value={String(stats.channels)} />
-                  <Metric title="Bit Depth" value={`${stats.bitDepth}-bit`} />
-                  <Metric title="Peak" value={`${stats.peakDb.toFixed(1)} dBFS`} />
-                  <Metric title="RMS" value={`${stats.rmsDb.toFixed(1)} dBFS`} />
-                  <Metric title="Noise Floor" value={`${stats.noiseFloorDb.toFixed(1)} dBFS`} />
-                  <Metric title="Verdict" value={stats.verdict} />
+                <h4>Live Noise Meter</h4>
+                <div className="liveMeter"><div ref={meterRef}></div></div>
+
+                <h4>Waveform</h4>
+                <canvas ref={waveRef} className="wave" />
+
+                <div className="metrics">
+                  <Metric title="Duration" value={`${duration.toFixed(2)}s`} />
+                  <Metric title="Sample Rate" value={`${sampleRate} Hz`} />
+                  <Metric title="Channels" value={`${channels}`} />
+                  <Metric title="Bit Depth" value={`${bitDepth}-bit`} />
+                  <Metric title="Peak" value={`${peakDb.toFixed(1)} dBFS`} />
+                  <Metric title="RMS" value={`${rmsDb.toFixed(1)} dBFS`} />
+                  <Metric title="Noise Floor" value={`${noiseDb.toFixed(1)} dBFS`} />
+                  <Metric title="Verdict" value={noiseDb <= -60 ? "Excellent / Pass" : noiseDb <= -50 ? "Review" : "Reject Risk"} />
                 </div>
 
-                <div className="decision">
-                  <button onClick={() => setDecision("Approved")} className="approve">Approve</button>
-                  <button onClick={() => setDecision("Review")} className="review">Review</button>
-                  <button onClick={() => setDecision("Rejected")} className="reject">Reject</button>
+                <div className="decisions">
+                  <button className="ok" onClick={() => setDecision("Approved")}>Approve</button>
+                  <button className="warn" onClick={() => setDecision("Review")}>Review</button>
+                  <button className="bad" onClick={() => setDecision("Rejected")}>Reject</button>
+                  <strong>Decision: {decision}</strong>
                 </div>
 
-                <textarea placeholder="Reviewer notes..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+                <textarea placeholder="Reviewer notes..." />
               </>
-            ) : (
-              <div className="empty">Upload a WAV file to start playback and noise analysis.</div>
             )}
           </section>
         )}
 
         {tab === "naming" && (
-          <section className="panel">
-            <h3>German Project Naming Reference</h3>
-            <div className="formGrid">
-              <input value={speaker} onChange={(e) => setSpeaker(e.target.value.toUpperCase())} placeholder="D0001" />
-              <input value={sentence} onChange={(e) => setSentence(e.target.value.toUpperCase())} placeholder="S0001" />
-              <select value={task} onChange={(e) => setTask(e.target.value as any)}>
-                <option value="dkws">Wake Word / dkws</option>
-                <option value="recording">Recording</option>
-                <option value="oneshot200">One Shot 200</option>
+          <section className="card">
+            <h3>German Naming Reference — S0001 to S0200</h3>
+
+            <div className="grid4">
+              <input value={speaker} onChange={(e) => setSpeaker(e.target.value.toUpperCase())} />
+              <select value={task} onChange={(e) => setTask(e.target.value)}>
+                <option value="dkws">dkws</option>
+                <option value="recording">recording</option>
+                <option value="oneshot200">oneshot200</option>
               </select>
-              <select value={speed} onChange={(e) => setSpeed(e.target.value as any)}>
+              <select value={speed} onChange={(e) => setSpeed(e.target.value as Speed)}>
                 <option value="slow">slow</option>
                 <option value="normal">normal</option>
                 <option value="fast">fast</option>
               </select>
+              <button onClick={() => navigator.clipboard.writeText(namingRows.join("\n"))}>Copy 200 Names</button>
             </div>
 
-            <div className="generated">{generatedName}</div>
-            <div className="valid">Approved German naming format</div>
-
-            <div className="rules">
-              <h4>Accepted German Naming Rules</h4>
-              <p>Wake Word: DE-DE_D0001_S0001_dkws_slow.wav</p>
-              <p>Recording: DE-DE_D0001_S0001_recording_normal.wav</p>
-              <p>One Shot: DE-DE_D0001_S0001_oneshot200_fast.wav</p>
-              <p>Speaker ID must be D + 4 digits. Sentence ID must be S + 4 digits.</p>
+            <div className="table">
+              {namingRows.map((name, i) => (
+                <div className="row" key={name}>
+                  <span>{i + 1}</span>
+                  <code>{name}</code>
+                </div>
+              ))}
             </div>
           </section>
         )}
 
         {tab === "audio" && (
-          <section className="panel">
-            <h3>Audio Lab</h3>
-            <p>Use QC Analyzer first. Current browser version analyzes and validates audio locally without uploading to a server.</p>
-            <p>Next real backend step: server-side WAV conversion, ZIP export and permanent storage.</p>
+          <section className="card">
+            <h3>Audio Tools</h3>
+            <button onClick={() => downloadProcessed("normalize")}>Normalize + Download WAV</button>
+            <button onClick={() => downloadProcessed("silence")}>Add 0.5s Silence Before/After + Download WAV</button>
+            <p>الملف بعد التحويل ينزل مباشرة في Downloads على جهازك.</p>
           </section>
         )}
 
-        {tab === "exports" && <Panel title="Exports" text="Prepare approved WAV files, metadata sheet and client delivery package." />}
-        {tab === "team" && <Panel title="Team" text="Zakaria Ahmed — Founder. Hanan Youssef — Operations Manager. QA Team — Review / Approve / Reject." />}
-        {tab === "client" && <Panel title="Client Portal" text="Client read-only progress view for German Recording Batch 01." />}
+        {tab === "export" && (
+          <section className="card">
+            <h3>Export Package</h3>
+            <p>Approved WAV + German naming sheet + reviewer notes + QC metrics.</p>
+            <button onClick={() => navigator.clipboard.writeText(namingRows.join("\n"))}>Copy Naming Sheet</button>
+          </section>
+        )}
       </main>
     </div>
   );
 }
 
 function Metric({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="metric">
-      <span>{title}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+  return <div className="metric"><span>{title}</span><strong>{value}</strong></div>;
 }
 
-function Panel({ title, text }: { title: string; text: string }) {
-  return (
-    <section className="panel">
-      <h3>{title}</h3>
-      <p>{text}</p>
-    </section>
-  );
-}
-
-function analyzeWav(buffer: ArrayBuffer, fileName: string): Omit<AudioStats, "objectUrl"> {
+function parseWav(buffer: ArrayBuffer) {
   const view = new DataView(buffer);
   let offset = 12;
-  let channels = 1;
-  let sampleRate = 48000;
-  let bitDepth = 16;
-  let audioFormat = 1;
-  let dataOffset = 0;
-  let dataSize = 0;
-
+  let bitDepth = 0;
   while (offset < view.byteLength - 8) {
     const id = readStr(view, offset, 4);
     const size = view.getUint32(offset + 4, true);
-    if (id === "fmt ") {
-      audioFormat = view.getUint16(offset + 8, true);
-      channels = view.getUint16(offset + 10, true);
-      sampleRate = view.getUint32(offset + 12, true);
-      bitDepth = view.getUint16(offset + 22, true);
-    }
-    if (id === "data") {
-      dataOffset = offset + 8;
-      dataSize = size;
-      break;
-    }
+    if (id === "fmt ") bitDepth = view.getUint16(offset + 22, true);
     offset += 8 + size + (size % 2);
   }
-
-  if (!dataOffset || !dataSize) {
-    throw new Error("Invalid WAV file: data chunk not found.");
-  }
-
-  const bytesPerSample = bitDepth / 8;
-  const totalSamples = Math.floor(dataSize / bytesPerSample);
-  const frames = Math.floor(totalSamples / channels);
-  const samples: number[] = [];
-
-  for (let i = 0; i < frames; i++) {
-    let sum = 0;
-    for (let ch = 0; ch < channels; ch++) {
-      const pos = dataOffset + (i * channels + ch) * bytesPerSample;
-      sum += readSample(view, pos, bitDepth, audioFormat);
-    }
-    samples.push(sum / channels);
-  }
-
-  let peak = 0;
-  let totalSq = 0;
-  for (const s of samples) {
-    const a = Math.abs(s);
-    if (a > peak) peak = a;
-    totalSq += s * s;
-  }
-
-  const rms = Math.sqrt(totalSq / Math.max(1, samples.length));
-  const blockSize = Math.max(256, Math.floor(sampleRate * 0.05));
-  const blockRms: number[] = [];
-
-  for (let i = 0; i < samples.length; i += blockSize) {
-    const block = samples.slice(i, i + blockSize);
-    const value = Math.sqrt(block.reduce((a, b) => a + b * b, 0) / Math.max(1, block.length));
-    blockRms.push(value);
-  }
-
-  const sorted = [...blockRms].sort((a, b) => a - b);
-  const quietCount = Math.max(1, Math.floor(sorted.length * 0.15));
-  const noise = sorted.slice(0, quietCount).reduce((a, b) => a + b, 0) / quietCount;
-
-  const bars = blockRms.slice(0, 80).map((v) => Math.min(1, v * 18));
-  const noiseDb = toDb(noise);
-  const verdict =
-    noiseDb <= -60 ? "Excellent / Pass" :
-    noiseDb <= -50 ? "Good / Review recommended" :
-    "High Noise / Reject risk";
-
-  return {
-    fileName,
-    duration: frames / sampleRate,
-    sampleRate,
-    channels,
-    bitDepth,
-    peakDb: toDb(peak),
-    rmsDb: toDb(rms),
-    noiseFloorDb: noiseDb,
-    verdict,
-    bars,
-  };
+  return { bitDepth };
 }
 
-function readSample(view: DataView, pos: number, bitDepth: number, format: number) {
-  if (format === 3 && bitDepth === 32) return view.getFloat32(pos, true);
-  if (bitDepth === 8) return (view.getUint8(pos) - 128) / 128;
-  if (bitDepth === 16) return view.getInt16(pos, true) / 32768;
-  if (bitDepth === 24) {
-    let v = view.getUint8(pos) | (view.getUint8(pos + 1) << 8) | (view.getUint8(pos + 2) << 16);
-    if (v & 0x800000) v |= 0xff000000;
-    return v / 8388608;
+function analyze(buffer: AudioBuffer) {
+  const data = buffer.getChannelData(0);
+  let peak = 0, sq = 0;
+  for (const s of data) {
+    const a = Math.abs(s);
+    if (a > peak) peak = a;
+    sq += s * s;
   }
-  if (bitDepth === 32) return view.getInt32(pos, true) / 2147483648;
-  return 0;
+  const rms = Math.sqrt(sq / data.length);
+  const block = Math.floor(buffer.sampleRate * 0.05);
+  const blocks:number[] = [];
+  for (let i = 0; i < data.length; i += block) {
+    let b = 0;
+    for (let j = i; j < Math.min(i + block, data.length); j++) b += data[j] * data[j];
+    blocks.push(Math.sqrt(b / block));
+  }
+  blocks.sort((a,b)=>a-b);
+  const noise = blocks.slice(0, Math.max(1, Math.floor(blocks.length * .15))).reduce((a,b)=>a+b,0) / Math.max(1, Math.floor(blocks.length * .15));
+  return { peakDb: db(peak), rmsDb: db(rms), noiseDb: db(noise) };
+}
+
+function normalizeBuffer(buffer: AudioBuffer) {
+  const ctx = new AudioContext();
+  const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+  let peak = 0;
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const d = buffer.getChannelData(c);
+    for (const s of d) peak = Math.max(peak, Math.abs(s));
+  }
+  const gain = peak ? 0.95 / peak : 1;
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const input = buffer.getChannelData(c);
+    const output = out.getChannelData(c);
+    for (let i = 0; i < input.length; i++) output[i] = input[i] * gain;
+  }
+  return out;
+}
+
+function addSilence(buffer: AudioBuffer, before: number, after: number) {
+  const ctx = new AudioContext();
+  const beforeFrames = Math.floor(before * buffer.sampleRate);
+  const afterFrames = Math.floor(after * buffer.sampleRate);
+  const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length + beforeFrames + afterFrames, buffer.sampleRate);
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    out.getChannelData(c).set(buffer.getChannelData(c), beforeFrames);
+  }
+  return out;
+}
+
+function audioBufferToWav(buffer: AudioBuffer) {
+  const channels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const length = buffer.length * channels * 2 + 44;
+  const array = new ArrayBuffer(length);
+  const view = new DataView(array);
+  writeStr(view, 0, "RIFF");
+  view.setUint32(4, length - 8, true);
+  writeStr(view, 8, "WAVE");
+  writeStr(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * channels * 2, true);
+  view.setUint16(32, channels * 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(view, 36, "data");
+  view.setUint32(40, length - 44, true);
+  let offset = 44;
+  for (let i = 0; i < buffer.length; i++) {
+    for (let c = 0; c < channels; c++) {
+      const s = Math.max(-1, Math.min(1, buffer.getChannelData(c)[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      offset += 2;
+    }
+  }
+  return array;
 }
 
 function readStr(view: DataView, offset: number, len: number) {
   return Array.from({ length: len }, (_, i) => String.fromCharCode(view.getUint8(offset + i))).join("");
 }
-
-function toDb(v: number) {
-  return 20 * Math.log10(Math.max(v, 1e-9));
+function writeStr(view: DataView, offset: number, str: string) {
+  for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
 }
+function db(v:number){ return 20 * Math.log10(Math.max(v, 1e-9)); }
