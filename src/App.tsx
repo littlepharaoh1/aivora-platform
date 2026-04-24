@@ -162,7 +162,7 @@ useEffect(() => {
   if (buffer) {
     setTimeout(() => drawWave(buffer), 80);
   }
-}, [selected]);
+}, [selected, tab, audioBuffer]);
 
   const namingRows = useMemo(() => Array.from({ length: 200 }, (_, i) => expectedName(speaker, i + 1, speed)), [speaker, speed]);
   const validCount = records.filter(r => r.status === "Valid").length;
