@@ -4,7 +4,21 @@ import "./styles.css";
 type Tab = "dashboard" | "upload" | "qc" | "contributors" | "naming" | "export";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
-
+type ProjectConfig = {
+  projectName: string;
+  clientName: string;
+  language: string;
+  locale: string;
+  totalFiles: number;
+  sampleRate: number;
+  bitDepth: number;
+  channels: number;
+  minDuration: number;
+  maxDuration: number;
+  maxNoiseDb: number;
+  namingTemplate: string;
+  deadline: string;
+};
 type FileRecord = {
   id: string;
   fileName: string;
@@ -20,7 +34,21 @@ type FileRecord = {
   rmsDb?: number;
   noiseDb?: number;
 };
-
+const defaultConfig: ProjectConfig = {
+  projectName: "German Wake Word",
+  clientName: "Appen",
+  language: "German",
+  locale: "DE-DE",
+  totalFiles: 200,
+  sampleRate: 44100,
+  bitDepth: 16,
+  channels: 1,
+  minDuration: 1,
+  maxDuration: 10,
+  maxNoiseDb: -60,
+  namingTemplate: "{locale}_{speaker}_S{index}_{task}_{speed}.wav",
+  deadline: "2026-05-30"
+};
 function expectedTask(index: number) {
   if (index <= 120) return "dkws";
   if (index <= 160) return "oneshot200";
@@ -144,6 +172,7 @@ function Metric({ label, value, tone = "" }: { label: string; value: React.React
 }
 
 export default function App() {
+  const [config, setConfig] = useState<ProjectConfig>(defaultConfig);
   const [theme, setTheme] = useState<"dark" | "clean">("dark");
   const [tab, setTab] = useState<Tab>("dashboard");
   const [speaker, setSpeaker] = useState("D0001");
@@ -157,7 +186,7 @@ export default function App() {
   const [notes, setNotes] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [sessionDone, setSessionDone] = useState(0);
-  const [sessionTarget, setSessionTarget] = useState(50);
+  const [sessionTarget, setSessionTarget] = useState(Math.min(50, config.totalFiles));
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -168,7 +197,7 @@ useEffect(() => {
   }
 }, [selected, tab, audioBuffer]);
 
-  const namingRows = useMemo(() => Array.from({ length: 200 }, (_, i) => expectedName(speaker, i + 1, speed)), [speaker, speed]);
+  const namingRows = useMemo(() => Array.from({ length: config.totalFiles }, (_, i) => expectedName(speaker, i + 1, speed)), [speaker, speed]);
   const validCount = records.filter(r => r.status === "Valid").length;
   const approved = records.filter(r => r.decision === "Approved").length;
   const review = records.filter(r => r.decision === "Review" || r.status === "Invalid").length;
