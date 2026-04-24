@@ -170,7 +170,10 @@ useEffect(() => {
   const approved = records.filter(r => r.decision === "Approved").length;
   const review = records.filter(r => r.decision === "Review" || r.status === "Invalid").length;
   const rejected = records.filter(r => r.decision === "Rejected").length;
-
+  const total = records.length;
+  const reviewedCount = approved + rejected + review;
+  const remaining = total - reviewedCount;
+  const progress = total ? Math.round((reviewedCount / total) * 100) : 0;
   async function handleUpload(files: FileList | null) {
     if (!files?.length) return;
     const next: FileRecord[] = Array.from(files).map((file, i) => {
