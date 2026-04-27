@@ -637,7 +637,7 @@ export default function App() {
         {tab === "dashboard" && (
           <>
             <section className="metrics">
-              <Metric label="Project Target" value="200" />
+<Metric label="Project Target" value={config.totalFiles} />
               <Metric label="Uploaded" value={records.length} />
               <Metric label="Valid Naming" value={validCount} tone="good" />
               <Metric label="Approved" value={approved} tone="good" />
