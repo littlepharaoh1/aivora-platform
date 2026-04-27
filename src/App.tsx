@@ -9,7 +9,8 @@ type Tab =
   | "contributors"
   | "naming"
   | "control"
-  | "export";
+  | "export"
+  | "rooms";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
@@ -590,6 +591,7 @@ export default function App() {
     ["naming", "German Naming 1–200"],
     ["control", "Control Center"],
     ["export", "Export Package"],
+["rooms", "Conversation Rooms"],
   ];
 
   return (
@@ -1101,6 +1103,32 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
               </button>
             </div>
           </section>
+)}
+{tab === "rooms" && (
+  <section className="panel">
+    <div className="panelHead">
+      <h2>Conversation Rooms</h2>
+      <p>Studio-grade two-speaker conversation capture and merge control.</p>
+    </div>
+
+    <div className="ruleGrid">
+      <div>Room Mode: Two Speakers</div>
+      <div>Speaker A: Left Channel</div>
+      <div>Speaker B: Right Channel</div>
+      <div>Format Target: WAV Stereo</div>
+      <div>Quality: Noise / Clipping / Silence Check</div>
+      <div>Merge: Professional Dual-Channel Export</div>
+      <div>Status: Room Draft</div>
+      <div>Next Step: Live Recorder + Auto Merge</div>
+    </div>
+
+    <div className="actions compact">
+      <button>+ Create Room</button>
+      <button>Import Speaker A</button>
+      <button>Import Speaker B</button>
+      <button>Export Merged WAV</button>
+    </div>
+  </section>
         )}
       </main>
     </div>
