@@ -649,7 +649,7 @@ export default function App() {
               <div className="ruleGrid">
 <div>Language: {config.language}</div>
 <div>Locale: {config.locale}</div>
-                <div>Target: 200 files</div>
+<div>Target: {config.totalFiles} files</div>
                 <div>Format target: 48 kHz / 32-bit float WAV</div>
                 <div>S0001–S0120 dkws</div>
                 <div>S0121–S0160 oneshot200</div>
