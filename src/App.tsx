@@ -237,6 +237,29 @@ useEffect(() => {
 useEffect(() => {
   localStorage.setItem("aivoraRecords", JSON.stringify(records));
 }, [records]);  
+useEffect(() => {
+  const loadRecords = async () => {
+    const { data, error } = await supabase
+      .from("audio_files")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      const mapped = data.map((row: any) => ({
+        id: row.id,
+        fileName: row.file_name,
+status: "Valid" as const,
+        decision: row.decision || "Pending",
+        reviewer: row.reviewer || "",
+reason: row.reason || "",
+        notes: row.notes || ""
+      }));
+      setRecords(mapped);
+    }
+  };
+
+  loadRecords();
+}, []);
 const [selected, setSelected] = useState<FileRecord | null>(null);
   const [audioUrl, setAudioUrl] = useState("");
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
