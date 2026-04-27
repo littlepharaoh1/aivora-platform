@@ -199,6 +199,19 @@ useEffect(() => {
  const [theme, setTheme] = useState<"dark" | "clean">("dark");
   const [tab, setTab] = useState<Tab>("dashboard");
 
+const [dbProjects, setDbProjects] = useState<any[]>([]);
+useEffect(() => {
+  const loadProjects = async () => {
+    const { data } = await supabase
+      .from("project_templates")
+      .select("*")
+      .order("category");
+
+    if (data) setDbProjects(data);
+  };
+
+  loadProjects();
+}, []);
 const [files, setFiles] = useState<any[]>([]);
 
 useEffect(() => {
@@ -427,7 +440,7 @@ if (nextRecord) {
       {tab==="naming" && <section className="panel"><div className="panelHead"><h2>German Naming Reference — S0001 to S0200</h2><div className="actions compact"><button onClick={()=>navigator.clipboard.writeText(namingRows.join("\n"))}>Copy 200 Names</button><button onClick={()=>downloadText("german_naming_1_200.txt", namingRows.join("\n"))}>Download TXT</button></div></div><div className="formGrid"><input value={speaker} onChange={e=>setSpeaker(e.target.value.toUpperCase())}/><select value={speed} onChange={e=>setSpeed(e.target.value as Speed)}><option value="slow">slow</option><option value="normal">normal</option><option value="fast">fast</option></select><span>S0001–S0120 dkws · S0121–S0160 oneshot200 · S0161–S0200 query</span></div><div className="nameTable">{namingRows.map((name,i)=><div className="nameRow" key={name}><span>{i+1}</span><code>{name}</code></div>)}</div></section>}
 
       
-{tab==="control" && <section className="panel"><div className="panelHead"><h2>Control Center</h2><p>Editable Project Configuration</p></div><div className="ruleGrid"><select className="input" onChange={e=>{const t=projectTemplates.find(p=>p.name===e.target.value);if(t)setConfig({...config,projectName:t.name,language:t.language,locale:t.locale,totalFiles:t.totalFiles,sampleRate:t.sampleRate,bitDepth:t.bitDepth,channels:t.channels,maxNoiseDb:t.maxNoiseDb,namingTemplate:t.namingTemplate});}}><option>Select Project Template</option>{projectTemplates.map(t=><option key={t.name} value={t.name}>{t.name}</option>)}</select>
+{tab==="control" && <section className="panel"><div className="panelHead"><h2>Control Center</h2><p>Editable Project Configuration</p></div><div className="ruleGrid"><select className="input" onChange={e=>{const t=[...dbProjects, ...projectTemplates].find(p=>p.name===e.target.value);if(t)setConfig({...config,projectName:t.name,language:t.language,locale:t.locale,totalFiles:t.totalFiles,sampleRate:t.sampleRate,bitDepth:t.bitDepth,channels:t.channels,maxNoiseDb:t.maxNoiseDb,namingTemplate:t.namingTemplate});}}><option>Select Project Template</option>{[...dbProjects, ...projectTemplates].map(t=><option key={t.name} value={t.name}>{t.name}</option>)}</select>
 <input className="input" value={config.projectName} onChange={e=>setConfig({...config,projectName:e.target.value})}/><input className="input" value={config.clientName} onChange={e=>setConfig({...config,clientName:e.target.value})}/><input className="input" value={config.language} onChange={e=>setConfig({...config,language:e.target.value})}/><input className="input" value={config.locale} onChange={e=>setConfig({...config,locale:e.target.value})}/><input className="input" type="number" value={config.totalFiles} onChange={e=>setConfig({...config,totalFiles:Number(e.target.value)})}/><input className="input" type="number" value={config.sampleRate} onChange={e=>setConfig({...config,sampleRate:Number(e.target.value)})}/><input className="input" type="number" value={config.bitDepth} onChange={e=>setConfig({...config,bitDepth:Number(e.target.value)})}/><input className="input" type="number" value={config.channels} onChange={e=>setConfig({...config,channels:Number(e.target.value)})}/><input className="input" type="number" value={config.maxNoiseDb} onChange={e=>setConfig({...config,maxNoiseDb:Number(e.target.value)})}/><input className="input" type="date" value={config.deadline} onChange={e=>setConfig({...config,deadline:e.target.value})}/></div></section>}
       
       {tab==="export" && <section className="panel"><h2>Export Package</h2><p>Export QC report, naming sheet, and reviewer decisions for client delivery.</p><div className="actions"><button className="primary" onClick={()=>downloadText("aivora_qc_report.csv", csv(), "text/csv")}>Download QC CSV</button><button onClick={()=>downloadText("german_naming_1_200.txt", namingRows.join("\n"))}>Download Naming Sheet</button><button onClick={()=>downloadProcessed("normalize")}>Download Normalized 32-bit WAV</button><button onClick={()=>downloadProcessed("silence")}>Download +0.5s Silence 32-bit WAV</button></div></section>}
