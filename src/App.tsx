@@ -276,6 +276,14 @@ async function saveDecision(value: Decision) {
     .from("audio_files")
     .update({ decision: value })
     .eq("file_name", selected.fileName);
+await supabase
+  .from("qc_reviews")
+  .insert({
+    file_name: selected.fileName,
+    decision: value,
+    reviewer_name: "Zakaria Ahmed",
+    notes: notes || "",
+  });
 
   setRecords(old =>
     old.map(r =>
