@@ -616,7 +616,7 @@ export default function App() {
         <header className="hero">
           <div>
             <p>AIVORA OPS PLATFORM · REAL REVIEW WORKSTATION</p>
-            <h2>German Recording Batch 01</h2>
+<h2>{config.projectName}</h2>
             <span>
               Upload, validate, review, analyze audio, export reports, and
               control German naming from S0001 to S0200.
