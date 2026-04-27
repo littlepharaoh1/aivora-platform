@@ -229,7 +229,15 @@ useEffect(() => {
   const [speaker, setSpeaker] = useState("D0001");
   const [speed, setSpeed] = useState<Speed>("normal");
   const [records, setRecords] = useState<FileRecord[]>([]);
-  const [selected, setSelected] = useState<FileRecord | null>(null);
+useEffect(() => {
+  const saved = localStorage.getItem("aivoraRecords");
+  if (saved) setRecords(JSON.parse(saved));
+}, []);
+
+useEffect(() => {
+  localStorage.setItem("aivoraRecords", JSON.stringify(records));
+}, [records]);  
+const [selected, setSelected] = useState<FileRecord | null>(null);
   const [audioUrl, setAudioUrl] = useState("");
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [meter, setMeter] = useState(0);
