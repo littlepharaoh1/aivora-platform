@@ -39,6 +39,9 @@ type ProjectConfig = {
   maxNoiseDb: number;
   namingTemplate: string;
   deadline: string;
+rule1: string;
+rule2: string;
+rule3: string;
 };
 type FileRecord = {
   id: string;
@@ -115,6 +118,9 @@ const defaultConfig: ProjectConfig = {
   maxNoiseDb: -60,
   namingTemplate: "{locale}_{speaker}_S{index}_{task}_{speed}.wav",
   deadline: "2026-05-30",
+rule1: "S0001–S0120 dkws",
+rule2: "S0121–S0160 oneshot200",
+rule3: "S0161–S0200 query",
 };
 function expectedTask(index: number) {
   if (index <= 120) return "dkws";
