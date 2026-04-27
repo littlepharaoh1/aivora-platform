@@ -648,7 +648,7 @@ export default function App() {
               <h2>Project Rules</h2>
               <div className="ruleGrid">
 <div>Language: {config.language}</div>
-                <div>Locale: DE-DE</div>
+<div>Locale: {config.locale}</div>
                 <div>Target: 200 files</div>
                 <div>Format target: 48 kHz / 32-bit float WAV</div>
                 <div>S0001–S0120 dkws</div>
