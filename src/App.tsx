@@ -657,9 +657,9 @@ export default function App() {
 <div>Locale: {config.locale}</div>
 <div>Target: {config.totalFiles} files</div>
                 <div>Format target: 48 kHz / 32-bit float WAV</div>
-<div>{config.rule1}</div>
-<div>{config.rule2}</div>
-<div>{config.rule3}</div>
+<div>{config.rule1 || "S0001–S0120 dkws"}</div>
+<div>{config.rule2 || "S0121–S0160 oneshot200"}</div>
+<div>{config.rule3 || "S0161–S0200 query"}</div>
                 <div>Deadline: 2026-05-05</div>
               </div>
             </section>
