@@ -1,1 +1,16 @@
-{"projectId":"prj_tKpON67lvLsTsR0WeVKGHkVdvU37","orgId":"team_03zrIiD6KnTGkrxlh6tg04tO","projectName":"aivora-platform"}
+{
+  "projectId": "prj_03fZdfAv6JsPbjWAZ7ozqxw8V9Ku",
+  "orgId": "team_03zrIiD6KnTGkrxlh6tg04tO",
+  "projectName": "aivora-internal-test-build",
+  "settings": {
+    "createdAt": 1777084709005,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}
