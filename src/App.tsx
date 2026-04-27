@@ -975,6 +975,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
                   </option>
                 ))}
               </select>
+<label>Project Name</label>
               <input
                 className="input"
                 value={config.projectName}
@@ -982,6 +983,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
                   setConfig({ ...config, projectName: e.target.value })
                 }
               />
+<label>Client Name</label>
               <input
                 className="input"
                 value={config.clientName}
@@ -989,21 +991,24 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
                   setConfig({ ...config, clientName: e.target.value })
                 }
               />
-              <input
+<label>Language</label>      
+        <input
                 className="input"
                 value={config.language}
                 onChange={(e) =>
                   setConfig({ ...config, language: e.target.value })
                 }
               />
-              <input
+<label>Locale</label>          
+    <input
                 className="input"
                 value={config.locale}
                 onChange={(e) =>
                   setConfig({ ...config, locale: e.target.value })
                 }
               />
-              <input
+<label>Total Files</label>             
+ <input
                 className="input"
                 type="number"
                 value={config.totalFiles}
@@ -1011,7 +1016,8 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
                   setConfig({ ...config, totalFiles: Number(e.target.value) })
                 }
               />
-              <input
+<label>Sample Rate</label>          
+    <input
                 className="input"
                 type="number"
                 value={config.sampleRate}
@@ -1019,6 +1025,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
                   setConfig({ ...config, sampleRate: Number(e.target.value) })
                 }
               />
+<label>Bit Depth</label>
               <input
                 className="input"
                 type="number"
@@ -1027,7 +1034,8 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
                   setConfig({ ...config, bitDepth: Number(e.target.value) })
                 }
               />
-              <input
+<label>Channels</label>           
+   <input
                 className="input"
                 type="number"
                 value={config.channels}
@@ -1035,6 +1043,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
                   setConfig({ ...config, channels: Number(e.target.value) })
                 }
               />
+<label>Max Noise dB</label>
               <input
                 className="input"
                 type="number"
