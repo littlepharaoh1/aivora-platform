@@ -651,42 +651,75 @@ const mergeRoomFiles = async () => {
   const a = await ctx.decodeAudioData(aBuf.slice(0));
   const b = await ctx.decodeAudioData(bBuf.slice(0));
 
-  const getTrimStart = (buf: AudioBuffer) => {
+  const threshold = 0.018;
+  const holdSamples = Math.floor(a.sampleRate * 0.35);
+  const gapSamples = Math.floor(a.sampleRate * 0.35);
+
+  const getSpeechSegments = (buf: AudioBuffer) => {
     const data = buf.getChannelData(0);
+    const segments: { start: number; end: number }[] = [];
+    let inSpeech = false;
+    let start = 0;
+    let lastVoice = 0;
+
     for (let i = 0; i < data.length; i++) {
-      if (Math.abs(data[i]) > 0.02) return i;
+      if (Math.abs(data[i]) > threshold) {
+        if (!inSpeech) {
+          inSpeech = true;
+          start = Math.max(0, i - Math.floor(buf.sampleRate * 0.08));
+        }
+        lastVoice = i;
+      }
+
+      if (inSpeech && i - lastVoice > holdSamples) {
+        segments.push({
+          start,
+          end: Math.min(data.length, lastVoice + Math.floor(buf.sampleRate * 0.12)),
+        });
+        inSpeech = false;
+      }
     }
-    return 0;
+
+    if (inSpeech) {
+      segments.push({ start, end: data.length });
+    }
+
+    return segments.filter((x) => x.end - x.start > Math.floor(buf.sampleRate * 0.25));
   };
 
-  const startA = getTrimStart(a);
-  const startB = getTrimStart(b);
+  const turns = [
+    ...getSpeechSegments(a).map((x) => ({ ...x, speaker: "A" as const, buffer: a })),
+    ...getSpeechSegments(b).map((x) => ({ ...x, speaker: "B" as const, buffer: b })),
+  ].sort((x, y) => x.start - y.start);
 
-  const lenA = a.length - startA;
-  const lenB = b.length - startB;
+  const totalLength = Math.max(
+    1,
+    turns.reduce((sum, t) => sum + (t.end - t.start) + gapSamples, 0)
+  );
 
-  const length = Math.max(lenA, lenB);
-  const rate = a.sampleRate;
-
-  const out = ctx.createBuffer(2, length, rate);
-
+  const out = ctx.createBuffer(2, totalLength, a.sampleRate);
   const left = out.getChannelData(0);
   const right = out.getChannelData(1);
 
-  const dataA = a.getChannelData(0);
-  const dataB = b.getChannelData(0);
+  let cursor = 0;
 
-  for (let i = 0; i < length; i++) {
-    let sa = i < lenA ? dataA[i + startA] : 0;
-    let sb = i < lenB ? dataB[i + startB] : 0;
+  for (const t of turns) {
+    const src = t.buffer.getChannelData(0);
+    const duration = t.end - t.start;
 
-    if (Math.abs(sa) > 0.05 && Math.abs(sb) > 0.05) {
-      sa *= 0.75;
-      sb *= 0.75;
+    for (let i = 0; i < duration && cursor + i < totalLength; i++) {
+      const sample = Math.max(-1, Math.min(1, src[t.start + i] * 0.92));
+
+      if (t.speaker === "A") {
+        left[cursor + i] = sample;
+        right[cursor + i] = sample * 0.18;
+      } else {
+        right[cursor + i] = sample;
+        left[cursor + i] = sample * 0.18;
+      }
     }
 
-    left[i] = sa;
-    right[i] = sb;
+    cursor += duration + gapSamples;
   }
 
   const wav = audioBufferToWav(out);
@@ -695,7 +728,7 @@ const mergeRoomFiles = async () => {
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = "conversation_room_v3.wav";
+  link.download = "conversation_room_v4_turn_based.wav";
   link.click();
 
   URL.revokeObjectURL(url);
