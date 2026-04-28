@@ -1253,7 +1253,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
 {tab === "rooms" && (
   <section className="panel">
     <div className="panelHead">
-      <h2>Conversation Rooms V2</h2>
+    <h2>Conversation Rooms V6 Smart Dialogue</h2>
       <p>Studio-grade dual speaker import, validation, and stereo merge.</p>
     </div>
 
