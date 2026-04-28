@@ -651,7 +651,21 @@ const mergeRoomFiles = async () => {
   const a = await ctx.decodeAudioData(aBuf.slice(0));
   const b = await ctx.decodeAudioData(bBuf.slice(0));
 
-  const length = Math.max(a.length, b.length);
+  const getTrimStart = (buf: AudioBuffer) => {
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      if (Math.abs(data[i]) > 0.02) return i;
+    }
+    return 0;
+  };
+
+  const startA = getTrimStart(a);
+  const startB = getTrimStart(b);
+
+  const lenA = a.length - startA;
+  const lenB = b.length - startB;
+
+  const length = Math.max(lenA, lenB);
   const rate = a.sampleRate;
 
   const out = ctx.createBuffer(2, length, rate);
@@ -659,8 +673,21 @@ const mergeRoomFiles = async () => {
   const left = out.getChannelData(0);
   const right = out.getChannelData(1);
 
-  left.set(a.getChannelData(0).slice(0, length));
-  right.set(b.getChannelData(0).slice(0, length));
+  const dataA = a.getChannelData(0);
+  const dataB = b.getChannelData(0);
+
+  for (let i = 0; i < length; i++) {
+    let sa = i < lenA ? dataA[i + startA] : 0;
+    let sb = i < lenB ? dataB[i + startB] : 0;
+
+    if (Math.abs(sa) > 0.05 && Math.abs(sb) > 0.05) {
+      sa *= 0.75;
+      sb *= 0.75;
+    }
+
+    left[i] = sa;
+    right[i] = sb;
+  }
 
   const wav = audioBufferToWav(out);
   const blob = new Blob([wav], { type: "audio/wav" });
@@ -668,7 +695,7 @@ const mergeRoomFiles = async () => {
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = "conversation_room_stereo.wav";
+  link.download = "conversation_room_v3.wav";
   link.click();
 
   URL.revokeObjectURL(url);
