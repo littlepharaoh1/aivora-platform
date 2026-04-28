@@ -374,7 +374,11 @@ export default function App() {
   const [sessionDone, setSessionDone] = useState(0);
   const [sessionTarget, setSessionTarget] = useState(
     Math.min(50, config.totalFiles),
-  );
+);
+const [roomFileA, setRoomFileA] = useState<File | null>(null);
+const [roomFileB, setRoomFileB] = useState<File | null>(null);
+const roomReady = !!roomFileA && !!roomFileB;
+ 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -593,6 +597,88 @@ export default function App() {
     ["export", "Export Package"],
 ["rooms", "Conversation Rooms"],
   ];
+const roomStatus = roomReady
+  ? "Ready for professional stereo merge"
+  : "Waiting for Speaker A and Speaker B files";
+
+const audioBufferToWav = (buffer: AudioBuffer) => {
+  const channels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const length = buffer.length * channels * 2;
+  const arrayBuffer = new ArrayBuffer(44 + length);
+  const view = new DataView(arrayBuffer);
+
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  };
+
+  let offset = 0;
+  writeString(offset, "RIFF"); offset += 4;
+  view.setUint32(offset, 36 + length, true); offset += 4;
+  writeString(offset, "WAVE"); offset += 4;
+  writeString(offset, "fmt "); offset += 4;
+  view.setUint32(offset, 16, true); offset += 4;
+  view.setUint16(offset, 1, true); offset += 2;
+  view.setUint16(offset, channels, true); offset += 2;
+  view.setUint32(offset, sampleRate, true); offset += 4;
+  view.setUint32(offset, sampleRate * channels * 2, true); offset += 4;
+  view.setUint16(offset, channels * 2, true); offset += 2;
+  view.setUint16(offset, 16, true); offset += 2;
+  writeString(offset, "data"); offset += 4;
+  view.setUint32(offset, length, true); offset += 4;
+
+  for (let i = 0; i < buffer.length; i++) {
+    for (let ch = 0; ch < channels; ch++) {
+      const sample = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += 2;
+    }
+  }
+
+  return arrayBuffer;
+};
+
+const mergeRoomFiles = async () => {
+  if (!roomFileA || !roomFileB) return;
+
+  const ctx = new AudioContext();
+
+  const aBuf = await roomFileA.arrayBuffer();
+  const bBuf = await roomFileB.arrayBuffer();
+
+  const a = await ctx.decodeAudioData(aBuf.slice(0));
+  const b = await ctx.decodeAudioData(bBuf.slice(0));
+
+  const length = Math.max(a.length, b.length);
+  const rate = a.sampleRate;
+
+  const out = ctx.createBuffer(2, length, rate);
+
+  const left = out.getChannelData(0);
+  const right = out.getChannelData(1);
+
+  left.set(a.getChannelData(0).slice(0, length));
+  right.set(b.getChannelData(0).slice(0, length));
+
+  const wav = audioBufferToWav(out);
+  const blob = new Blob([wav], { type: "audio/wav" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "conversation_room_stereo.wav";
+  link.click();
+
+  URL.revokeObjectURL(url);
+};
+
+const roomFileSummary = [
+  `Speaker A: ${roomFileA ? roomFileA.name : "Not uploaded"}`,
+  `Speaker B: ${roomFileB ? roomFileB.name : "Not uploaded"}`,
+  `Status: ${roomStatus}`,
+].join("\n");
 
   return (
     <div className={`app ${theme}`}>
@@ -1107,29 +1193,73 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
 {tab === "rooms" && (
   <section className="panel">
     <div className="panelHead">
-      <h2>Conversation Rooms</h2>
-      <p>Studio-grade two-speaker conversation capture and merge control.</p>
+      <h2>Conversation Rooms V2</h2>
+      <p>Studio-grade dual speaker import, validation, and stereo merge.</p>
     </div>
 
     <div className="ruleGrid">
       <div>Room Mode: Two Speakers</div>
       <div>Speaker A: Left Channel</div>
       <div>Speaker B: Right Channel</div>
-      <div>Format Target: WAV Stereo</div>
-      <div>Quality: Noise / Clipping / Silence Check</div>
-      <div>Merge: Professional Dual-Channel Export</div>
-      <div>Status: Room Draft</div>
-      <div>Next Step: Live Recorder + Auto Merge</div>
+      <div>Target: WAV Stereo</div>
+      <div>Status: {roomStatus}</div>
+      <div>Ready: {roomReady ? "YES" : "NO"}</div>
+    </div>
+
+    <div className="panel" style={{ marginTop: 12 }}>
+      <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+{roomFileSummary}
+      </pre>
     </div>
 
     <div className="actions compact">
-      <button>+ Create Room</button>
-      <button>Import Speaker A</button>
-      <button>Import Speaker B</button>
-      <button>Export Merged WAV</button>
+      <button onClick={() => document.getElementById("roomA")?.click()}>
+        Import Speaker A
+      </button>
+
+      <button onClick={() => document.getElementById("roomB")?.click()}>
+        Import Speaker B
+      </button>
+
+      <button
+        className="primary"
+        disabled={!roomReady}
+     onClick={mergeRoomFiles}
+      >
+        Merge Stereo WAV
+      </button>
+
+      <button
+        disabled={!roomReady}
+        onClick={() =>
+          downloadText("room_status.txt", roomFileSummary, "text/plain")
+        }
+      >
+        Export Report
+      </button>
     </div>
+
+    <input
+      id="roomA"
+      type="file"
+      accept=".wav,audio/wav"
+      hidden
+      onChange={(e) =>
+        setRoomFileA(e.target.files?.[0] || null)
+      }
+    />
+
+    <input
+      id="roomB"
+      type="file"
+      accept=".wav,audio/wav"
+      hidden
+      onChange={(e) =>
+        setRoomFileB(e.target.files?.[0] || null)
+      }
+    />
   </section>
-        )}
+)}
       </main>
     </div>
   );
