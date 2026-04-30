@@ -330,8 +330,7 @@ export default function App() {
   }, []);
   const [speaker, setSpeaker] = useState("D0001");
   const [speed, setSpeed] = useState<Speed>("normal");
-const [speedRate, setSpeedRate] = useState<number>(1.0);  
-const [records, setRecords] = useState<FileRecord[]>([]);
+  const [records, setRecords] = useState<FileRecord[]>([]);
   useEffect(() => {
     const saved = localStorage.getItem("aivoraRecords");
     if (saved) setRecords(JSON.parse(saved));
@@ -940,41 +939,24 @@ const roomFileSummary = [
               value={selected?.fileName || "No selected file"}
               readOnly
             />
-<audio
-  ref={audioRef}
-  controls
-  src={audioUrl}
-  onLoadedMetadata={() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = speedRate;
-    }
-  }}
-  onPlay={() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = speedRate;
-    }
-    animateMeter();
-  }}
-/>
+            <audio
+              ref={audioRef}
+              controls
+              src={audioUrl}
+              onPlay={animateMeter}
+            />
             <div className="controlRow">
               <label>Playback Speed</label>
-              <label>Speed Rate (0.50 – 3.50)</label>
-<input
-  type="number"
-  min="0.5"
-  max="3.5"
-  step="0.01"
-  value={speedRate}
-  onChange={(e) => {
-    let val = parseFloat(e.target.value);
-    if (isNaN(val)) val = 1;
-    if (val < 0.5) val = 0.5;
-    if (val > 3.5) val = 3.5;
-    setSpeedRate(val);
-  }}
-/>
-
-
+              <select
+                onChange={(e) => {
+                  if (audioRef.current)
+                    audioRef.current.playbackRate = Number(e.target.value);
+                }}
+              >
+                <option value="0.75">Slow 0.75x</option>
+                <option value="1">Normal 1x</option>
+                <option value="1.25">Fast 1.25x</option>
+              </select>
             </div>
             <label className="label">Live Noise Meter</label>
             <div className="meter">
