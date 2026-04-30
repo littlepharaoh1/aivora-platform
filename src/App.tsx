@@ -944,19 +944,9 @@ const roomFileSummary = [
   ref={audioRef}
   controls
   src={audioUrl}
-  onLoadedMetadata={() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = speedRate;
-    }
-  }}
-  onPlay={() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = speedRate;
-    }
-    animateMeter();
-  }}
+  onPlay={animateMeter}
 />
-            <div className="controlRow">
+<div className="controlRow">
               <label>Playback Speed</label>
               <label>Speed Rate (0.50 – 3.50)</label>
 <input
