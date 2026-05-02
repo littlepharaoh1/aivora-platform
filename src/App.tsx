@@ -50,6 +50,7 @@ type FileRecord = {
   status: "Valid" | "Invalid";
   reason: string;
   decision: Decision;
+ notes?: string;
   file?: File;
   duration?: number;
   sampleRate?: number;
@@ -229,8 +230,8 @@ function audioBufferToWavFloat32(
 ) {
   const addSilence = mode === "silence";
   const normalize = mode === "normalize";
-  const before = addSilence ? Math.floor(buffer.sampleRate * 0.5) : 0;
-  const after = addSilence ? Math.floor(buffer.sampleRate * 0.5) : 0;
+  const before = addSilence ? Math.floor(buffer.sampleRate *2) : 0;
+  const after = addSilence ? Math.floor(buffer.sampleRate *2) : 0;
   const frames = buffer.length + before + after;
   const channels = buffer.numberOfChannels;
   let peak = 0;
@@ -330,7 +331,11 @@ export default function App() {
   }, []);
   const [speaker, setSpeaker] = useState("D0001");
   const [speed, setSpeed] = useState<Speed>("normal");
-const [speedRate, setSpeedRate] = useState<number>(1.0);  
+
+const [speedRate, setSpeedRate] = useState(1);
+const [speechStart, setSpeechStart] = useState(0);
+const [speechEnd, setSpeechEnd] = useState(0);
+const [speechSpeed, setSpeechSpeed] = useState(0);
 const [records, setRecords] = useState<FileRecord[]>([]);
   useEffect(() => {
     const saved = localStorage.getItem("aivoraRecords");
@@ -498,7 +503,7 @@ const roomReady = !!roomFileA && !!roomFileB;
     ctx.fillStyle = "#020817";
     ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = "#12d6ff";
-    ctx.lineWidth = 3;
+  ctx.lineWidth = 3;
     ctx.beginPath();
     for (let x = 0; x < w; x++) {
       let min = 1,
@@ -512,6 +517,27 @@ const roomReady = !!roomFileA && !!roomFileB;
       ctx.lineTo(x, ((1 + max) * h) / 2);
     }
     ctx.stroke();
+// ===== Selection Highlight =====
+if (speechStart && speechEnd && selected?.duration) {
+  const startX = (speechStart / selected.duration) * w;
+  const endX = (speechEnd / selected.duration) * w;
+
+  ctx.fillStyle = "rgba(0, 200, 255, 0.25)";
+  ctx.fillRect(startX, 0, endX - startX, h);
+ctx.strokeStyle = "lime";
+ctx.lineWidth = 3;
+ctx.beginPath();
+ctx.moveTo(startX, 0);
+ctx.lineTo(startX, h);
+ctx.stroke();
+
+ctx.strokeStyle = "red";
+ctx.lineWidth = 3;
+ctx.beginPath();
+ctx.moveTo(endX, 0);
+ctx.lineTo(endX, h);
+ctx.stroke();
+}
   }
 
   function animateMeter() {
@@ -584,7 +610,7 @@ const roomReady = !!roomFileA && !!roomFileB;
         r.peakDb?.toFixed(1) || "",
         r.rmsDb?.toFixed(1) || "",
         r.noiseDb?.toFixed(1) || "",
-        notes.replace(",", " "),
+(r.notes || "").replace(/,/g, " ")
       ].join(","),
     );
     return header + rows.join("\n");
@@ -874,7 +900,9 @@ const roomFileSummary = [
                 </tr>
               </thead>
               <tbody>
-                {records.map((r) => (
+{records
+  .filter((r) => r.decision !== "Approved" && r.decision !== "Rejected")
+  .map((r) => (
                   <tr key={r.id}>
                     <td>{r.fileName}</td>
                     <td>
@@ -900,7 +928,24 @@ const roomFileSummary = [
           <section className="panel">
             <div className="panelHead">
               <h2>QC Audio Analyzer</h2>
-              <select
+<button
+  style={{
+    marginTop: 10,
+    marginBottom: 10,
+    background: "red",
+    color: "white",
+    padding: "10px 15px",
+    borderRadius: 8
+  }}
+  onClick={() => {
+    localStorage.removeItem("aivoraRecords");
+    setRecords([]);
+    alert("QC List Cleared");
+  }}
+>
+  🗑 Clear QC List
+</button>            
+  <select
                 className="input"
                 value={channelMode}
                 onChange={(e) => setChannelMode(e.target.value as any)}
@@ -974,9 +1019,50 @@ const roomFileSummary = [
                 }}
               />
             </div>
-            <label className="label">Waveform</label>
-            <canvas ref={waveRef} className="wave" />
-            <section className="metrics small">
+<label className="label">Waveform</label>
+<canvas
+  ref={waveRef}
+  className="wave"
+  onClick={(e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+
+    const duration = selected?.duration || 1;
+    const time = (x / width) * duration;
+
+const t = parseFloat(time.toFixed(2));
+
+if (!speechStart) {
+setSpeechStart(t);
+} else if (!speechEnd) {
+setSpeechEnd(t);
+} else {
+// reset on third click
+  setSpeechStart(time);
+  setSpeechEnd(0);
+}
+  }}
+/>
+<div style={{ marginTop: 10 }}>
+
+<label>Speech Start</label>
+<input
+  type="number"
+  step="0.01"
+  value={speechStart}
+  onChange={(e) => setSpeechStart(Number(e.target.value))}
+/>
+
+<label>Speech End</label>
+<input
+  type="number"
+  step="0.01"
+  value={speechEnd}
+  onChange={(e) => setSpeechEnd(Number(e.target.value))}
+/>
+</div>            
+<section className="metrics small">
               <Metric
                 label="Duration"
                 value={
@@ -1282,7 +1368,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
                 Download Normalized 32-bit WAV
               </button>
               <button onClick={() => downloadProcessed("silence")}>
-                Download +0.5s Silence 32-bit WAV
+                Download +2s Silence 32-bit WAV
               </button>
             </div>
           </section>
