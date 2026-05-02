@@ -292,11 +292,29 @@ function Metric({
 
 export default function App() {
 const [user, setUser] = useState<any>(null);
+const [role, setRole] = useState<string | null>(null);
 
 useEffect(() => {
-  supabase.auth.getUser().then(({ data }) => {
-    setUser(data.user);
-  });
+  const loadUser = async () => {
+    const { data: authData } = await supabase.auth.getUser();
+
+    const currentUser = authData.user;
+    setUser(currentUser);
+
+    if (currentUser) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("email", currentUser.email)
+        .single();
+
+      if (profile) {
+        setRole(profile.role);
+      }
+    }
+  };
+
+  loadUser();
 }, []);
 if (!user) {
   return (
@@ -308,8 +326,9 @@ if (!user) {
           if (!email) return;
 
           await supabase.auth.signInWithOtp({
-           email: email
-           });
+            email: email,
+          });
+
           alert("Check your email for login link");
         }}
       >
@@ -317,7 +336,11 @@ if (!user) {
       </button>
     </div>
   );
-} 
+}
+
+if (!role) {
+  return <div style={{ padding: 20 }}>Loading role...</div>;
+}
  const [config, setConfig] = useState<ProjectConfig>(
     () =>
       JSON.parse(localStorage.getItem("aivoraProjectConfig") || "null") ||
