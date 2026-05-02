@@ -291,7 +291,34 @@ function Metric({
 }
 
 export default function App() {
-  const [config, setConfig] = useState<ProjectConfig>(
+const [user, setUser] = useState<any>(null);
+
+useEffect(() => {
+  supabase.auth.getUser().then(({ data }) => {
+    setUser(data.user);
+  });
+}, []);
+if (!user) {
+  return (
+    <div style={{ padding: 20 }}>
+      <h2>Login Required</h2>
+      <button
+        onClick={async () => {
+          const email = prompt("Enter your email");
+          if (!email) return;
+
+          await supabase.auth.signInWithOtp({
+           email: email
+           });
+          alert("Check your email for login link");
+        }}
+      >
+        Login
+      </button>
+    </div>
+  );
+} 
+ const [config, setConfig] = useState<ProjectConfig>(
     () =>
       JSON.parse(localStorage.getItem("aivoraProjectConfig") || "null") ||
       defaultConfig,
