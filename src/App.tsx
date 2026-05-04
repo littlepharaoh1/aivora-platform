@@ -298,10 +298,10 @@ useEffect(() => {
     try {
       await supabase.from("visitors").insert([
         {
-          name: "unknown",
-          team: "unknown",
-          phone: "unknown",
-          email: "unknown",
+  name: prompt("Enter your name") || "unknown",
+  team: prompt("Enter your team") || "unknown",
+phone: prompt("Enter your phone") || "unknown",
+email: prompt("Enter your email") || "unknown",
           device: navigator.userAgent,
           page_url: window.location.href
         }
