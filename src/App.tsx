@@ -292,31 +292,10 @@ function Metric({
 
 export default function App() {
 const [user, setUser] = useState<any>(null);
-const [role, setRole] = useState<string | null>(null);
+const [role, setRole] = useState<string | null>("Admin");
 
-useEffect(() => {
-  const loadUser = async () => {
-    const { data: authData } = await supabase.auth.getUser();
-
-    const currentUser = authData.user;
-    setUser(currentUser);
-
-    if (currentUser) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("email", currentUser.email)
-        .single();
-
-      if (profile) {
-        setRole(profile.role);
-      }
-    }
-  };
-
-  loadUser();
-}, []);
-if (!user) {
+// auth disabled temporarily
+if (!user && false) {
   return (
     <div style={{ padding: 20 }}>
       <h2>Login Required</h2>
@@ -325,10 +304,12 @@ if (!user) {
           const email = prompt("Enter your email");
           if (!email) return;
 
-          await supabase.auth.signInWithOtp({
-            email: email,
-          });
-
+         await supabase.auth.signInWithOtp({
+  email: email,
+  options: {
+    emailRedirectTo: "http://localhost:3000"
+  }
+});
           alert("Check your email for login link");
         }}
       >
@@ -338,9 +319,7 @@ if (!user) {
   );
 }
 
-if (!role) {
-  return <div style={{ padding: 20 }}>Loading role...</div>;
-}
+// role check disabled temporarily
  const [config, setConfig] = useState<ProjectConfig>(
     () =>
       JSON.parse(localStorage.getItem("aivoraProjectConfig") || "null") ||
