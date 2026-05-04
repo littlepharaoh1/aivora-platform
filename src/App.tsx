@@ -293,6 +293,26 @@ function Metric({
 export default function App() {
 const [user, setUser] = useState<any>(null);
 const [role, setRole] = useState<string | null>("Admin");
+useEffect(() => {
+  const logVisitor = async () => {
+    try {
+      await supabase.from("visitors").insert([
+        {
+          name: "unknown",
+          team: "unknown",
+          phone: "unknown",
+          email: "unknown",
+          device: navigator.userAgent,
+          page_url: window.location.href
+        }
+      ]);
+    } catch (err) {
+      console.log("log error", err);
+    }
+  };
+
+  logVisitor();
+}, []);
 
 // auth disabled temporarily
 if (!user && false) {
