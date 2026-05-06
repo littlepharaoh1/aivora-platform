@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
-import AudioEnhancementLab from "./components/AudioEnhancementLab";
 
 type Tab =
   | "dashboard"
@@ -11,8 +10,7 @@ type Tab =
   | "naming"
   | "control"
   | "export"
-  | "rooms"
-  | "enhancement";
+  | "rooms";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
@@ -676,7 +674,6 @@ ctx.stroke();
     ["control", "Control Center"],
     ["export", "Export Package"],
 ["rooms", "Conversation Rooms"],
-  ["enhancement", "Enhancement Lab"],
   ];
 const roomStatus = roomReady
   ? "Ready for professional stereo merge"
@@ -1495,8 +1492,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
     />
   </section>
 )}
-            {tab === "enhancement" && <AudioEnhancementLab />}
-</main>
+      </main>
     </div>
   );
 }
