@@ -687,6 +687,7 @@ ctx.stroke();
   ["enhancement", "Enhancement Lab"],
   ["readiness", "Readiness Score"],
 ["analyzer", "Quality Analyzer"],
+["pipeline", "Audio Pipeline"],
   ];
 const roomStatus = roomReady
   ? "Ready for professional stereo merge"
