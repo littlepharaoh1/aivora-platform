@@ -104,16 +104,16 @@ function Ring({score,grade,verdict}) {
 function Row({c}) {
   const [open,setOpen]=useState(false);
   const icon=c.ok&&!c.w?<CheckCircle2 size={13} color="#10b981"/>:c.w?<AlertTriangle size={13} color="#f59e0b"/>:<XCircle size={13} color="#ef4444"/>;
-  const bc=c.sc>=80?"#10b981":c.sc>=50?"#f59e0b":"#ef4444";
+  const bc=(c.score || c.sc)>=80?"#10b981":(c.score || c.sc)>=50?"#f59e0b":"#ef4444";
   return <div onClick={()=>setOpen(!open)} style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:8,padding:"9px 12px",cursor:"pointer"}}>
     <div style={{display:"flex",alignItems:"center",gap:8}}>
       {icon}
-      <span style={{flex:1,fontSize:11,fontFamily:"monospace",color:"#a0c4cc"}}>{c.lb}{c.bonus&&<span style={{fontSize:9,color:"#2a5a6a",marginLeft:6}}>ADV</span>}</span>
-      <span style={{fontSize:11,color:"#4a8a9a",fontFamily:"monospace"}}>{c.val}</span>
-      <div style={{width:50,height:3,background:"#0f2a3a",borderRadius:2,marginLeft:8}}><div style={{height:"100%",width:c.sc+"%",background:bc,borderRadius:2}}/></div>
-      <span style={{fontSize:10,color:bc,fontFamily:"monospace",minWidth:24,textAlign:"right"}}>{c.sc}</span>
+      <span style={{flex:1,fontSize:11,fontFamily:"monospace",color:"#a0c4cc"}}>{(c.label || c.lb)}{c.bonus&&<span style={{fontSize:9,color:"#2a5a6a",marginLeft:6}}>ADV</span>}</span>
+      <span style={{fontSize:11,color:"#4a8a9a",fontFamily:"monospace"}}>{(c.value || c.val)}</span>
+      <div style={{width:50,height:3,background:"#0f2a3a",borderRadius:2,marginLeft:8}}><div style={{height:"100%",width:(c.score || c.sc)+"%",background:bc,borderRadius:2}}/></div>
+      <span style={{fontSize:10,color:bc,fontFamily:"monospace",minWidth:24,textAlign:"right"}}>{(c.score || c.sc)}</span>
     </div>
-    {open&&<div style={{marginTop:6,paddingTop:6,borderTop:"1px solid #0f2a3a",fontSize:10,color:"#4a8a9a"}}>{c.lb} — Score: {c.sc}{!c.bonus&&" · Weight: "+c.w8+"%"}</div>}
+    {open&&<div style={{marginTop:6,paddingTop:6,borderTop:"1px solid #0f2a3a",fontSize:10,color:"#4a8a9a"}}>{(c.label || c.lb)} — Score: {(c.score || c.sc)}{!c.bonus&&" · Weight: "+c.w8+"%"}</div>}
   </div>;
 }
 
