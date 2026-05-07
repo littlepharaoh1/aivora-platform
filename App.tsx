@@ -1,5 +1,6 @@
+import DeliveryReadinessScore from "./src/components/DeliveryReadinessScore";
 import AudioEnhancementLab from "./src/components/AudioEnhancementLab";
-import React, { useMemo, useRef, useState } from "react"; import { Upload, PlayCircle, CheckCircle2, XCircle, AlertTriangle, Download, Users, FolderKanban, ShieldCheck, FileAudio, Search, BarChart3, PackageCheck, Settings, Clock3, Activity } from "lucide-react";
+import React, { useMemo, useRef, useState } from "react"; import { Upload, PlayCircle, CheckCircle2, XCircle, AlertTriangle, Download, Users, FolderKanban, ShieldCheck, FileAudio, Search, BarChart3, PackageCheck, Settings, Clock3, Activity, Award } from "lucide-react";
 
 const PROJECT = { id: "DE-BATCH-01", name: "German Recording Batch 01", language: "German", locale: "Germany", target: 200, deadline: "2026-05-05", sampleRateTarget: 48000, bitDepthTarget: 32, acceptedPattern: "DE-DE_D0001_S0001_dkws_normal.wav", };
 
@@ -41,7 +42,7 @@ function copyNames() { navigator.clipboard.writeText(namingRows.join("\n")); }
 
 function exportReport() { const header = "file,status,decision,reason,notes\n"; const rows = files.map((f) => ${f.name},${f.status},${f.decision},${f.reason || ""},${notes.replaceAll(",", " ")}).join("\n"); downloadText("aivora_german_qc_report.csv", header + rows); }
 
-const nav = [ ["dashboard", "Dashboard", BarChart3], ["projects", "Projects", FolderKanban], ["contributors", "Contributors", Users], ["upload", "Upload Center", Upload], ["qc", "QC Workstation", ShieldCheck], ["naming", "German Naming 1–200", FileAudio], ["audio", "Audio Tools", Settings], ["enhancement", "Enhancement Lab", Activity], ["enhancement", "Enhancement Lab", Activity], ["enhancement", "Enhancement Lab", Activity], ["export", "Export Package", PackageCheck], ];
+const nav = [ ["dashboard", "Dashboard", BarChart3], ["projects", "Projects", FolderKanban], ["contributors", "Contributors", Users], ["upload", "Upload Center", Upload], ["qc", "QC Workstation", ShieldCheck], ["naming", "German Naming 1–200", FileAudio], ["audio", "Audio Tools", Settings], ["enhancement", "Enhancement Lab", Activity], ["readiness", "Readiness Score", Award], ["enhancement", "Enhancement Lab", Activity], ["readiness", "Readiness Score", Award], ["enhancement", "Enhancement Lab", Activity], ["readiness", "Readiness Score", Award], ["export", "Export Package", PackageCheck], ];
 
 return <div className={app ${theme}}> <aside className="sidebar"> <div className="brand"><div className="logo">AI</div><div><h1>Aivora AI</h1><p>AI · DATA · VISION</p></div></div> <div className="themeSwitch"><button onClick={() => setTheme("dark")}>Dark Professional</button><button onClick={() => setTheme("clean")}>Appen Clean</button></div> <nav>{nav.map(([key, label, Icon]) => <button key={key} onClick={() => setTab(key)} className={tab === key ? "active" : ""}><Icon size={18}/>{label}</button>)}</nav> </aside>
 
@@ -78,6 +79,7 @@ return <div className={app ${theme}}> <aside className="sidebar"> <div className
 
   {tab === "export" && <Panel title="Export Package"><p>Approved WAV + German naming sheet + reviewer notes + QC metrics.</p><div className="actions"><button className="primary" onClick={exportReport}><Download size={18}/> Download QC CSV</button><button onClick={() => downloadText("german_naming_1_200.txt", namingRows.join("\n"))}>Download Naming Sheet</button></div></Panel>}
 {tab === "enhancement" && <AudioEnhancementLab />}
+{tab === "readiness" && <DeliveryReadinessScore />}
 </main>
 
   </div>;
