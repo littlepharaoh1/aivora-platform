@@ -12,73 +12,69 @@ const PROFILES = {
 
 function toDb(v) { return v <= 0 ? -120 : 20 * Math.log10(v); }
 
-
-
-
-function analyze(buf, name, pk) {
-  // Legacy synchronous wrapper - delegates to advanced DSP engine
-  // The actual heavy work happens in analyzeAudioBuffer (async)
-  // This wrapper is kept for backward compatibility with existing UI
-  return _analyzeWithDSP(buf, name, pk);
+function detectHum(data, sr) {
+  const p50=Math.round(sr/50), p60=Math.round(sr/60);
+  let c50=0, c60=0, tot=0;
+  const len=Math.min(2000, data.length-Math.max(p50,p60));
+  for(let i=0;i<len;i++){c50+=data[i]*(data[i+p50]||0);c60+=data[i]*(data[i+p60]||0);tot+=data[i]*data[i];}
+  const n=tot/len||1, h50=Math.abs(c50/len)/n, h60=Math.abs(c60/len)/n;
+  return { detected:h50>0.15||h60>0.15, freq:h50>h60?50:60, strength:Math.max(h50,h60) };
 }
 
-async function _analyzeWithDSP(buf, name, pk) {
-  const profileMap = {
-    wakeword: "wakeword",
-    asr: "asr",
-    tts: "tts",
-    conversation: "conversation"
-  };
+function detectEdges(data, sr) {
+  const fs=Math.floor(sr*0.01), frames=Math.floor(data.length/fs);
+  let lead=0, trail=0, tot=0, speech=false, gap=0, maxGap=0;
+  for(let f=0;f<frames;f++){
+    let e=0; for(let i=0;i<fs;i++){const v=data[f*fs+i]||0;e+=v*v;}
+    const sil=Math.sqrt(e/fs)<0.002;
+    if(sil){tot++;gap++;if(!speech)lead++;}
+    else{speech=true;maxGap=Math.max(maxGap,gap);gap=0;}
+  }
+  trail=gap;
+  return { leadMs:lead*10, trailMs:trail*10, silRatio:tot/frames };
+}
 
-  const p = PROFILES[pk];
-  const analysis = await analyzeAudioBuffer(buf);
-  const scored = scoreAnalysis(analysis, profileMap[pk] || "asr");
+function detectVoice(data, sr) {
+  const fs=Math.floor(sr*0.025), frames=Math.floor(data.length/fs);
+  const en=[];
+  for(let f=0;f<frames;f++){let e=0;for(let i=0;i<fs;i++){const v=data[f*fs+i]||0;e+=v*v;}en.push(Math.sqrt(e/fs));}
+  const s=[...en].sort((a,b)=>a-b), noise=s[Math.floor(s.length*0.1)], th=noise*5;
+  const vf=en.filter(e=>e>th).length;
+  const pct=Math.round(vf/frames*100);
+  return { pct, present:pct>10 };
+}
 
-  // Map advanced analysis results back to legacy UI shape
-  const edges = {
-    silRatio: analysis.silence.silenceRatio,
-    leadMs: analysis.silence.leadingMs,
-    trailMs: analysis.silence.trailingMs
-  };
-
-  const hum = {
-    detected: analysis.noise.type === "hum_50" || analysis.noise.type === "hum_60",
-    freq: analysis.noise.humFreq || 0,
-    strength: analysis.noise.humStrength || 0
-  };
-
-  const voice = {
-    pct: Math.round(analysis.vad.voiceRatio * 100),
-    present: analysis.vad.voiceRatio > 0.1
-  };
-
-  return {
-    name,
-    pk,
-    plabel: p.label,
-    picon: p.icon,
-    pcolor: p.color,
-    total: scored.total,
-    grade: scored.grade,
-    verdict: scored.verdict,
-    checks: scored.checks,
-    edges,
-    hum,
-    voice,
-    pkDb: analysis.peakDb,
-    rDb: analysis.rmsDb,
-    nDb: analysis.noise.floorDb,
-    snr: analysis.snrDb,
-    clip: analysis.clipping.hardClips,
-    dur: analysis.duration,
-    sr: analysis.sampleRate,
-    // Extended fields (new)
-    analysis,
-    env: analysis.environment,
-    silence: analysis.silence,
-    lufs: analysis.lufs,
-    time: new Date().toLocaleTimeString()
-  };
+function analyze(buf, name, pk) {
+  const data=buf.getChannelData(0), sr=buf.sampleRate, p=PROFILES[pk], th=p.th;
+  let peak=0, sq=0, clip=0; const ns=[];
+  const step=Math.max(1,Math.floor(data.length/20000));
+  for(let i=0;i<data.length;i+=step){const v=Math.abs(data[i]);if(v>peak)peak=v;sq+=v*v;if(v>=0.999)clip++;if(v<0.005)ns.push(v*v);}
+  const cnt=Math.floor(data.length/step);
+  const rms=Math.sqrt(sq/cnt);
+  const nr=ns.length>10?Math.sqrt(ns.reduce((a,b)=>a+b,0)/ns.length):0.000001;
+  const pkDb=toDb(peak), rDb=toDb(rms), nDb=toDb(nr), snr=rDb-nDb;
+  const hum=detectHum(data,sr), edges=detectEdges(data,sr), voice=detectVoice(data,sr);
+  const C=[];
+  C.push({id:"sr",lb:"Sample Rate",ok:sr===48000,w:sr===44100,val:sr+"Hz",w8:15,sc:sr===48000?100:sr===44100?60:20});
+  C.push({id:"bd",lb:"Bit Depth",ok:true,w:false,val:"32-bit",w8:10,sc:100});
+  const pkOk=pkDb>=th.pkMin&&pkDb<=th.pkMax, pkCl=pkDb>-0.3;
+  C.push({id:"pk",lb:"Peak Level",ok:pkOk&&!pkCl,w:!pkOk&&!pkCl,val:pkDb.toFixed(1)+"dBFS",w8:20,sc:pkCl?0:pkOk?100:50});
+  const rmOk=rDb>=th.rmsMin&&rDb<=th.rmsMax;
+  C.push({id:"rms",lb:"RMS",ok:rmOk,w:!rmOk,val:rDb.toFixed(1)+"dBFS",w8:15,sc:rmOk?100:50});
+  const nOk=nDb<=th.noiseMax;
+  C.push({id:"nf",lb:"Noise Floor",ok:nOk,w:!nOk&&nDb<=th.noiseMax+10,val:nDb.toFixed(1)+"dBFS",w8:15,sc:nOk?100:nDb<=th.noiseMax+10?50:15});
+  const snOk=snr>=th.snrMin;
+  C.push({id:"snr",lb:"SNR",ok:snOk,w:!snOk&&snr>=th.snrMin-15,val:snr.toFixed(1)+"dB",w8:15,sc:snOk?100:snr>=th.snrMin-15?50:15});
+  C.push({id:"cl",lb:"Clipping",ok:clip===0,w:clip<5&&clip>0,val:clip===0?"None":clip+" smp",w8:10,sc:clip===0?100:clip<5?40:0});
+  const slOk=edges.silRatio<=th.silMax;
+  C.push({id:"sl",lb:"Silence",ok:slOk,w:!slOk&&edges.silRatio<=th.silMax+0.2,val:(edges.silRatio*100).toFixed(1)+"%",w8:10,sc:slOk?100:50});
+  C.push({id:"hum",lb:"Hum 50/60Hz",ok:!hum.detected,w:hum.strength>0.08,val:hum.detected?hum.freq+"Hz":"Clean",w8:0,sc:hum.detected?30:100,bonus:true});
+  C.push({id:"vp",lb:"Voice Presence",ok:voice.present,w:!voice.present,val:voice.pct+"%",w8:0,sc:voice.pct,bonus:true});
+  const main=C.filter(c=>!c.bonus), tw=main.reduce((a,c)=>a+c.w8,0);
+  const total=Math.round(main.reduce((a,c)=>a+c.sc*c.w8,0)/tw);
+  const grade=total>=90?"A":total>=75?"B":total>=60?"C":total>=40?"D":"F";
+  const verdict=total>=75&&clip===0?"READY":total>=50?"REVIEW":"REJECT";
+  return {name,pk,plabel:p.label,picon:p.icon,pcolor:p.color,total,grade,verdict,checks:C,edges,hum,voice,pkDb,rDb,nDb,snr,clip,dur:buf.duration,sr,time:new Date().toLocaleTimeString()};
 }
 
 function Ring({score,grade,verdict}) {
@@ -131,7 +127,7 @@ export default function AudioQualityAnalyzer() {
       const ab=await file.arrayBuffer();
       const ctx=new AudioContext();
       const buf=await ctx.decodeAudioData(ab);
-      const r=await analyze(buf,file.name,pk);
+      const r=analyze(buf,file.name,pk);
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
     }catch(e){console.error(e);}
     setLoading(false);
