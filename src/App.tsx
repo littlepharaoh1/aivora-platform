@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 import "./styles.css";
 import DeliveryReadinessScore from "./components/DeliveryReadinessScore";
 import AudioQualityAnalyzer from "./components/AudioQualityAnalyzer";
+import AudioPipeline from "./components/AudioPipeline";
 import AudioEnhancementLab from "./components/AudioEnhancementLab";
 
 type Tab =
@@ -17,7 +18,9 @@ type Tab =
   | "export"
   | "rooms"
   | "enhancement"
-  | "readiness"|"analyzer";
+  | "readiness"
+  | "analyzer"
+  | "pipeline";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
@@ -1505,6 +1508,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
             {tab === "enhancement" && <AudioEnhancementLab />}
       {tab === "readiness" && <DeliveryReadinessScore />}
 {tab === "analyzer" && <AudioQualityAnalyzer />}
+{tab === "pipeline" && <AudioPipeline />}
 </main>
     </div>
   );
