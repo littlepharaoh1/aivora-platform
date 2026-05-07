@@ -192,9 +192,9 @@ export default function AudioQualityAnalyzer() {
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
             <div style={{fontSize:9,color:"#4a8a9a",marginBottom:2}}>WEIGHTED CHECKS</div>
-            {rep.checks.filter(c=>!c.bonus).map(c=><Row key={c.id} c={c}/>)}
+            {rep.checks.filter(c=>!c.bonus).map(c=><Row key={c.label || c.id} c={c}/>)}
             <div style={{fontSize:9,color:"#4a8a9a",marginTop:6,marginBottom:2}}>ADVANCED</div>
-            {rep.checks.filter(c=>c.bonus).map(c=><Row key={c.id} c={c}/>)}
+            {rep.checks.filter(c=>c.bonus).map(c=><Row key={c.label || c.id} c={c}/>)}
             <div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:8,padding:10,marginTop:4}}>
               <div style={{fontSize:9,color:"#4a8a9a",marginBottom:6}}>SILENCE EDGES</div>
               {[["Leading",rep.edges.leadMs+"ms"],["Trailing",rep.edges.trailMs+"ms"],["Ratio",(rep.edges.silRatio*100).toFixed(1)+"%"]].map(([l,v])=>(
