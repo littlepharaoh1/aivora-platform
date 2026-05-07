@@ -1,3 +1,4 @@
+import AudioQualityAnalyzer from "./src/components/AudioQualityAnalyzer";
 import DeliveryReadinessScore from "./src/components/DeliveryReadinessScore";
 import AudioEnhancementLab from "./src/components/AudioEnhancementLab";
 import React, { useMemo, useRef, useState } from "react"; import { Upload, PlayCircle, CheckCircle2, XCircle, AlertTriangle, Download, Users, FolderKanban, ShieldCheck, FileAudio, Search, BarChart3, PackageCheck, Settings, Clock3, Activity, Award } from "lucide-react";
@@ -50,7 +51,7 @@ const nav = [
   ["naming", "German Naming 1-200", FileAudio],
   ["audio", "Audio Tools", Settings],
   ["enhancement", "Enhancement Lab", Activity],
-  ["readiness", "Readiness Score", Award],
+  ["readiness", "Readiness Score", Award], ["analyzer", "Quality Analyzer", Activity],
   ["export", "Export Package", PackageCheck],
 ];
 
@@ -90,6 +91,7 @@ return <div className={app ${theme}}> <aside className="sidebar"> <div className
   {tab === "export" && <Panel title="Export Package"><p>Approved WAV + German naming sheet + reviewer notes + QC metrics.</p><div className="actions"><button className="primary" onClick={exportReport}><Download size={18}/> Download QC CSV</button><button onClick={() => downloadText("german_naming_1_200.txt", namingRows.join("\n"))}>Download Naming Sheet</button></div></Panel>}
 {tab === "enhancement" && <AudioEnhancementLab />}
 {tab === "readiness" && <DeliveryReadinessScore />}
+{tab === "analyzer" && <AudioQualityAnalyzer />}
 </main>
 
   </div>;
