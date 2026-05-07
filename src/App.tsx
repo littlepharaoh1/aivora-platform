@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
 import DeliveryReadinessScore from "./components/DeliveryReadinessScore";
+import AudioQualityAnalyzer from "./components/AudioQualityAnalyzer";
 import AudioEnhancementLab from "./components/AudioEnhancementLab";
 
 type Tab =
@@ -1502,6 +1503,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
 )}
             {tab === "enhancement" && <AudioEnhancementLab />}
       {tab === "readiness" && <DeliveryReadinessScore />}
+{tab === "analyzer" && <AudioQualityAnalyzer />}
 </main>
     </div>
   );
