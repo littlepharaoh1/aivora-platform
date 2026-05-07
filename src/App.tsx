@@ -16,7 +16,7 @@ type Tab =
   | "export"
   | "rooms"
   | "enhancement"
-  | "readiness";
+  | "readiness"|"analyzer";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
