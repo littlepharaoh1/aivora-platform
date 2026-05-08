@@ -119,23 +119,6 @@ export default function StorePanel() {
             : "📁 Bulk Upload Audio Files"}
         </button>
         <button style={btnDanger} onClick={handleClear} disabled={busy}>
-          🧠 Analyze All
-        </button>
-
-        <button
-          onClick={() => analyzeAll()}
-          style={{
-            background: "#10b98122",
-            border: "1px solid #10b981",
-            color: "#10b981",
-            padding: "10px 16px",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontFamily: "monospace",
-            fontWeight: 700,
-            marginRight: 12,
-          }}
-        >
           🗑️ Clear All
         </button>
         <input
