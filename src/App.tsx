@@ -6,6 +6,7 @@ import AudioQualityAnalyzer from "./components/AudioQualityAnalyzer";
 import AudioPipeline from "./components/AudioPipeline";
 import AudioEnhancementLab from "./components/AudioEnhancementLab";
 import StorePanel from "./components/StorePanel";
+import { useAivora } from "./lib/store/AivoraContext";
 
 type Tab =
   | "dashboard"
@@ -305,6 +306,7 @@ function Metric({
 export default function App() {
 const [user, setUser] = useState<any>(null);
 const [role, setRole] = useState<string | null>("Admin");
+  const { addFiles: aivoraAddFiles } = useAivora();
 useEffect(() => {
   const logVisitor = async () => {
     try {
@@ -475,6 +477,9 @@ const roomReady = !!roomFileA && !!roomFileB;
   const progress = total ? Math.round((reviewedCount / total) * 100) : 0;
   async function handleUpload(files: FileList | null) {
     if (!files?.length) return;
+    aivoraAddFiles(Array.from(files)).catch((e) =>
+      console.warn("[Aivora] addFiles failed:", e)
+    );
     const next: FileRecord[] = Array.from(files).map((file, i) => {
       const v = validateGermanName(file.name);
       return {
