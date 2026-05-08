@@ -119,7 +119,7 @@ export default function StorePanel() {
             : "📁 Bulk Upload Audio Files"}
         </button>
         <button style={btnDanger} onClick={handleClear} disabled={busy}>
-          🧠 Analyze All TEMP
+          🗑️ Clear All
         </button>
 
         <button
