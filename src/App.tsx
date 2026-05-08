@@ -1507,7 +1507,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
   </section>
 )}
             {tab === "enhancement" && <AudioEnhancementLab />}
-      {tab === "readiness" && <DeliveryReadinessScore />}
+      {tab === "readiness" && <DeliveryReadinessScore records={records} setRecords={setRecords} />}
 {tab === "analyzer" && <AudioQualityAnalyzer />}
 {tab === "pipeline" && <AudioPipeline />}
 </main>

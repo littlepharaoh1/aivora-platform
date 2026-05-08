@@ -693,4 +693,3 @@ export default {
   STUDIO_PROFILES,
   DEFAULT_PROFILE,
 };
-
