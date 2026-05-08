@@ -5,6 +5,7 @@ import DeliveryReadinessScore from "./components/DeliveryReadinessScore";
 import AudioQualityAnalyzer from "./components/AudioQualityAnalyzer";
 import AudioPipeline from "./components/AudioPipeline";
 import AudioEnhancementLab from "./components/AudioEnhancementLab";
+import StorePanel from "./components/StorePanel";
 
 type Tab =
   | "dashboard"
@@ -20,7 +21,8 @@ type Tab =
   | "enhancement"
   | "readiness"
   | "analyzer"
-  | "pipeline";
+  | "pipeline"
+  | "store";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
@@ -688,6 +690,7 @@ ctx.stroke();
   ["readiness", "Readiness Score"],
 ["analyzer", "Quality Analyzer"],
 ["pipeline", "Audio Pipeline"],
+      ["store", "Aivora Store"],
   ];
 const roomStatus = roomReady
   ? "Ready for professional stereo merge"
@@ -1510,6 +1513,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
       {tab === "readiness" && <DeliveryReadinessScore records={records} setRecords={setRecords} />}
 {tab === "analyzer" && <AudioQualityAnalyzer />}
 {tab === "pipeline" && <AudioPipeline />}
+        {tab === "store" && <StorePanel />}
 </main>
     </div>
   );
