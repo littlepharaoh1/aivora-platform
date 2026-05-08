@@ -123,7 +123,7 @@ export default function StorePanel() {
         </button>
 
         <button
-          onClick={() => clearAll()}
+          onClick={() => analyzeAll(profile)}
           style={{
             background: "#10b98122",
             border: "1px solid #10b981",
