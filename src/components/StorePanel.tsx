@@ -119,11 +119,11 @@ export default function StorePanel() {
             : "📁 Bulk Upload Audio Files"}
         </button>
         <button style={btnDanger} onClick={handleClear} disabled={busy}>
-          🧠 Analyze All
+          🧠 Analyze All TEMP
         </button>
 
         <button
-          onClick={() => analyzeAll()}
+          onClick={() => clearAll()}
           style={{
             background: "#10b98122",
             border: "1px solid #10b981",
@@ -136,7 +136,7 @@ export default function StorePanel() {
             marginRight: 12,
           }}
         >
-          🗑️ Clear All
+          🧠 Analyze All
         </button>
         <input
           ref={fileInputRef}
