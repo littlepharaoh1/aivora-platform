@@ -21,7 +21,11 @@ export default function StorePanel() {
     addFiles,
     clearAll,
     refreshStorageInfo,
+    analyzeAll,
+    analysisProgress,
   } = useAivora();
+
+  const [profile, setProfile] = useState("asr_studio");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -229,6 +233,27 @@ const infoBoxStyle: React.CSSProperties = {
 
 const btnPrimary: React.CSSProperties = {
   background: "#0ea5e9",
+  color: "#fff",
+  border: "none",
+  padding: "10px 20px",
+  borderRadius: 8,
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 500,
+};
+
+const selectStyle: React.CSSProperties = {
+  background: "#0f172a",
+  color: "#e2e8f0",
+  border: "1px solid #334155",
+  padding: "10px 14px",
+  borderRadius: 8,
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+const btnAnalyze: React.CSSProperties = {
+  background: "#10b981",
   color: "#fff",
   border: "none",
   padding: "10px 20px",

@@ -37,6 +37,12 @@ import {
   getStorageInfo,
 } from "./persistence";
 
+import { analyzeAudioBuffer } from "../audio/AdvancedAudioAnalyzer";
+import {
+  validateStudioCompliance,
+  STUDIO_PROFILES,
+} from "../audio/StudioSpecCompliance";
+
 // ============================================================================
 // CONTEXT SHAPE
 // ============================================================================
@@ -77,6 +83,11 @@ export interface AivoraContextValue {
     estimatedUsage?: number;
     estimatedQuota?: number;
   };
+
+  // ─── Analysis ───
+  analyzeFile: (id: string, profile?: string) => Promise<void>;
+  analyzeAll: (profile?: string) => Promise<void>;
+  analysisProgress: { done: number; total: number; running: boolean };
 }
 
 const AivoraCtx = createContext<AivoraContextValue | null>(null);
@@ -94,6 +105,11 @@ export function AivoraProvider({ children }: { children: ReactNode }) {
   const [storageInfo, setStorageInfo] = useState({
     recordsCount: 0,
     blobsCount: 0,
+  });
+const [analysisProgress, setAnalysisProgress] = useState({
+    done: 0,
+    total: 0,
+    running: false,
   });
 
   const memBlobs = useRef<Map<string, Blob>>(new Map());
@@ -377,6 +393,88 @@ export function AivoraProvider({ children }: { children: ReactNode }) {
     setStats(computeBatchStats([]));
   }, []);
 
+  // ─── ANALYSIS ───
+  const analyzeFile = useCallback(
+    async (id: string, profile: string = "asr_studio") => {
+      const record = records.find((r) => r.id === id);
+      if (!record) return;
+
+      const blob = await loadBlob(record.blobId);
+      if (!blob) {
+        console.warn("[Aivora] No blob found for record:", id);
+        return;
+      }
+
+      try {
+        // Decode audio
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioCtx = new (window.AudioContext ||
+          (window as any).webkitAudioContext)();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+        // Run DSP analysis
+        const analysis = await analyzeAudioBuffer(audioBuffer);
+
+        // Run compliance check
+        const studioProfile = STUDIO_PROFILES[profile] || STUDIO_PROFILES["asr_studio"];
+        const compliance = validateStudioCompliance(analysis as any, profile as any);
+
+        // Update record
+        const now = Date.now();
+        const updated = {
+          ...record,
+          dspAnalysis: analysis as any,
+          compliance: compliance as any,
+          stage: "analyzed" as const,
+          stageHistory: [
+            ...record.stageHistory,
+            { stage: "analyzed" as const, at: now },
+          ],
+        };
+
+        setRecords((prev) =>
+          prev.map((r) => (r.id === id ? updated : r))
+        );
+
+        try {
+          await saveRecord(updated);
+        } catch (e) {
+          console.warn("[Aivora] Failed to persist analysis:", e);
+        }
+
+        try {
+          audioCtx.close();
+        } catch {
+          // ignore
+        }
+      } catch (e) {
+        console.error("[Aivora] Analysis failed for", record.filename, e);
+      }
+    },
+    [records]
+  );
+
+  const analyzeAll = useCallback(
+    async (profile: string = "asr_studio") => {
+      const pending = records.filter((r) => !r.compliance);
+      if (pending.length === 0) return;
+
+      setAnalysisProgress({ done: 0, total: pending.length, running: true });
+
+      for (let i = 0; i < pending.length; i++) {
+        await analyzeFile(pending[i].id, profile);
+        setAnalysisProgress({
+          done: i + 1,
+          total: pending.length,
+          running: i + 1 < pending.length,
+        });
+      }
+
+      setAnalysisProgress((p) => ({ ...p, running: false }));
+    },
+    [records, analyzeFile]
+  );
+
   // ─── STORAGE INFO ───
   const refreshStorageInfo = useCallback(async () => {
     try {
@@ -415,6 +513,9 @@ export function AivoraProvider({ children }: { children: ReactNode }) {
     clearAll,
     refreshStorageInfo,
     storageInfo,
+    analyzeFile,
+    analyzeAll,
+    analysisProgress,
   };
 
   return <AivoraCtx.Provider value={value}>{children}</AivoraCtx.Provider>;
