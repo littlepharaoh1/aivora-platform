@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { analyzeAudioBuffer, scoreAnalysis } from "../lib/audio/AdvancedAudioAnalyzer";
+import { validateStudioCompliance } from "../lib/audio/StudioSpecCompliance";
 import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
 
 const PROFILES = {
@@ -24,15 +25,17 @@ function analyze(buf, name, pk) {
 
 async function _analyzeWithDSP(buf, name, pk) {
   const profileMap = {
-    wakeword: "wakeword",
-    asr: "asr",
-    tts: "tts",
-    conversation: "conversation"
+    wakeword: "wakeword_studio",
+    asr: "asr_studio",
+    tts: "tts_studio",
+    conversation: "conversation_studio"
   };
 
   const p = PROFILES[pk];
   const analysis = await analyzeAudioBuffer(buf);
-  const scored = scoreAnalysis(analysis, profileMap[pk] || "asr");
+  const studioProfile = profileMap[pk] || "asr_studio";
+  const scored = scoreAnalysis(analysis, pk);
+  const compliance = validateStudioCompliance(analysis, studioProfile);
 
   // Map advanced analysis results back to legacy UI shape
   const edges = {
@@ -77,6 +80,7 @@ async function _analyzeWithDSP(buf, name, pk) {
     env: analysis.environment,
     silence: analysis.silence,
     lufs: analysis.lufs,
+    compliance,
     time: new Date().toLocaleTimeString()
   };
 }
