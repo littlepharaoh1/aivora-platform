@@ -282,8 +282,8 @@ const btnAnalyze: React.CSSProperties = {
 
 const btnDanger: React.CSSProperties = {
   background: "transparent",
-  color: "#ef4444",
-  border: "1px solid #ef4444",
+  color: "#10b981",
+  border: "1px solid #10b981",
   padding: "10px 20px",
   borderRadius: 8,
   cursor: "pointer",
