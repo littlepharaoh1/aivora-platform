@@ -1,7 +1,7 @@
 export type AudioProblemSeverity = "low" | "medium" | "high" | "critical";
 
 export interface AudioProblem {
-  type: string;
+    type: "DIGITAL_SILENCE";
   severity: AudioProblemSeverity;
   confidence: number;
   startSample: number;
@@ -108,8 +108,8 @@ export function detectAdaptiveDigitalSilence(
       );
 
       problems.push({
-        type: "DIGITAL_SILENCE",
-        severity: durationMs > 800 ? "critical" : "high",
+      type: "DIGITAL_SILENCE" as const,
+       severity: durationMs > 800 ? ("critical" as const) : ("high" as const),
         confidence,
         startSample: start,
         endSample: end,
