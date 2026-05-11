@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 import "./styles.css";
 import DeliveryReadinessScore from "./components/DeliveryReadinessScore";
 import AudioQualityAnalyzer from "./components/AudioQualityAnalyzer";
+import BatchAnalyzer from "./components/BatchAnalyzer";
 import AudioPipeline from "./components/AudioPipeline";
 import AudioEnhancementLab from "./components/AudioEnhancementLab";
 import StorePanel from "./components/StorePanel";
@@ -23,7 +24,8 @@ type Tab =
   | "readiness"
   | "analyzer"
   | "pipeline"
-  | "store";
+  | "store"
+  | "batch";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
@@ -694,6 +696,7 @@ ctx.stroke();
   ["enhancement", "Enhancement Lab"],
   ["readiness", "Readiness Score"],
 ["analyzer", "Quality Analyzer"],
+["batch", "Batch Analyzer"],
 ["pipeline", "Audio Pipeline"],
       ["store", "Aivora Store"],
   ];
@@ -1517,6 +1520,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
             {tab === "enhancement" && <AudioEnhancementLab />}
       {tab === "readiness" && <DeliveryReadinessScore records={records} setRecords={setRecords} />}
 {tab === "analyzer" && <AudioQualityAnalyzer />}
+{tab === "batch" && <BatchAnalyzer />}
 {tab === "pipeline" && <AudioPipeline />}
         {tab === "store" && <StorePanel />}
 </main>
