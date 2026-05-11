@@ -17,6 +17,7 @@ function severityPenalty(severity: AudioProblemSeverity): number {
     case "high": return 15;
     case "medium": return 8;
     case "low": return 3;
+    case "warning": return 5;
     default: return 3;
   }
 }
@@ -34,6 +35,7 @@ function sortProblems(problems: AudioProblem[]): AudioProblem[] {
     high: 3,
     medium: 2,
     low: 1,
+    warning: 2,
   };
 
   return [...problems].sort((a, b) => {

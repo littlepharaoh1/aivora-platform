@@ -24,7 +24,8 @@ export type AudioProblemSeverity =
   | "low"
   | "medium"
   | "high"
-  | "critical";
+  | "critical"
+  | "warning";
 
 // ----------------------------------------------------------------------------
 // Problem taxonomy
@@ -62,6 +63,9 @@ export type AudioProblemType =
   | "HARD_CUT"
   | "CLIPPING"
   | "HARD_CLIPPING"
+  | "TOO_QUIET"
+  | "TOO_LOUD"
+  | "DYNAMIC_RANGE_ISSUE"
   | "SOFT_CLIPPING"
   | "SPECTRAL_NOISE"
   | "HISS"
@@ -83,6 +87,7 @@ export interface AudioProblem {
   type: AudioProblemType;
   severity: AudioProblemSeverity;
   confidence: number; // 0.0 - 1.0
+  suggestedAction?: string;
 
   // Location information (all optional - detectors fill what applies)
   startSample?: number;
