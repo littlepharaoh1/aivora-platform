@@ -5,12 +5,12 @@
 
 export const ADMIN_EMAILS: string[] = [
   // Add your email here:
-  // "your@email.com",
+  "zikaaaa460@gmail.com",  // Owner
 ];
 
 export const OWNER_EMAILS: string[] = [
   // Add owner emails here:
-  // "owner@email.com",
+  "zikaaaa460@gmail.com",  // Owner
 ];
 
 export function getRoleFromEmail(email: string): string {
