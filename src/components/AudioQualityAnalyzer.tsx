@@ -10,6 +10,7 @@ import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../lib/audi
 import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
+import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-28, rmsMax:-10, noiseMax:-60, snrMin:45, silMax:0.15 } },
@@ -101,6 +102,7 @@ function Badge({label,value,ok}) {
 }
 
 export default function AudioQualityAnalyzer() {
+  const { currentFile, setAudioFile, loading: globalLoading } = useGlobalAudio();
   const [rep,setRep]=useState(null);
   const [loading,setLoading]=useState(false);
   const [pk,setPk]=useState("wakeword");
@@ -111,6 +113,21 @@ export default function AudioQualityAnalyzer() {
   const [repairResult,setRepairResult]=useState(null);
   const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false});
   const [spectrogramData,setSpectrogramData]=useState(null);
+
+  // Auto-analyze when global file changes from another section
+  React.useEffect(()=>{
+    if(currentFile&&!loading){
+      const ctx=new AudioContext();
+      const buf=currentFile.buffer;
+      analyze(buf,currentFile.name,currentFile.profile||pk).then(r=>{
+        setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
+        const spec=computeSpectrogram(buf,{fftSize:2048,sampleRate:buf.sampleRate});
+        setSpectrogramData(spec);
+        const gaps=detectDigitalGaps(buf);
+        setDigitalGaps(gaps);
+      }).catch(console.error);
+    }
+  },[currentFile]);
   const [digitalGaps,setDigitalGaps]=useState([]);
   const canvasRef=useRef(null);
   const prof=PROFILES[pk];
@@ -124,6 +141,7 @@ export default function AudioQualityAnalyzer() {
       const buf=await ctx.decodeAudioData(ab);
       const r=await analyze(buf,file.name,pk);
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
+      setAudioFile(file,pk);
       const spec=computeSpectrogram(buf,{fftSize:2048,sampleRate:buf.sampleRate});
       setSpectrogramData(spec);
       const gaps=detectDigitalGaps(buf);

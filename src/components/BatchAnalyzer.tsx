@@ -5,6 +5,7 @@ import { analyzeAudioQuality } from "../lib/audioQc/audioAnalyzerCore";
 import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, FileText, Download } from "lucide-react";
+import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee" },
@@ -61,6 +62,7 @@ async function analyzeFile(file, pk) {
 }
 
 export default function BatchAnalyzer() {
+  const { currentFile, setAudioFile } = useGlobalAudio();
   const [pk, setPk]           = useState("asr");
   const [results, setResults] = useState([]);
   const [running, setRunning] = useState(false);
@@ -71,6 +73,8 @@ export default function BatchAnalyzer() {
   async function handleFiles(files) {
     const wavFiles = Array.from(files).filter(f=>f.name.toLowerCase().endsWith(".wav"));
     if(wavFiles.length===0) return;
+    // Share first file globally
+    if(wavFiles.length>0) setAudioFile(wavFiles[0],pk);
     setRunning(true);
     setResults([]);
     setProgress({done:0,total:wavFiles.length});
