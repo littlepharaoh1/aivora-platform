@@ -43,17 +43,19 @@ function detectDevice(): {
   timezone: string;
   country: string;
 } {
-  const ua = navigator.userAgent;
+  const ua = window.navigator?.userAgent || navigator.userAgent || '';
 
   // Device type
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
   const deviceType =
     /iPad/.test(ua) ? "iPad" :
     /iPhone/.test(ua) ? "iPhone" :
-    /Android.*Mobile/.test(ua) ? "Android Phone" :
-    /Android/.test(ua) ? "Android Tablet" :
-    /Macintosh/.test(ua) ? "MacBook" :
-    /Windows/.test(ua) ? "Windows PC" :
-    /Linux/.test(ua) ? "Linux PC" : "Unknown Device";
+    /Android.*Mobile/i.test(ua) ? "Android Phone" :
+    /Android/i.test(ua) ? "Android Tablet" :
+    /Macintosh.*Mac OS X/.test(ua) && !isMobile ? "MacBook" :
+    /Windows NT/.test(ua) ? "Windows PC" :
+    /CrOS/.test(ua) ? "Chromebook" :
+    /Linux/.test(ua) && !isMobile ? "Linux PC" : "Mobile Device";
 
   // OS
   const os =
