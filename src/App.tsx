@@ -505,6 +505,15 @@ const roomReady = !!roomFileA && !!roomFileB;
     // Share first WAV globally across all sections
     const wavFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith(".wav"));
     if (wavFiles.length > 0) setAudioFile(wavFiles[0]);
+    // Track upload
+    trackEvent({
+      eventType: "file_uploaded",
+      module:    "upload",
+      userId:    authUser?.uid,
+      userEmail: authUser?.email,
+      userRole:  authUser?.role,
+      metadata:  { count: wavFiles.length, files: wavFiles.slice(0,5).map(f=>f.name) },
+    });
     aivoraAddFiles(Array.from(files)).catch((e) =>
       console.warn("[Aivora] addFiles failed:", e)
     );

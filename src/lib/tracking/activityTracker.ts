@@ -5,6 +5,34 @@
 
 import { supabase } from "../supabase";
 
+// ── Country from Timezone ────────────────────────────────────────────────────
+
+function getCountryFromTimezone(tz: string): string {
+  const map: Record<string, string> = {
+    "Africa/Cairo":           "Egypt",
+    "Asia/Shanghai":          "China",
+    "Asia/Beijing":           "China",
+    "Asia/Kolkata":           "India",
+    "Europe/London":          "UK",
+    "Europe/Berlin":          "Germany",
+    "Europe/Paris":           "France",
+    "America/New_York":       "USA",
+    "America/Los_Angeles":    "USA",
+    "Asia/Dubai":             "UAE",
+    "Asia/Riyadh":            "Saudi Arabia",
+    "Africa/Johannesburg":    "South Africa",
+    "Asia/Tokyo":             "Japan",
+    "Australia/Sydney":       "Australia",
+    "America/Sao_Paulo":      "Brazil",
+    "Europe/Moscow":          "Russia",
+    "Asia/Jakarta":           "Indonesia",
+    "Asia/Karachi":           "Pakistan",
+    "Asia/Dhaka":             "Bangladesh",
+    "Africa/Lagos":           "Nigeria",
+  };
+  return map[tz] || tz.split("/")[1]?.replace(/_/g," ") || "Unknown";
+}
+
 // ── Device Detection ──────────────────────────────────────────────────────────
 
 function detectDevice(): {
@@ -13,6 +41,7 @@ function detectDevice(): {
   browser: string;
   screenResolution: string;
   timezone: string;
+  country: string;
 } {
   const ua = navigator.userAgent;
 
@@ -45,8 +74,9 @@ function detectDevice(): {
 
   const screenResolution = `${screen.width}x${screen.height}`;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const country = getCountryFromTimezone(timezone);
 
-  return { deviceType, os, browser, screenResolution, timezone };
+  return { deviceType, os, browser, screenResolution, timezone, country };
 }
 
 function generateId(): string {
@@ -127,6 +157,7 @@ export async function trackEvent(opts: TrackEventOptions): Promise<void> {
       browser:          device.browser,
       screen_resolution: device.screenResolution,
       timezone:         device.timezone,
+      country:          device.country,
       ip_hash:          ipHash,
       metadata:         opts.metadata  ?? {},
       created_at:       new Date().toISOString(),

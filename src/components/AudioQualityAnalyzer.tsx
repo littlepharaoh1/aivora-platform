@@ -12,6 +12,8 @@ import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { computeAppenScore } from "../lib/audioQc/appenScore";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
+import { trackEvent } from "../lib/tracking/activityTracker";
+import { useAuth } from "../lib/auth/AuthContext";
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-28, rmsMax:-10, noiseMax:-60, snrMin:45, silMax:0.15 } },
@@ -104,6 +106,7 @@ function Badge({label,value,ok}) {
 
 export default function AudioQualityAnalyzer() {
   const { currentFile, setAudioFile, loading: globalLoading } = useGlobalAudio();
+  const { user: qcUser } = useAuth();
   const [rep,setRep]=useState(null);
   const [loading,setLoading]=useState(false);
   const [pk,setPk]=useState("wakeword");
@@ -144,6 +147,14 @@ export default function AudioQualityAnalyzer() {
       const r=await analyze(buf,file.name,pk);
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
       setAudioFile(file,pk);
+      trackEvent({
+        eventType: "file_analyzed",
+        module:    "quality_analyzer",
+        userId:    qcUser?.uid,
+        userEmail: qcUser?.email,
+        userRole:  qcUser?.role,
+        metadata:  { fileName: file.name, score: r.total, grade: r.grade, verdict: r.verdict, profile: pk },
+      });
       if(r.qc){
         const gaps=r.qc.problems.filter(p=>p.type==="DIGITAL_SILENCE"||p.type==="SILENCE_GAP").length;
         const as=computeAppenScore({
@@ -230,6 +241,16 @@ export default function AudioQualityAnalyzer() {
         profile:pk,
       },rep.name);
       setRepairResult(result);
+      if(result.changed){
+        trackEvent({
+          eventType: "repair_applied",
+          module:    "repair_suite",
+          userId:    qcUser?.uid,
+          userEmail: qcUser?.email,
+          userRole:  qcUser?.role,
+          metadata:  { operations: result.operations, fileName: rep?.name },
+        });
+      }
     }catch(e){console.error(e);}
     setRepairing(false);
   }
@@ -238,6 +259,14 @@ export default function AudioQualityAnalyzer() {
     if(!repairResult?.repairedBuffer)return;
     const wav=exportToWav(repairResult.repairedBuffer,rep?.name||"audio");
     downloadWav(wav);
+    trackEvent({
+      eventType: "wav_exported",
+      module:    "repair_suite",
+      userId:    qcUser?.uid,
+      userEmail: qcUser?.email,
+      userRole:  qcUser?.role,
+      metadata:  { fileName: wav.filename, operations: repairResult.operations },
+    });
   }
 
   useEffect(()=>{
