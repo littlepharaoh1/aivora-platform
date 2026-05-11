@@ -1,24 +1,58 @@
+/**
+ * audioAnalyzerCore.ts — Unified QC Engine
+ * Aivora Audio QC Engine — Batch 7
+ */
+
 import { detectAdaptiveDigitalSilence } from "./adaptiveSilenceDetector";
-import { detectHardCuts } from "./hardCutDetector";
-import { detectClipping } from "./clippingDetector";
+import { detectHardCuts }               from "./hardCutDetector";
+import { detectClipping }               from "./clippingDetector";
+import { analyzeLUFS }                  from "./lufsAnalyzer";
+import { analyzeFFT }                   from "./fftAnalyzer";
+import { analyzeVAD }                   from "./vadAnalyzer";
+import { analyzeSNR }                   from "./snrAnalyzer";
+import { restoreNaturalSilence }        from "./silenceRestorer";
 import type { AudioProblem, AudioProblemSeverity } from "./qcTypes";
 
+// ── PUBLIC TYPES ──────────────────────────────────────────────────────────────
+
+export type QcProfile = "wakeword" | "asr" | "tts" | "conversation";
+
 export interface AudioQcResult {
-  score: number;
-  deliveryRisk: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  problems: AudioProblem[];
+  score:          number;
+  deliveryRisk:   "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  problems:       AudioProblem[];
   technicalScore: number;
   integrityScore: number;
+
+  // Extended metrics (new)
+  metrics: {
+    lufs:        number;
+    truePeak:    number;
+    lra:         number;
+    snrDb:       number;
+    noiseClass:  string;
+    environment: string;
+    speechRatio: number;
+    quality:     string;
+  };
+
+  restoration: {
+    changed:          boolean;
+    segmentsRestored: number;
+    totalRestoredMs:  number;
+  };
 }
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
 
 function severityPenalty(severity: AudioProblemSeverity): number {
   switch (severity) {
     case "critical": return 25;
-    case "high": return 15;
-    case "medium": return 8;
-    case "low": return 3;
-    case "warning": return 5;
-    default: return 3;
+    case "high":     return 15;
+    case "warning":  return 5;
+    case "medium":   return 8;
+    case "low":      return 3;
+    default:         return 3;
   }
 }
 
@@ -32,63 +66,111 @@ function deliveryRiskFromScore(score: number): AudioQcResult["deliveryRisk"] {
 function sortProblems(problems: AudioProblem[]): AudioProblem[] {
   const rank: Record<AudioProblemSeverity, number> = {
     critical: 4,
-    high: 3,
-    medium: 2,
-    low: 1,
-    warning: 2,
+    high:     3,
+    warning:  2,
+    medium:   2,
+    low:      1,
   };
-
   return [...problems].sort((a, b) => {
-    const severityDiff = rank[b.severity] - rank[a.severity];
-    if (severityDiff !== 0) return severityDiff;
-
-    const timeA = a.timeMs ?? 0;
-    const timeB = b.timeMs ?? 0;
-    return timeA - timeB;
+    const sd = rank[b.severity] - rank[a.severity];
+    if (sd !== 0) return sd;
+    return (a.timeMs ?? 0) - (b.timeMs ?? 0);
   });
 }
 
-export async function analyzeAudioQuality(
+function buildAudioBuffer(
   samples: Float32Array,
   sampleRate: number
-): Promise<AudioQcResult> {
-  const silenceProblems = detectAdaptiveDigitalSilence(samples, sampleRate);
-  const hardCutProblems = detectHardCuts(samples, sampleRate);
-  const clippingProblems = detectClipping(samples, sampleRate);
+): AudioBuffer {
+  const ctx = new OfflineAudioContext(1, samples.length, sampleRate);
+  const buf = ctx.createBuffer(1, samples.length, sampleRate);
+  buf.getChannelData(0).set(samples);
+  return buf;
+}
 
-  const problems = sortProblems([
+// ── MAIN ANALYZER ─────────────────────────────────────────────────────────────
+
+export async function analyzeAudioQuality(
+  samples: Float32Array,
+  sampleRate: number,
+  profile: QcProfile = "asr"
+): Promise<AudioQcResult> {
+
+  // Build AudioBuffer for new analyzers
+  const buffer = buildAudioBuffer(samples, sampleRate);
+
+  // ── Run all analyzers ─────────────────────────────────────────────────────
+  const [
+    silenceProblems,
+    hardCutProblems,
+    clippingProblems,
+    lufsResult,
+    fftResult,
+    vadResult,
+    snrResult,
+    restorationResult,
+  ] = await Promise.all([
+    Promise.resolve(detectAdaptiveDigitalSilence(samples, sampleRate)),
+    Promise.resolve(detectHardCuts(samples, sampleRate)),
+    Promise.resolve(detectClipping(samples, sampleRate)),
+    Promise.resolve(analyzeLUFS(buffer, profile)),
+    Promise.resolve(analyzeFFT(buffer)),
+    Promise.resolve(analyzeVAD(buffer, profile)),
+    Promise.resolve(analyzeSNR(buffer, profile)),
+    Promise.resolve(restoreNaturalSilence(buffer)),
+  ]);
+
+  // ── Merge all problems ────────────────────────────────────────────────────
+  const allProblems = sortProblems([
     ...silenceProblems,
     ...hardCutProblems,
     ...clippingProblems,
+    ...lufsResult.problems,
+    ...fftResult.problems,
+    ...vadResult.problems,
+    ...snrResult.problems,
+    ...restorationResult.problems,
   ]);
 
+  // ── Scoring ───────────────────────────────────────────────────────────────
   let score = 100;
-  for (const p of problems) {
-    score -= severityPenalty(p.severity);
-  }
-
+  for (const p of allProblems) score -= severityPenalty(p.severity);
   score = Math.max(0, Math.min(100, Math.round(score)));
 
-  const technicalScore = Math.max(
-    0,
-    Math.min(100, 100 - clippingProblems.length * 12)
-  );
+  // Technical score: clipping + LUFS + SNR
+  const lufsOk  = lufsResult.problems.filter(p => p.severity === "critical").length === 0;
+  const snrOk   = snrResult.quality !== "unusable" && snrResult.quality !== "poor";
+  const techPen = clippingProblems.length * 12 + (lufsOk ? 0 : 15) + (snrOk ? 0 : 10);
+  const technicalScore = Math.max(0, Math.min(100, 100 - techPen));
 
-  const integrityScore = Math.max(
-    0,
-    Math.min(
-      100,
-      100 -
-        silenceProblems.length * 10 -
-        hardCutProblems.length * 15
-    )
-  );
+  // Integrity score: silence + hard cuts + VAD
+  const intPen =
+    silenceProblems.length * 10 +
+    hardCutProblems.length * 15 +
+    (vadResult.speechRatio < 0.2 ? 20 : 0) +
+    restorationResult.segmentsRestored * 3;
+  const integrityScore = Math.max(0, Math.min(100, 100 - intPen));
 
   return {
     score,
     deliveryRisk: deliveryRiskFromScore(score),
-    problems,
+    problems:     allProblems,
     technicalScore,
     integrityScore,
+    metrics: {
+      lufs:        lufsResult.integrated,
+      truePeak:    lufsResult.truePeak,
+      lra:         lufsResult.lra,
+      snrDb:       snrResult.snrDb,
+      noiseClass:  fftResult.noiseClass,
+      environment: fftResult.environment,
+      speechRatio: vadResult.speechRatio,
+      quality:     snrResult.quality,
+    },
+    restoration: {
+      changed:          restorationResult.changed,
+      segmentsRestored: restorationResult.segmentsRestored,
+      totalRestoredMs:  restorationResult.totalRestoredMs,
+    },
   };
 }
