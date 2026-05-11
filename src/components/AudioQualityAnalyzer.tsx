@@ -4,10 +4,11 @@ import { analyzeAudioBuffer, scoreAnalysis } from "../lib/audio/AdvancedAudioAna
 import { validateStudioCompliance } from "../lib/audio/StudioSpecCompliance";
 import { analyzeAudioQuality } from "../lib/audioQc/audioAnalyzerCore";
 import { restoreNaturalSilence } from "../lib/audioQc/silenceRestorer";
-import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, Download, Wand2, Wrench } from "lucide-react";
+import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, Download, Wand2, Wrench, FileText } from "lucide-react";
 import { repairAudioBuffer } from "../lib/audioQc/repair/repairPipeline";
 import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../lib/audioQc/spectrogram";
 import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
+import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 
 const PROFILES = {
@@ -141,6 +142,44 @@ export default function AudioQualityAnalyzer() {
     setRestoring(false);
   }
 
+  function doGenerateReport() {
+    if(!rep)return;
+    openQCReport({
+      fileName:    rep.name,
+      profile:     pk,
+      score:       rep.total,
+      grade:       rep.grade,
+      verdict:     rep.verdict,
+      analyzedAt:  rep.time,
+      metrics: {
+        duration:    rep.dur.toFixed(2)+"s",
+        sampleRate:  rep.sr+"Hz",
+        peak:        rep.pkDb.toFixed(1)+" dBFS",
+        rms:         rep.rDb.toFixed(1)+" dBFS",
+        lufs:        rep.qc?.metrics.lufs.toFixed(1)+" LUFS" ?? "—",
+        truePeak:    rep.qc?.metrics.truePeak.toFixed(2)+" dBTP" ?? "—",
+        lra:         rep.qc?.metrics.lra.toFixed(1)+" LU" ?? "—",
+        snr:         rep.qc?.metrics.snrDb.toFixed(1)+" dB" ?? "—",
+        noiseClass:  rep.qc?.metrics.noiseClass ?? "—",
+        environment: rep.qc?.metrics.environment ?? "—",
+        speechRatio: ((rep.qc?.metrics.speechRatio??0)*100).toFixed(1)+"%",
+        qcScore:     (rep.qc?.score??0)+"/100",
+      },
+      problems: (rep.qc?.problems??[]).map(p=>({
+        severity: p.severity,
+        message:  p.message,
+        action:   p.suggestedAction,
+      })),
+      silenceEdges: {
+        leading:  rep.edges.leadMs+"ms",
+        trailing: rep.edges.trailMs+"ms",
+        ratio:    (rep.edges.silRatio*100).toFixed(1)+"%",
+      },
+      repairs:     repairResult?.operations.map(o=>({operation:o})),
+      digitalGaps: digitalGaps.filter(g=>g.type==="internal").length||undefined,
+    });
+  }
+
   async function doRepair() {
     if(!rep?._buf)return;
     setRepairing(true);setRepairResult(null);
@@ -223,7 +262,15 @@ export default function AudioQualityAnalyzer() {
           <div style={{background:"#060e16",border:"1px solid "+vc+"33",borderRadius:12,padding:16,display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
             <Ring score={rep.total} grade={rep.grade} verdict={rep.verdict}/>
             <div style={{flex:1}}>
-              <div style={{fontSize:12,color:"#e0f2f8",fontWeight:700,marginBottom:4}}>{rep.name}</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{fontSize:12,color:"#e0f2f8",fontWeight:700}}>{rep.name}</div>
+              <button onClick={doGenerateReport}
+                style={{display:"flex",alignItems:"center",gap:5,background:"#0f172a",
+                  border:"1px solid #1e3a5f",borderRadius:6,padding:"4px 10px",
+                  cursor:"pointer",color:"#94a3b8",fontSize:9,fontWeight:700}}>
+                <FileText size={10}/>QC REPORT
+              </button>
+            </div>
               <div style={{fontSize:9,color:rep.pcolor,marginBottom:10}}>{rep.picon} {rep.plabel} · {rep.time}</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {[["Dur",rep.dur.toFixed(2)+"s"],["Rate",rep.sr+"Hz"],["Peak",rep.pkDb.toFixed(1)+"dBFS"],["RMS",rep.rDb.toFixed(1)+"dBFS"],["Noise",rep.nDb.toFixed(1)+"dBFS"],["SNR",rep.snr.toFixed(1)+"dB"],["Voice",rep.voice.pct+"%"],["Hum",rep.hum.detected?rep.hum.freq+"Hz":"None"]].map(([l,v])=>(
