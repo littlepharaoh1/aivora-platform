@@ -1,11 +1,12 @@
 // @ts-nocheck
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { analyzeAudioBuffer, scoreAnalysis } from "../lib/audio/AdvancedAudioAnalyzer";
 import { validateStudioCompliance } from "../lib/audio/StudioSpecCompliance";
 import { analyzeAudioQuality } from "../lib/audioQc/audioAnalyzerCore";
 import { restoreNaturalSilence } from "../lib/audioQc/silenceRestorer";
 import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, Download, Wand2, Wrench } from "lucide-react";
 import { repairAudioBuffer } from "../lib/audioQc/repair/repairPipeline";
+import { computeSpectrogram, drawSpectrogram } from "../lib/audioQc/spectrogram";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 
 const PROFILES = {
@@ -107,6 +108,8 @@ export default function AudioQualityAnalyzer() {
   const [repairing,setRepairing]=useState(false);
   const [repairResult,setRepairResult]=useState(null);
   const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false});
+  const [spectrogramData,setSpectrogramData]=useState(null);
+  const canvasRef=useRef(null);
   const prof=PROFILES[pk];
 
   async function go(file) {
@@ -118,6 +121,8 @@ export default function AudioQualityAnalyzer() {
       const buf=await ctx.decodeAudioData(ab);
       const r=await analyze(buf,file.name,pk);
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
+      const spec=computeSpectrogram(buf,{fftSize:2048,sampleRate:buf.sampleRate});
+      setSpectrogramData(spec);
     }catch(e){console.error(e);}
     setLoading(false);
   }
@@ -153,6 +158,12 @@ export default function AudioQualityAnalyzer() {
     const wav=exportToWav(repairResult.repairedBuffer,rep?.name||"audio");
     downloadWav(wav);
   }
+
+  useEffect(()=>{
+    if(canvasRef.current&&spectrogramData){
+      drawSpectrogram(canvasRef.current,spectrogramData);
+    }
+  },[spectrogramData]);
 
   const vc=rep?.verdict==="READY"?"#10b981":rep?.verdict==="REVIEW"?"#f59e0b":"#ef4444";
   const qc=rep?.qc;
@@ -257,6 +268,30 @@ export default function AudioQualityAnalyzer() {
                   {restored.changed?`✓ ${restored.segmentsRestored} segment(s) restored · ${restored.totalRestoredMs.toFixed(0)}ms`:"No digital silence found"}
                 </span>}
               </div>
+            </div>
+          </div>}
+
+          {/* Spectrogram */}
+          {spectrogramData&&<div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:12,padding:14}}>
+            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8}}>SPECTROGRAM · {spectrogramData.numFrames} FRAMES · FFT {spectrogramData.fftSize}</div>
+            <div style={{position:"relative",width:"100%",borderRadius:8,overflow:"hidden",background:"#040c14"}}>
+              <canvas ref={canvasRef} width={800} height={200}
+                style={{width:"100%",height:180,display:"block",borderRadius:8}}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+              <span style={{fontSize:9,color:"#2a5a6a"}}>0s</span>
+              <span style={{fontSize:9,color:"#2a5a6a",textAlign:"center"}}>← time →</span>
+              <span style={{fontSize:9,color:"#2a5a6a"}}>{spectrogramData.durationSec.toFixed(2)}s</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}>
+              <div style={{height:8,flex:1,borderRadius:4,background:"linear-gradient(to right,#08080a,#003c78,#008080,#00c878,#b4dc00,#ffa000,#ff3c14,#ffffff)"}}/>
+              <div style={{display:"flex",justifyContent:"space-between",width:"100%",position:"absolute",pointerEvents:"none"}}>
+              </div>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
+              <span style={{fontSize:8,color:"#2a5a6a"}}>-90 dB</span>
+              <span style={{fontSize:8,color:"#2a5a6a"}}>-45 dB</span>
+              <span style={{fontSize:8,color:"#2a5a6a"}}>0 dB</span>
             </div>
           </div>}
 
