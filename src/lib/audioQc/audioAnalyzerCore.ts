@@ -10,7 +10,7 @@ import { analyzeLUFS }                  from "./lufsAnalyzer";
 import { analyzeFFT }                   from "./fftAnalyzer";
 import { analyzeVAD }                   from "./vadAnalyzer";
 import { analyzeSNR }                   from "./snrAnalyzer";
-import { restoreNaturalSilence }        from "./silenceRestorer";
+
 import type { AudioProblem, AudioProblemSeverity } from "./qcTypes";
 
 // ── PUBLIC TYPES ──────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ export async function analyzeAudioQuality(
     fftResult,
     vadResult,
     snrResult,
-    restorationResult,
+    restorationResult,// placeholder — call restoreNaturalSilence separately
   ] = await Promise.all([
     Promise.resolve(detectAdaptiveDigitalSilence(samples, sampleRate)),
     Promise.resolve(detectHardCuts(samples, sampleRate)),
@@ -117,7 +117,7 @@ export async function analyzeAudioQuality(
     Promise.resolve(analyzeFFT(buffer)),
     Promise.resolve(analyzeVAD(buffer, profile)),
     Promise.resolve(analyzeSNR(buffer, profile)),
-    Promise.resolve(restoreNaturalSilence(buffer)),
+    Promise.resolve({ changed: false, segmentsRestored: 0, totalRestoredMs: 0, problems: [] }),
   ]);
 
   // ── Merge all problems ────────────────────────────────────────────────────
