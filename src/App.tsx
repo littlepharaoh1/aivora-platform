@@ -9,6 +9,7 @@ import AudioEnhancementLab from "./components/AudioEnhancementLab";
 import StorePanel from "./components/StorePanel";
 import { useAivora } from "./lib/store/AivoraContext";
 import GlobalAudioPlayer from "./components/GlobalAudioPlayer";
+import UserAvatar from "./components/UserAvatar";
 import SmartNamingSequencer from "./components/SmartNamingSequencer";
 import { useGlobalAudio } from "./lib/store/GlobalAudioContext";
 
@@ -915,16 +916,19 @@ const roomFileSummary = [
               control German naming from S0001 to S0200.
             </span>
           </div>
-          <label className="primary">
-            Bulk Upload
-            <input
-              type="file"
-              multiple
-              accept=".wav,audio/wav,audio/*"
-              hidden
-              onChange={(e) => handleUpload(e.target.files)}
-            />
-          </label>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <label className="primary">
+              Bulk Upload
+              <input
+                type="file"
+                multiple
+                accept=".wav,audio/wav,audio/*"
+                hidden
+                onChange={(e) => handleUpload(e.target.files)}
+              />
+            </label>
+            <UserAvatar/>
+          </div>
         </header>
 
         {tab === "dashboard" && (
