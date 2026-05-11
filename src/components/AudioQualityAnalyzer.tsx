@@ -9,6 +9,7 @@ import { repairAudioBuffer } from "../lib/audioQc/repair/repairPipeline";
 import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../lib/audioQc/spectrogram";
 import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
+import { computeAppenScore } from "../lib/audioQc/appenScore";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 
@@ -111,6 +112,7 @@ export default function AudioQualityAnalyzer() {
   const [restored,setRestored]=useState(null);
   const [repairing,setRepairing]=useState(false);
   const [repairResult,setRepairResult]=useState(null);
+  const [appenResult,setAppenResult]=useState(null);
   const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false});
   const [spectrogramData,setSpectrogramData]=useState(null);
 
@@ -142,6 +144,24 @@ export default function AudioQualityAnalyzer() {
       const r=await analyze(buf,file.name,pk);
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
       setAudioFile(file,pk);
+      if(r.qc){
+        const gaps=r.qc.problems.filter(p=>p.type==="DIGITAL_SILENCE"||p.type==="SILENCE_GAP").length;
+        const as=computeAppenScore({
+          fileName:   file.name,
+          profile:    pk,
+          sampleRate: buf.sampleRate,
+          duration:   buf.duration,
+          lufs:       {integrated:r.qc.metrics.lufs,truePeak:r.qc.metrics.truePeak,lra:r.qc.metrics.lra,problems:[]},
+          fft:        {centroid:0,rolloff:0,flatness:0,noiseClass:r.qc.metrics.noiseClass,environment:r.qc.metrics.environment,bandEnergies:{sub:0,low:0,lowMid:0,mid:0,highMid:0,high:0},problems:[]},
+          vad:        {speechRegions:[],silenceMetrics:{leadingSec:r.edges.leadMs/1000,trailingSec:r.edges.trailMs/1000,totalSilenceSec:0,speechRatio:r.qc.metrics.speechRatio,longestGapSec:0},speechRatio:r.qc.metrics.speechRatio,problems:[]},
+          snr:        {snrDb:r.qc.metrics.snrDb,noiseFloorDb:r.nDb,signalDb:0,segmentalSnr:0,fakeStudio:false,quality:r.qc.metrics.quality,problems:[]},
+          hasDigitalGaps: gaps>0,
+          digitalGapCount: gaps,
+          peakDb:     r.pkDb,
+          silenceRatio: r.edges.silRatio,
+        });
+        setAppenResult(as);
+      }
       const spec=computeSpectrogram(buf,{fftSize:2048,sampleRate:buf.sampleRate});
       setSpectrogramData(spec);
       const gaps=detectDigitalGaps(buf);
@@ -364,6 +384,42 @@ export default function AudioQualityAnalyzer() {
               <span style={{fontSize:8,color:"#2a5a6a"}}>-90 dB</span>
               <span style={{fontSize:8,color:"#2a5a6a"}}>-45 dB</span>
               <span style={{fontSize:8,color:"#2a5a6a"}}>0 dB</span>
+            </div>
+          </div>}
+
+          {/* Appen Delivery Score */}
+          {appenResult&&<div style={{background:"#060e16",border:"1px solid "+(appenResult.verdict==="READY"?"#10b98144":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b44":"#ef444444"),borderRadius:12,padding:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,fontWeight:700}}>APPEN DELIVERY SCORE</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:20,fontWeight:900,fontFamily:"monospace",
+                  color:appenResult.verdict==="READY"?"#10b981":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b":"#ef4444"}}>
+                  {appenResult.score}/100
+                </span>
+                <span style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:12,
+                  background:appenResult.verdict==="READY"?"#10b98122":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b22":"#ef444422",
+                  color:appenResult.verdict==="READY"?"#10b981":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b":"#ef4444",
+                  border:"1px solid "+(appenResult.verdict==="READY"?"#10b98144":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b44":"#ef444444")}}>
+                  {appenResult.verdict.replace("_"," ")}
+                </span>
+              </div>
+            </div>
+            <div style={{fontSize:10,color:"#a0c4cc",marginBottom:10,padding:"6px 10px",
+              background:"#050d14",borderRadius:6}}>{appenResult.summary}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              {appenResult.checks.map((c,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",
+                  background:"#050d14",borderRadius:6,border:"1px solid "+(c.passed?"#10b98122":c.critical?"#ef444433":"#f59e0b33")}}>
+                  <span style={{fontSize:11,color:c.passed?"#10b981":c.critical?"#ef4444":"#f59e0b"}}>
+                    {c.passed?"✓":"✗"}
+                  </span>
+                  <span style={{fontSize:10,color:"#a0c4cc",flex:1}}>{c.label}</span>
+                  <span style={{fontSize:10,color:"#4a8a9a",fontFamily:"monospace"}}>{c.value}</span>
+                  {!c.passed&&c.fix&&<span style={{fontSize:9,color:"#4a8a9a",maxWidth:200,textAlign:"right"}}>→ {c.fix}</span>}
+                </div>
+              ))}
             </div>
           </div>}
 
