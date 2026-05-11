@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: "https://aivora-platform.vercel.app",
         queryParams: { access_type: "offline", prompt: "consent" },
       },
     });
