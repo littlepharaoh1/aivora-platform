@@ -315,6 +315,15 @@ function Metric({
 }
 
 export default function App() {
+  // Track app load on mount
+  React.useEffect(() => {
+    trackEvent({
+      eventType: "app_loaded",
+      module:    "platform",
+      metadata:  { version: "V4", timestamp: new Date().toISOString() },
+    });
+  }, []);
+
 const [user, setUser] = useState<any>(null);
 const [role, setRole] = useState<string | null>("Admin");
   const { addFiles: aivoraAddFiles } = useAivora();
