@@ -166,8 +166,8 @@ export async function trackEvent(opts: TrackEventOptions): Promise<void> {
     };
 
     // Use fetch directly to bypass RLS issues
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const SUPABASE_URL = "https://ausczfqaemtfqvosjyqo.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1c2N6ZnFhZW10ZnF2b3NqeXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNDM2NTcsImV4cCI6MjA5MjYxOTY1N30.EuYBavGnQCvdcxpsjelqqPlNCxtsHoOCYhEykl7cF4Q";
 
     const res = await fetch(`${SUPABASE_URL}/rest/v1/activity_logs`, {
       method: "POST",
