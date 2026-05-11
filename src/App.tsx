@@ -8,6 +8,8 @@ import AudioPipeline from "./components/AudioPipeline";
 import AudioEnhancementLab from "./components/AudioEnhancementLab";
 import StorePanel from "./components/StorePanel";
 import { useAivora } from "./lib/store/AivoraContext";
+import { trackEvent } from "./lib/tracking/activityTracker";
+import { useAuth } from "./lib/auth/AuthContext";
 import GlobalAudioPlayer from "./components/GlobalAudioPlayer";
 import UserAvatar from "./components/UserAvatar";
 import SmartNamingSequencer from "./components/SmartNamingSequencer";
@@ -315,6 +317,7 @@ const [user, setUser] = useState<any>(null);
 const [role, setRole] = useState<string | null>("Admin");
   const { addFiles: aivoraAddFiles } = useAivora();
   const { setAudioFile } = useGlobalAudio();
+  const { user: authUser } = useAuth();
 useEffect(() => {
   const logVisitor = async () => {
     try {
@@ -372,6 +375,18 @@ if (!user && false) {
   }, [config]);
   const [theme, setTheme] = useState<"dark" | "clean">("dark");
   const [tab, setTab] = useState<Tab>("dashboard");
+
+  function navigateTo(newTab: Tab) {
+    setTab(newTab);
+    trackEvent({
+      eventType:  "tab_opened",
+      module:     newTab,
+      userId:     authUser?.uid,
+      userEmail:  authUser?.email,
+      userRole:   authUser?.role,
+      metadata:   { tab: newTab },
+    });
+  }
 
   const [dbProjects, setDbProjects] = useState<any[]>([]);
   useEffect(() => {
@@ -899,7 +914,7 @@ const roomFileSummary = [
             <button
               key={id}
               className={tab === id ? "active" : ""}
-              onClick={() => setTab(id)}
+              onClick={() => navigateTo(id as Tab)}
             >
               {label}
             </button>

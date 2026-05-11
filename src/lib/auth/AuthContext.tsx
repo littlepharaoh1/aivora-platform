@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { supabase } from "../supabase";
 import { getRoleFromEmail } from "./adminAllowlist";
+import { trackEvent, startSession, endSession } from "../tracking/activityTracker";
 import type { User, Session } from "@supabase/supabase-js";
 
 export interface AivoraUser {
@@ -66,10 +67,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, sess) => {
+      (event, sess) => {
         setSession(sess);
-        setUser(sess?.user ? mapUser(sess.user) : null);
+        const mappedUser = sess?.user ? mapUser(sess.user) : null;
+        setUser(mappedUser);
         setLoading(false);
+
+        if (event === "SIGNED_IN" && mappedUser) {
+          startSession();
+          trackEvent({
+            eventType:  "login_success",
+            module:     "auth",
+            userId:     mappedUser.uid,
+            userEmail:  mappedUser.email,
+            userRole:   mappedUser.role,
+            metadata:   { provider: mappedUser.provider },
+          });
+        }
+        if (event === "SIGNED_OUT") {
+          trackEvent({ eventType: "logout", module: "auth" });
+          endSession();
+        }
+        if (event === "TOKEN_REFRESHED" && mappedUser) {
+          trackEvent({
+            eventType: "session_restored",
+            module:    "auth",
+            userId:    mappedUser.uid,
+            userEmail: mappedUser.email,
+            userRole:  mappedUser.role,
+          });
+        }
       }
     );
     return () => subscription.unsubscribe();
