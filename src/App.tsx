@@ -13,6 +13,7 @@ import { useAuth } from "./lib/auth/AuthContext";
 import GlobalAudioPlayer from "./components/GlobalAudioPlayer";
 import UserAvatar from "./components/UserAvatar";
 import SmartNamingSequencer from "./components/SmartNamingSequencer";
+import ActivityMonitor from "./components/ActivityMonitor";
 import { useGlobalAudio } from "./lib/store/GlobalAudioContext";
 
 type Tab =
@@ -32,7 +33,8 @@ type Tab =
   | "pipeline"
   | "store"
   | "batch"
-  | "sequencer";
+  | "sequencer"
+  | "monitor";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
@@ -722,6 +724,7 @@ ctx.stroke();
 ["analyzer", "Quality Analyzer"],
 ["batch", "Batch Analyzer"],
 ["sequencer", "Smart Naming"],
+["monitor", "Activity Monitor"],
 ["pipeline", "Audio Pipeline"],
       ["store", "Aivora Store"],
   ];
@@ -1576,6 +1579,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
 {tab === "analyzer" && <AudioQualityAnalyzer />}
 {tab === "batch" && <BatchAnalyzer />}
 {tab === "sequencer" && <SmartNamingSequencer />}
+{tab === "monitor" && <ActivityMonitor />}
 {tab === "pipeline" && <AudioPipeline />}
         {tab === "store" && <StorePanel />}
       <GlobalAudioPlayer />
