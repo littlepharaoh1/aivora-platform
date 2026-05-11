@@ -4,7 +4,9 @@ import { analyzeAudioBuffer, scoreAnalysis } from "../lib/audio/AdvancedAudioAna
 import { validateStudioCompliance } from "../lib/audio/StudioSpecCompliance";
 import { analyzeAudioQuality } from "../lib/audioQc/audioAnalyzerCore";
 import { restoreNaturalSilence } from "../lib/audioQc/silenceRestorer";
-import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, Download, Wand2 } from "lucide-react";
+import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, Download, Wand2, Wrench } from "lucide-react";
+import { repairAudioBuffer } from "../lib/audioQc/repair/repairPipeline";
+import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-28, rmsMax:-10, noiseMax:-60, snrMin:45, silMax:0.15 } },
@@ -102,6 +104,9 @@ export default function AudioQualityAnalyzer() {
   const [hist,setHist]=useState([]);
   const [restoring,setRestoring]=useState(false);
   const [restored,setRestored]=useState(null);
+  const [repairing,setRepairing]=useState(false);
+  const [repairResult,setRepairResult]=useState(null);
+  const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false});
   const prof=PROFILES[pk];
 
   async function go(file) {
@@ -125,6 +130,28 @@ export default function AudioQualityAnalyzer() {
       setRestored(result);
     }catch(e){console.error(e);}
     setRestoring(false);
+  }
+
+  async function doRepair() {
+    if(!rep?._buf)return;
+    setRepairing(true);setRepairResult(null);
+    try{
+      const profileTargets={wakeword:-20,asr:-20,tts:-20,conversation:-23};
+      const result=repairAudioBuffer(rep._buf,{
+        ...repairOpts,
+        humFrequency:repairOpts.humFrequency,
+        targetLufs:profileTargets[pk]||(-20),
+        profile:pk,
+      },rep.name);
+      setRepairResult(result);
+    }catch(e){console.error(e);}
+    setRepairing(false);
+  }
+
+  function doExport(){
+    if(!repairResult?.repairedBuffer)return;
+    const wav=exportToWav(repairResult.repairedBuffer,rep?.name||"audio");
+    downloadWav(wav);
   }
 
   const vc=rep?.verdict==="READY"?"#10b981":rep?.verdict==="REVIEW"?"#f59e0b":"#ef4444";
@@ -232,6 +259,76 @@ export default function AudioQualityAnalyzer() {
               </div>
             </div>
           </div>}
+
+          {/* Honest Audio Repair Suite */}
+          <div style={{background:"#060e16",border:"1px solid #1a3a2a",borderRadius:12,padding:14}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <Wrench size={13} color="#10b981"/>
+              <span style={{fontSize:9,color:"#10b981",letterSpacing:1,fontWeight:700}}>HONEST AUDIO REPAIR SUITE</span>
+            </div>
+            <div style={{fontSize:9,color:"#4a8a9a",marginBottom:10,padding:"6px 10px",background:"#050d14",borderRadius:6,border:"1px solid #0f2a3a"}}>
+              ⚠ Repairs are manual and should be reviewed before delivery.
+            </div>
+            {/* Options */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
+              {[
+                ["humRemoval",      "Remove Hum",          repairOpts.humRemoval],
+                ["loudnessNormalize","Normalize Loudness",  repairOpts.loudnessNormalize],
+                ["trimSilence",     "Trim Silence",         repairOpts.trimSilence],
+                ["shortenInternalSilence","Shorten Gaps",   repairOpts.shortenInternalSilence],
+              ].map(([key,label,active])=>(
+                <div key={key} onClick={()=>setRepairOpts(p=>({...p,[key]:!p[key]}))}
+                  style={{padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:10,fontWeight:700,
+                    background:active?"#10b98122":"#050d14",
+                    border:"1px solid "+(active?"#10b98166":"#0f2a3a"),
+                    color:active?"#10b981":"#4a8a9a"}}>
+                  {label}
+                </div>
+              ))}
+              {repairOpts.humRemoval&&<div style={{display:"flex",gap:4}}>
+                {([50,60]).map(f=>(
+                  <div key={f} onClick={()=>setRepairOpts(p=>({...p,humFrequency:f}))}
+                    style={{padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:10,fontWeight:700,
+                      background:repairOpts.humFrequency===f?"#f59e0b22":"#050d14",
+                      border:"1px solid "+(repairOpts.humFrequency===f?"#f59e0b66":"#0f2a3a"),
+                      color:repairOpts.humFrequency===f?"#f59e0b":"#4a8a9a"}}>
+                    {f}Hz
+                  </div>
+                ))}
+              </div>}
+            </div>
+            {/* Action buttons */}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:repairResult?12:0}}>
+              <button onClick={doRepair} disabled={repairing||(!repairOpts.humRemoval&&!repairOpts.loudnessNormalize&&!repairOpts.trimSilence)}
+                style={{display:"flex",alignItems:"center",gap:6,
+                  background:repairing?"#0f2a3a":"#10b98122",border:"1px solid #10b98144",
+                  borderRadius:6,padding:"6px 14px",cursor:"pointer",color:"#10b981",fontSize:10,fontWeight:700}}>
+                <Wrench size={11}/>{repairing?"Repairing...":"Run Repair"}
+              </button>
+              {repairResult?.changed&&<button onClick={doExport}
+                style={{display:"flex",alignItems:"center",gap:6,
+                  background:"#22d3ee22",border:"1px solid #22d3ee44",
+                  borderRadius:6,padding:"6px 14px",cursor:"pointer",color:"#22d3ee",fontSize:10,fontWeight:700}}>
+                <Download size={11}/>Export WAV
+              </button>}
+            </div>
+            {/* Results */}
+            {repairResult&&<div style={{borderTop:"1px solid #0f2a3a",paddingTop:10}}>
+              {repairResult.operations.length>0&&<div style={{marginBottom:6}}>
+                <div style={{fontSize:9,color:"#4a8a9a",marginBottom:4}}>OPERATIONS APPLIED</div>
+                {repairResult.operations.map((op,i)=>(
+                  <div key={i} style={{fontSize:10,color:"#10b981",marginBottom:2}}>✓ {op}</div>
+                ))}
+              </div>}
+              {repairResult.warnings.length>0&&<div>
+                <div style={{fontSize:9,color:"#4a8a9a",marginBottom:4}}>WARNINGS</div>
+                {repairResult.warnings.map((w,i)=>(
+                  <div key={i} style={{fontSize:10,color:"#f59e0b",marginBottom:2}}>⚠ {w}</div>
+                ))}
+              </div>}
+              {!repairResult.changed&&<div style={{fontSize:10,color:"#4a8a9a"}}>No changes were needed.</div>}
+            </div>}
+          </div>
 
           {/* Weighted checks */}
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
