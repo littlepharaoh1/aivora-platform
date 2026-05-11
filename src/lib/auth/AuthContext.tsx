@@ -84,6 +84,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             metadata:   { provider: mappedUser.provider },
           });
         }
+        if (event === "INITIAL_SESSION" && mappedUser) {
+          startSession();
+          trackEvent({
+            eventType:  "session_restored",
+            module:     "auth",
+            userId:     mappedUser.uid,
+            userEmail:  mappedUser.email,
+            userRole:   mappedUser.role,
+            metadata:   { provider: mappedUser.provider },
+          });
+        }
         if (event === "SIGNED_OUT") {
           trackEvent({ eventType: "logout", module: "auth" });
           endSession();
