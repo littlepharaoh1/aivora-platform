@@ -198,3 +198,49 @@ export function drawSpectrogram(
     ctx.fillText(t+"s", x + 2, H - 4);
   }
 }
+
+// ── Draw digital silence gap markers ─────────────────────────────────────────
+
+export interface GapMarker {
+  startSec:  number;
+  endSec:    number;
+  type:      "leading" | "trailing" | "internal";
+}
+
+export function drawGapMarkers(
+  canvas: HTMLCanvasElement,
+  gaps:   GapMarker[],
+  durationSec: number
+): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx || gaps.length === 0) return;
+
+  const W = canvas.width;
+  const H = canvas.height;
+
+  for (const gap of gaps) {
+    const x1 = Math.floor((gap.startSec / durationSec) * W);
+    const x2 = Math.ceil( (gap.endSec   / durationSec) * W);
+    const w  = Math.max(2, x2 - x1);
+
+    const color = gap.type === "internal"
+      ? "rgba(239,68,68,0.35)"   // red — internal gaps (Appen rejects these)
+      : "rgba(251,191,36,0.25)"; // yellow — leading/trailing
+
+    ctx.fillStyle = color;
+    ctx.fillRect(x1, 0, w, H);
+
+    // Border line
+    ctx.fillStyle = gap.type === "internal"
+      ? "rgba(239,68,68,0.9)"
+      : "rgba(251,191,36,0.7)";
+    ctx.fillRect(x1, 0, 2, H);
+  }
+
+  // Legend
+  ctx.font      = "9px monospace";
+  ctx.fillStyle = "rgba(239,68,68,0.9)";
+  ctx.fillText("█ digital silence gap", 6, H - 16);
+  ctx.fillStyle = "rgba(251,191,36,0.9)";
+  ctx.fillText("█ leading/trailing", 6, H - 6);
+}

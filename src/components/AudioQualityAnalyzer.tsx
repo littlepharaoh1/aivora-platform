@@ -6,7 +6,8 @@ import { analyzeAudioQuality } from "../lib/audioQc/audioAnalyzerCore";
 import { restoreNaturalSilence } from "../lib/audioQc/silenceRestorer";
 import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, Download, Wand2, Wrench } from "lucide-react";
 import { repairAudioBuffer } from "../lib/audioQc/repair/repairPipeline";
-import { computeSpectrogram, drawSpectrogram } from "../lib/audioQc/spectrogram";
+import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../lib/audioQc/spectrogram";
+import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 
 const PROFILES = {
@@ -109,6 +110,7 @@ export default function AudioQualityAnalyzer() {
   const [repairResult,setRepairResult]=useState(null);
   const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false});
   const [spectrogramData,setSpectrogramData]=useState(null);
+  const [digitalGaps,setDigitalGaps]=useState([]);
   const canvasRef=useRef(null);
   const prof=PROFILES[pk];
 
@@ -123,6 +125,8 @@ export default function AudioQualityAnalyzer() {
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
       const spec=computeSpectrogram(buf,{fftSize:2048,sampleRate:buf.sampleRate});
       setSpectrogramData(spec);
+      const gaps=detectDigitalGaps(buf);
+      setDigitalGaps(gaps);
     }catch(e){console.error(e);}
     setLoading(false);
   }
@@ -162,8 +166,11 @@ export default function AudioQualityAnalyzer() {
   useEffect(()=>{
     if(canvasRef.current&&spectrogramData){
       drawSpectrogram(canvasRef.current,spectrogramData);
+      if(digitalGaps.length>0){
+        drawGapMarkers(canvasRef.current,digitalGaps,spectrogramData.durationSec);
+      }
     }
-  },[spectrogramData]);
+  },[spectrogramData,digitalGaps]);
 
   const vc=rep?.verdict==="READY"?"#10b981":rep?.verdict==="REVIEW"?"#f59e0b":"#ef4444";
   const qc=rep?.qc;
@@ -273,7 +280,7 @@ export default function AudioQualityAnalyzer() {
 
           {/* Spectrogram */}
           {spectrogramData&&<div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:12,padding:14}}>
-            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8}}>SPECTROGRAM · {spectrogramData.numFrames} FRAMES · FFT {spectrogramData.fftSize}</div>
+            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8,display:"flex",justifyContent:"space-between"}}><span>SPECTROGRAM · {spectrogramData.numFrames} FRAMES · FFT {spectrogramData.fftSize}</span>{digitalGaps.length>0&&<span style={{color:digitalGaps.some(g=>g.type==="internal")?"#ef4444":"#f59e0b"}}>{digitalGaps.filter(g=>g.type==="internal").length} INTERNAL GAP(S) DETECTED ⚠</span>}</div>
             <div style={{position:"relative",width:"100%",borderRadius:8,overflow:"hidden",background:"#040c14"}}>
               <canvas ref={canvasRef} width={800} height={200}
                 style={{width:"100%",height:180,display:"block",borderRadius:8}}/>

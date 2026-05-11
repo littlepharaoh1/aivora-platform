@@ -26,7 +26,7 @@ function frameEnergies(
 
 function noiseFloorFromEnergies(energies: Float64Array): number {
   const sorted = Float64Array.from(energies).sort();
-  const cutoff = Math.max(1, Math.floor(sorted.length * 0.10));
+  const cutoff = Math.max(1, Math.floor(sorted.length * 0.05)); // tighter noise floor
   let sum = 0;
   for (let i = 0; i < cutoff; i++) sum += sorted[i];
   return sum / cutoff;
@@ -47,7 +47,7 @@ function detectDigitalSilenceSegments(
 ): SilenceSegment[] {
   const FRAME_MS  = 10;
   const frameSize = Math.round((FRAME_MS / 1000) * sampleRate);
-  const threshold = noiseFloor * 0.5; // well below noise floor = digital silence
+  const threshold = noiseFloor * 0.15; // sensitive: catch near-zero digital silence
   const segments: SilenceSegment[] = [];
 
   let inSilence = false;
@@ -165,6 +165,54 @@ export interface RestorationResult {
   problems:         AudioProblem[];
 }
 
+
+// ── EXPORTED: Detect digital silence gaps for UI highlighting ─────────────────
+
+export interface DigitalGap {
+  startSec:    number;
+  endSec:      number;
+  durationMs:  number;
+  type:        "leading" | "trailing" | "internal";
+}
+
+export function detectDigitalGaps(buffer: AudioBuffer): DigitalGap[] {
+  const ch0        = buffer.getChannelData(0);
+  const sampleRate = buffer.sampleRate;
+  const frameSize  = Math.round(0.005 * sampleRate); // 5ms frames — very sensitive
+  const energies   = frameEnergies(ch0, sampleRate, 5);
+  const sorted     = Float64Array.from(energies).sort();
+  const cutoff     = Math.max(1, Math.floor(sorted.length * 0.05));
+  let   noiseSum   = 0;
+  for (let i = 0; i < cutoff; i++) noiseSum += sorted[i];
+  const noiseFloor = noiseSum / cutoff;
+  const threshold  = noiseFloor * 0.15;
+
+  const segments   = detectDigitalSilenceSegments(ch0, sampleRate, noiseFloor);
+  const gaps: DigitalGap[] = [];
+
+  // Find first/last speech frame for type classification
+  let firstSpeech = -1, lastSpeech = -1;
+  for (let i = 0; i < energies.length; i++) {
+    if (energies[i] > noiseFloor * 1.5) {
+      if (firstSpeech === -1) firstSpeech = i;
+      lastSpeech = i;
+    }
+  }
+
+  for (const seg of segments) {
+    const durationMs = ((seg.endSample - seg.startSample) / sampleRate) * 1000;
+    if (durationMs < 5) continue; // skip sub-5ms artifacts
+    gaps.push({
+      startSec:   seg.startSample / sampleRate,
+      endSec:     seg.endSample   / sampleRate,
+      durationMs,
+      type:       seg.type,
+    });
+  }
+
+  return gaps;
+}
+
 export function restoreNaturalSilence(
   buffer: AudioBuffer
 ): RestorationResult {
@@ -214,7 +262,7 @@ export function restoreNaturalSilence(
     const durationSec = (seg.endSample - seg.startSample) / sampleRate;
 
     // Only restore segments > 50ms
-    if (durationSec < 0.05) continue;
+    if (durationSec < 0.01) continue; // catch gaps as short as 10ms
 
     for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
       const dest = outBuffer.getChannelData(ch);
