@@ -129,8 +129,8 @@ export default function LoginScreen() {
         {/* Footer */}
         <div style={{marginTop:32,textAlign:"center",fontSize:9,
           color:"#2a5a6a",lineHeight:1.6}}>
-          Enterprise AI Data Operations<br/>
-          DSP Engine V4 · EBU R128 · Appen-Ready QC
+          Enterprise Audio Data Operations<br/>
+          DSP Engine V4 · EBU R128 · Professional QC
         </div>
       </div>
 
