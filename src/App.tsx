@@ -8,6 +8,7 @@ import AudioPipeline from "./components/AudioPipeline";
 import AudioEnhancementLab from "./components/AudioEnhancementLab";
 import StorePanel from "./components/StorePanel";
 import { useAivora } from "./lib/store/AivoraContext";
+import { useGlobalAudio } from "./lib/store/GlobalAudioContext";
 
 type Tab =
   | "dashboard"
@@ -309,6 +310,7 @@ export default function App() {
 const [user, setUser] = useState<any>(null);
 const [role, setRole] = useState<string | null>("Admin");
   const { addFiles: aivoraAddFiles } = useAivora();
+  const { setAudioFile } = useGlobalAudio();
 useEffect(() => {
   const logVisitor = async () => {
     try {
@@ -479,6 +481,9 @@ const roomReady = !!roomFileA && !!roomFileB;
   const progress = total ? Math.round((reviewedCount / total) * 100) : 0;
   async function handleUpload(files: FileList | null) {
     if (!files?.length) return;
+    // Share first WAV globally across all sections
+    const wavFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith(".wav"));
+    if (wavFiles.length > 0) setAudioFile(wavFiles[0]);
     aivoraAddFiles(Array.from(files)).catch((e) =>
       console.warn("[Aivora] addFiles failed:", e)
     );
