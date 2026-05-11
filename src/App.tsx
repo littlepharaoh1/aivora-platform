@@ -9,6 +9,7 @@ import AudioEnhancementLab from "./components/AudioEnhancementLab";
 import StorePanel from "./components/StorePanel";
 import { useAivora } from "./lib/store/AivoraContext";
 import GlobalAudioPlayer from "./components/GlobalAudioPlayer";
+import SmartNamingSequencer from "./components/SmartNamingSequencer";
 import { useGlobalAudio } from "./lib/store/GlobalAudioContext";
 
 type Tab =
@@ -27,7 +28,8 @@ type Tab =
   | "analyzer"
   | "pipeline"
   | "store"
-  | "batch";
+  | "batch"
+  | "sequencer";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
@@ -703,6 +705,7 @@ ctx.stroke();
   ["readiness", "Readiness Score"],
 ["analyzer", "Quality Analyzer"],
 ["batch", "Batch Analyzer"],
+["sequencer", "Smart Naming"],
 ["pipeline", "Audio Pipeline"],
       ["store", "Aivora Store"],
   ];
@@ -1553,6 +1556,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
       {tab === "readiness" && <DeliveryReadinessScore records={records} setRecords={setRecords} />}
 {tab === "analyzer" && <AudioQualityAnalyzer />}
 {tab === "batch" && <BatchAnalyzer />}
+{tab === "sequencer" && <SmartNamingSequencer />}
 {tab === "pipeline" && <AudioPipeline />}
         {tab === "store" && <StorePanel />}
       <GlobalAudioPlayer />
