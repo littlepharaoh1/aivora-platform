@@ -8,6 +8,7 @@ import AudioPipeline from "./components/AudioPipeline";
 import AudioEnhancementLab from "./components/AudioEnhancementLab";
 import StorePanel from "./components/StorePanel";
 import { useAivora } from "./lib/store/AivoraContext";
+import GlobalAudioPlayer from "./components/GlobalAudioPlayer";
 import { useGlobalAudio } from "./lib/store/GlobalAudioContext";
 
 type Tab =
@@ -943,7 +944,7 @@ const roomFileSummary = [
 <div>{config.rule1 || "S0001–S0120 dkws"}</div>
 <div>{config.rule2 || "S0121–S0160 oneshot200"}</div>
 <div>{config.rule3 || "S0161–S0200 query"}</div>
-                <div>Deadline: 2026-05-05</div>
+                <div>Deadline: {config.deadline || "Not set"}</div>
               </div>
             </section>
           </>
@@ -1011,15 +1012,17 @@ const roomFileSummary = [
   style={{
     marginTop: 10,
     marginBottom: 10,
-    background: "red",
+    background: "#7f1d1d",
     color: "white",
     padding: "10px 15px",
-    borderRadius: 8
+    borderRadius: 8,
+    border: "1px solid #ef4444"
   }}
   onClick={() => {
-    localStorage.removeItem("aivoraRecords");
-    setRecords([]);
-    alert("QC List Cleared");
+    if(window.confirm("⚠️ Are you sure you want to clear the entire QC list? This cannot be undone.")) {
+      localStorage.removeItem("aivoraRecords");
+      setRecords([]);
+    }
   }}
 >
   🗑 Clear QC List
@@ -1214,35 +1217,59 @@ setSpeechEnd(t);
           </section>
         )}
 
-        {tab === "contributors" && (
+        {tab === "contributors" && (() => {
+          // Build real contributor stats from records
+          const contribMap: Record<string, {submitted:number,approved:number,review:number,rejected:number}> = {};
+          records.forEach(r => {
+            const match = r.fileName.match(/^DE-DE_(D\d{4})/i);
+            const id = match ? match[1].toUpperCase() : "UNKNOWN";
+            if (!contribMap[id]) contribMap[id] = {submitted:0,approved:0,review:0,rejected:0};
+            contribMap[id].submitted++;
+            if (r.decision === "Approved")  contribMap[id].approved++;
+            if (r.decision === "Review")    contribMap[id].review++;
+            if (r.decision === "Rejected")  contribMap[id].rejected++;
+          });
+          const contribs = Object.entries(contribMap).sort((a,b)=>a[0].localeCompare(b[0]));
+          return (
           <section className="panel">
-            <h2>Contributor Management</h2>
+            <div className="panelHead">
+              <h2>Contributor Management</h2>
+              <span style={{fontSize:12,color:"#4a8a9a"}}>{contribs.length} contributor(s) · {records.length} total files</span>
+            </div>
+            {contribs.length === 0 ? (
+              <p className="hint">No files uploaded yet. Upload WAV files to see contributor stats.</p>
+            ) : (
             <table>
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Name</th>
                   <th>Submitted</th>
                   <th>Approved</th>
                   <th>Review</th>
                   <th>Rejected</th>
+                  <th>Pass Rate</th>
                 </tr>
               </thead>
               <tbody>
-                {["D0001", "D0002", "D0003", "D0004"].map((id, i) => (
+                {contribs.map(([id, s]) => {
+                  const rate = s.submitted > 0 ? Math.round((s.approved / s.submitted) * 100) : 0;
+                  const rateColor = rate >= 80 ? "#10b981" : rate >= 50 ? "#f59e0b" : "#ef4444";
+                  return (
                   <tr key={id}>
-                    <td>{id}</td>
-                    <td>Contributor {String(i + 1).padStart(3, "0")}</td>
-                    <td>0</td>
-                    <td>0</td>
-                    <td>0</td>
-                    <td>0</td>
+                    <td><strong>{id}</strong></td>
+                    <td>{s.submitted}</td>
+                    <td style={{color:"#10b981",fontWeight:700}}>{s.approved}</td>
+                    <td style={{color:"#f59e0b",fontWeight:700}}>{s.review}</td>
+                    <td style={{color:"#ef4444",fontWeight:700}}>{s.rejected}</td>
+                    <td><span style={{color:rateColor,fontWeight:700}}>{rate}%</span></td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
+            )}
           </section>
-        )}
+          );
+        })()}
 
         {tab === "naming" && (
           <section className="panel">
@@ -1528,6 +1555,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
 {tab === "batch" && <BatchAnalyzer />}
 {tab === "pipeline" && <AudioPipeline />}
         {tab === "store" && <StorePanel />}
+      <GlobalAudioPlayer />
 </main>
     </div>
   );
