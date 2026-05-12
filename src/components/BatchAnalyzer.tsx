@@ -6,6 +6,7 @@ import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, FileText, Download } from "lucide-react";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
+import { extractSpeakerProfile, verifySpeaker } from "../lib/audioQc/speakerVerifier";
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee" },
@@ -67,7 +68,9 @@ export default function BatchAnalyzer() {
   const [results, setResults] = useState([]);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({done:0,total:0});
-  const [sortBy, setSortBy]   = useState("score");
+  const [sortBy, setSortBy]     = useState("score");
+  const [speakerProfiles, setSpeakerProfiles] = useState([]);
+  const [speakerWarnings, setSpeakerWarnings] = useState([]);
   const prof = PROFILES[pk];
 
   async function handleFiles(files) {
@@ -83,6 +86,11 @@ export default function BatchAnalyzer() {
     for(let i=0;i<wavFiles.length;i++){
       try{
         const r = await analyzeFile(wavFiles[i], pk);
+      // Extract speaker profile
+      const ctx2 = new AudioContext();
+      const ab2  = await wavFiles[i].arrayBuffer();
+      const buf2 = await ctx2.decodeAudioData(ab2);
+      r._speakerProfile = extractSpeakerProfile(buf2, wavFiles[i].name);
         out.push(r);
         setResults([...out]);
         setProgress({done:i+1,total:wavFiles.length});
@@ -91,6 +99,24 @@ export default function BatchAnalyzer() {
         setResults([...out]);
         setProgress({done:i+1,total:wavFiles.length});
       }
+    }
+    // Verify speaker consistency
+    if (out.length > 1) {
+      const profiles = out.filter(r => r._speakerProfile).map(r => r._speakerProfile);
+      setSpeakerProfiles(profiles);
+      const warnings = [];
+      const ref = profiles[0];
+      for (let i = 1; i < profiles.length; i++) {
+        const result = verifySpeaker(ref, profiles[i]);
+        if (result.verdict === "DIFFERENT_SPEAKER" || result.verdict === "UNCERTAIN") {
+          warnings.push({
+            file:       profiles[i].fileName,
+            similarity: result.similarity,
+            verdict:    result.verdict,
+          });
+        }
+      }
+      setSpeakerWarnings(warnings);
     }
     setRunning(false);
   }
@@ -259,6 +285,23 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;}
         ))}
       </div>}
 
+      {/* Speaker Consistency */}
+      {speakerWarnings.length>0&&<div style={{background:"#060e16",border:"1px solid #ef444433",
+        borderRadius:10,padding:12}}>
+        <div style={{fontSize:9,color:"#ef4444",fontWeight:700,marginBottom:8,letterSpacing:1}}>
+          ⚠ SPEAKER INCONSISTENCY DETECTED
+        </div>
+        {speakerWarnings.map((w,i)=>(
+          <div key={i} style={{display:"flex",gap:8,marginBottom:4,alignItems:"center"}}>
+            <span style={{fontSize:9,color:w.verdict==="DIFFERENT_SPEAKER"?"#ef4444":"#f59e0b",
+              fontWeight:700,minWidth:120}}>{w.verdict.replace(/_/g," ")}</span>
+            <span style={{fontSize:9,color:"#a0c4cc",flex:1,overflow:"hidden",
+              textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{w.file}</span>
+            <span style={{fontSize:9,color:"#4a8a9a"}}>{(w.similarity*100).toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>}
+
       {/* Sort */}
       {results.length>0&&<div style={{display:"flex",gap:6,alignItems:"center"}}>
         <span style={{fontSize:9,color:"#4a8a9a"}}>SORT:</span>
@@ -279,7 +322,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;}
         {/* Table header */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 60px 50px 80px 90px 70px 60px 60px",
           padding:"8px 12px",borderBottom:"1px solid #0f2a3a",background:"#050d14"}}>
-          {["FILE","SCORE","GRADE","VERDICT","LUFS","SNR","GAPS","PROBS"].map(h=>(
+          {["FILE","SCORE","GRADE","VERDICT","LUFS","SNR","GAPS","SPEAKER"].map(h=>(
             <div key={h} style={{fontSize:8,color:"#4a8a9a",textAlign:h==="FILE"?"left":"center"}}>{h}</div>
           ))}
         </div>
