@@ -6,9 +6,12 @@
 import { removeHum }          from "./humRemover";
 import { normalizeLoudness }  from "./loudnessNormalizer";
 import { trimSilence }        from "./silenceTrimmer";
+import { reduceNoise }        from "./noiseReducer";
 
 export interface RepairOptions {
   humRemoval:             boolean;
+  noiseReduction:         boolean;
+  noiseStrength:          number;
   humFrequency:           50 | 60;
   loudnessNormalize:      boolean;
   targetLufs:             number;
@@ -33,6 +36,18 @@ export function repairAudioBuffer(
   let current    = buffer;
   const operations: string[] = [];
   const warnings:   string[] = [];
+
+  // Step 0: Noise reduction
+  if (options.noiseReduction) {
+    const result = reduceNoise(current, {
+      strength:     options.noiseStrength ?? 0.7,
+      noiseEstMs:   500,
+      overSubtract: 1.2,
+    });
+    current = result.buffer;
+    operations.push(`Noise reduction: ${options.noiseStrength ?? 0.7}x strength (${result.reductionDb.toFixed(1)} dB reduction)`);
+    warnings.push(...result.warnings);
+  }
 
   // Step 1: Hum removal
   if (options.humRemoval) {
