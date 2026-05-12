@@ -1,6 +1,6 @@
 /**
  * adminAllowlist.ts — Access Control
- * Aivora Platform Enterprise Auth
+ * Aivora Platform
  */
 
 export const OWNER_EMAILS: string[] = [
@@ -9,29 +9,24 @@ export const OWNER_EMAILS: string[] = [
 
 export const ADMIN_EMAILS: string[] = [
   "zikaaaa460@gmail.com",
-];
-
-// All emails allowed to access the platform
-// Empty = open access, add emails to restrict
-export const ALLOWED_EMAILS: string[] = [
-  "zikaaaa460@gmail.com",
   "aivoraailtduk@gmail.com",
-  "aivoracontrol@gmail.com",
-  "aivoraleader@gmail.com",
-  "aivoraqa@gmail.com",
-  // Add more emails here
 ];
 
-export const RESTRICT_ACCESS = false; // Set true to enforce allowlist
+export const ROLE_MAP: Record<string, string> = {
+  "zikaaaa460@gmail.com":    "owner",
+  "aivoraailtduk@gmail.com": "admin",
+  "aivoracontrol@gmail.com": "manager",
+  "aivoraleader@gmail.com":  "manager",
+  "aivoraqa@gmail.com":      "qa_manager",
+};
+
+// OPEN = any Google account can access
+export const RESTRICT_ACCESS = false;
 
 export function getRoleFromEmail(email: string): string {
-  const e = email.toLowerCase();
-  if (OWNER_EMAILS.includes(e)) return "owner";
-  if (ADMIN_EMAILS.includes(e))  return "admin";
-  return "client_viewer";
+  return ROLE_MAP[email.toLowerCase()] ?? "client_viewer";
 }
 
 export function isEmailAllowed(email: string): boolean {
-  if (!RESTRICT_ACCESS) return true;
-  return ALLOWED_EMAILS.includes(email.toLowerCase());
+  return true; // Open access
 }
