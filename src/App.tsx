@@ -10,6 +10,10 @@ import StorePanel from "./components/StorePanel";
 import { useAivora } from "./lib/store/AivoraContext";
 import { trackEvent } from "./lib/tracking/activityTracker";
 import { useAuth } from "./lib/auth/AuthContext";
+import { usePermissions } from "./lib/auth/usePermissions";
+import { canAccess } from "./lib/auth/permissions";
+import type { AivoraModule } from "./lib/auth/permissions";
+import AccessDenied from "./components/AccessDenied";
 import GlobalAudioPlayer from "./components/GlobalAudioPlayer";
 import UserAvatar from "./components/UserAvatar";
 import SmartNamingSequencer from "./components/SmartNamingSequencer";
@@ -329,6 +333,7 @@ const [role, setRole] = useState<string | null>("Admin");
   const { addFiles: aivoraAddFiles } = useAivora();
   const { setAudioFile } = useGlobalAudio();
   const { user: authUser } = useAuth();
+  const { can, allowedTabs, role: userRole } = usePermissions();
 useEffect(() => {
   const logVisitor = async () => {
     try {
@@ -967,7 +972,7 @@ const roomFileSummary = [
           </div>
         </header>
 
-        {tab === "dashboard" && (
+        {tab === "dashboard" && !can("dashboard") ? <AccessDenied module="dashboard"/> : tab === "dashboard" && (
           <>
             <section className="metrics">
 <Metric label="Project Target" value={config.totalFiles} />
@@ -993,7 +998,7 @@ const roomFileSummary = [
           </>
         )}
 
-        {tab === "upload" && (
+        {tab === "upload" && !can("upload") ? <AccessDenied module="upload"/> : tab === "upload" && (
           <section className="panel">
             <div className="panelHead">
               <h2>Upload Center</h2>
@@ -1047,7 +1052,7 @@ const roomFileSummary = [
           </section>
         )}
 
-        {tab === "qc" && (
+        {tab === "qc" && !can("qc") ? <AccessDenied module="qc"/> : tab === "qc" && (
           <section className="panel">
             <div className="panelHead">
               <h2>QC Audio Analyzer</h2>
@@ -1260,7 +1265,7 @@ setSpeechEnd(t);
           </section>
         )}
 
-        {tab === "contributors" && (() => {
+        {tab === "contributors" && !can("contributors") ? <AccessDenied module="contributors"/> : tab === "contributors" && (() => {
           // Build real contributor stats from records
           const contribMap: Record<string, {submitted:number,approved:number,review:number,rejected:number}> = {};
           records.forEach(r => {
@@ -1314,7 +1319,7 @@ setSpeechEnd(t);
           );
         })()}
 
-        {tab === "naming" && (
+        {tab === "naming" && !can("naming") ? <AccessDenied module="naming"/> : tab === "naming" && (
           <section className="panel">
             <div className="panelHead">
               <h2>German Naming Reference — S0001 to S0200</h2>
@@ -1366,7 +1371,7 @@ setSpeechEnd(t);
           </section>
         )}
 
-        {tab === "control" && (
+        {tab === "control" && !can("control") ? <AccessDenied module="control"/> : tab === "control" && (
           <section className="panel">
             <div className="panelHead">
               <h2>Control Center</h2>
@@ -1490,7 +1495,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
           </section>
         )}
 
-        {tab === "export" && (
+        {tab === "export" && !can("export") ? <AccessDenied module="export"/> : tab === "export" && (
           <section className="panel">
             <h2>Export Package</h2>
             <p>
@@ -1522,7 +1527,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
             </div>
           </section>
 )}
-{tab === "rooms" && (
+{tab === "rooms" && !can("rooms") ? <AccessDenied module="rooms"/> : tab === "rooms" && (
   <section className="panel">
     <div className="panelHead">
     <h2>Conversation Rooms V8 Multi-Clip Builder</h2>
@@ -1592,14 +1597,14 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
     />
   </section>
 )}
-            {tab === "enhancement" && <AudioEnhancementLab />}
-      {tab === "readiness" && <DeliveryReadinessScore records={records} setRecords={setRecords} />}
-{tab === "analyzer" && <AudioQualityAnalyzer />}
-{tab === "batch" && <BatchAnalyzer />}
-{tab === "sequencer" && <SmartNamingSequencer />}
-{tab === "monitor" && <ActivityMonitor />}
-{tab === "pipeline" && <AudioPipeline />}
-        {tab === "store" && <StorePanel />}
+            {tab === "enhancement" && !can("enhancement") ? <AccessDenied module="enhancement"/> : tab === "enhancement" && <AudioEnhancementLab />}
+      {tab === "readiness" && !can("readiness") ? <AccessDenied module="readiness"/> : tab === "readiness" && <DeliveryReadinessScore records={records} setRecords={setRecords} />}
+{tab === "analyzer" && !can("analyzer") ? <AccessDenied module="analyzer"/> : tab === "analyzer" && <AudioQualityAnalyzer />}
+{tab === "batch" && !can("batch") ? <AccessDenied module="batch"/> : tab === "batch" && <BatchAnalyzer />}
+{tab === "sequencer" && !can("sequencer") ? <AccessDenied module="sequencer"/> : tab === "sequencer" && <SmartNamingSequencer />}
+{tab === "monitor" && !can("monitor") ? <AccessDenied module="monitor"/> : tab === "monitor" && <ActivityMonitor />}
+{tab === "pipeline" && !can("pipeline") ? <AccessDenied module="pipeline"/> : tab === "pipeline" && <AudioPipeline />}
+        {tab === "store" && !can("store") ? <AccessDenied module="store"/> : tab === "store" && <StorePanel />}
       <GlobalAudioPlayer />
 </main>
     </div>
