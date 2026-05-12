@@ -6,6 +6,7 @@ import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, FileText, Download } from "lucide-react";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
+import { audioWorker, makeTaskId } from "../lib/workers/audioWorkerClient";
 import { extractSpeakerProfile, verifySpeaker } from "../lib/audioQc/speakerVerifier";
 
 const PROFILES = {
@@ -70,6 +71,7 @@ export default function BatchAnalyzer() {
   const [progress, setProgress] = useState({done:0,total:0});
   const [sortBy, setSortBy]     = useState("score");
   const [speakerProfiles, setSpeakerProfiles] = useState([]);
+  const [workerProgress, setWorkerProgress] = useState<Record<string,number>>({});
   const [speakerWarnings, setSpeakerWarnings] = useState([]);
   const prof = PROFILES[pk];
 
