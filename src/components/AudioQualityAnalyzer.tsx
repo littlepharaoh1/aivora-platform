@@ -425,14 +425,40 @@ export default function AudioQualityAnalyzer() {
             <WaveformEditor
               buffer={rep._buf}
               fileName={rep.name}
-              qcMarkers={(rep.qc?.problems||[])
-                .filter(p=>p.type&&typeof p.type==="string")
-                .map(p=>({
+              qcMarkers={[
+                // Leading silence marker
+                ...(rep.edges?.leadMs>500?[{
                   timeSec:  0,
-                  type:     p.type,
-                  severity: p.severity,
-                  message:  p.message,
-                }))}
+                  type:     "LEADING_SILENCE",
+                  severity: "medium",
+                  message:  `Leading silence ${rep.edges.leadMs}ms`,
+                }]:[]),
+                // Trailing silence marker
+                ...(rep.edges?.trailMs>500?[{
+                  timeSec:  rep.dur - rep.edges.trailMs/1000,
+                  type:     "TRAILING_SILENCE",
+                  severity: "medium",
+                  message:  `Trailing silence ${rep.edges.trailMs}ms`,
+                }]:[]),
+                // Digital gaps from spectrogram
+                ...digitalGaps.filter(g=>g.type==="internal").map(g=>({
+                  timeSec:  g.startSec,
+                  type:     "DIGITAL_SILENCE",
+                  severity: "critical",
+                  message:  `Digital gap ${g.durationMs.toFixed(0)}ms at ${g.startSec.toFixed(2)}s`,
+                })),
+                // QC problems from DSP engine
+                ...(rep.qc?.problems||[])
+                  .filter(p=>p.type&&typeof p.type==="string")
+                  .map((p,i)=>({
+                    timeSec:  p.startSample
+                      ? p.startSample / rep.sr
+                      : (rep.dur * (i+1)) / ((rep.qc?.problems?.length||1)+1),
+                    type:     p.type,
+                    severity: p.severity,
+                    message:  p.message,
+                  })),
+              ]}
             />
           </div>}
 
