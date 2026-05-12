@@ -58,7 +58,9 @@ export const ROLE_PERMISSIONS: Record<AivoraRole, AivoraModule[]> = {
     "upload"
   ],
   client_viewer: [
-    "dashboard","readiness","export"
+    "dashboard","upload","qc","contributors","naming","control",
+    "export","rooms","enhancement","readiness","analyzer","batch",
+    "pipeline","store","sequencer"
   ],
 };
 
