@@ -121,7 +121,7 @@ export default function AudioQualityAnalyzer() {
   const [appenResult,setAppenResult]=useState(null);
   const [vadResult,setVadResult]=useState(null);
   const [reverbResult,setReverbResult]=useState(null);
-  const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false,noiseReduction:false,noiseStrength:0.7});
+  const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false,noiseReduction:false,noiseStrength:0.7,dynamicCompression:false,speechEQ:false});
   const [spectrogramData,setSpectrogramData]=useState(null);
 
   // Auto-analyze when global file changes from another section
@@ -536,7 +536,9 @@ export default function AudioQualityAnalyzer() {
                 ["loudnessNormalize","Normalize Loudness",  repairOpts.loudnessNormalize],
                 ["trimSilence",     "Trim Silence",         repairOpts.trimSilence],
                 ["shortenInternalSilence","Shorten Gaps",   repairOpts.shortenInternalSilence],
-                ["noiseReduction",  "Noise Reduction",      repairOpts.noiseReduction],
+                ["noiseReduction",      "Noise Reduction",   repairOpts.noiseReduction],
+                ["dynamicCompression",  "Compress Dynamics", repairOpts.dynamicCompression],
+                ["speechEQ",            "Speech EQ",         repairOpts.speechEQ],
               ].map(([key,label,active])=>(
                 <div key={key} onClick={()=>setRepairOpts(p=>({...p,[key]:!p[key]}))}
                   style={{padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:10,fontWeight:700,

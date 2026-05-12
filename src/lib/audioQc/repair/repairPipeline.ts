@@ -7,9 +7,13 @@ import { removeHum }          from "./humRemover";
 import { normalizeLoudness }  from "./loudnessNormalizer";
 import { trimSilence }        from "./silenceTrimmer";
 import { reduceNoise }        from "./noiseReducer";
+import { compressDynamics }   from "./dynamicCompressor";
+import { applyEQ, SPEECH_CLARITY_EQ } from "./multiBandEQ";
 
 export interface RepairOptions {
   humRemoval:             boolean;
+  dynamicCompression:     boolean;
+  speechEQ:               boolean;
   noiseReduction:         boolean;
   noiseStrength:          number;
   humFrequency:           50 | 60;
@@ -46,6 +50,22 @@ export function repairAudioBuffer(
     });
     current = result.buffer;
     operations.push(`Noise reduction: ${options.noiseStrength ?? 0.7}x strength (${result.reductionDb.toFixed(1)} dB reduction)`);
+    warnings.push(...result.warnings);
+  }
+
+  // Step 0b: Dynamic compression
+  if (options.dynamicCompression) {
+    const result = compressDynamics(current, { threshold:-24, ratio:4, attack:10, release:100, makeupGain:6 });
+    current = result.buffer;
+    operations.push(`Dynamic compression: ${result.gainReductionDb.toFixed(1)} dB max reduction`);
+    warnings.push(...result.warnings);
+  }
+
+  // Step 0c: Speech clarity EQ
+  if (options.speechEQ) {
+    const result = applyEQ(current, { bands: SPEECH_CLARITY_EQ });
+    current = result.buffer;
+    operations.push("Speech clarity EQ applied (80Hz HP, presence boost, 3kHz clarity)");
     warnings.push(...result.warnings);
   }
 
