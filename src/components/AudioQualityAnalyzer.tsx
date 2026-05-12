@@ -160,7 +160,7 @@ export default function AudioQualityAnalyzer() {
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
       setAudioFile(file,pk);
       // Advanced VAD + Reverb
-      const advVad = analyzeAdvancedVAD(buf, pk);
+      const advVad = analyzeAdvancedVAD(buf, pk === "wakeword_pro" ? "wakeword" : pk);
       setVadResult(advVad);
       const reverb = detectReverb(buf);
       setReverbResult(reverb);
@@ -176,7 +176,7 @@ export default function AudioQualityAnalyzer() {
         const gaps=r.qc.problems.filter(p=>p.type==="DIGITAL_SILENCE"||p.type==="SILENCE_GAP").length;
         const as=computeAppenScore({
           fileName:   file.name,
-          profile:    pk,
+          profile:    (pk === "wakeword_pro" ? "wakeword_pro" : pk) as any,
           sampleRate: buf.sampleRate,
           duration:   buf.duration,
           lufs:       {integrated:r.qc.metrics.lufs,truePeak:r.qc.metrics.truePeak,lra:r.qc.metrics.lra,problems:[]},
