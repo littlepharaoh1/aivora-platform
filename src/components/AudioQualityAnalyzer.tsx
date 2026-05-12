@@ -10,6 +10,8 @@ import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../lib/audi
 import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { computeAppenScore } from "../lib/audioQc/appenScore";
+import { analyzeAdvancedVAD } from "../lib/audioQc/advancedVAD";
+import { detectReverb } from "../lib/audioQc/reverbDetector";
 import WaveformEditor from "./audio/WaveformEditor";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
@@ -117,6 +119,8 @@ export default function AudioQualityAnalyzer() {
   const [repairing,setRepairing]=useState(false);
   const [repairResult,setRepairResult]=useState(null);
   const [appenResult,setAppenResult]=useState(null);
+  const [vadResult,setVadResult]=useState(null);
+  const [reverbResult,setReverbResult]=useState(null);
   const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false,noiseReduction:false,noiseStrength:0.7});
   const [spectrogramData,setSpectrogramData]=useState(null);
 
@@ -148,6 +152,11 @@ export default function AudioQualityAnalyzer() {
       const r=await analyze(buf,file.name,pk);
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
       setAudioFile(file,pk);
+      // Advanced VAD + Reverb
+      const advVad = analyzeAdvancedVAD(buf, pk);
+      setVadResult(advVad);
+      const reverb = detectReverb(buf);
+      setReverbResult(reverb);
       trackEvent({
         eventType: "file_analyzed",
         module:    "quality_analyzer",
@@ -364,9 +373,22 @@ export default function AudioQualityAnalyzer() {
               <MetricCard label="Environment"       value={qc.metrics.environment.replace("_"," ").toUpperCase()} color={envColor}/>
               <MetricCard label="Speech Ratio"      value={(qc.metrics.speechRatio*100).toFixed(1)+"%" } color={qc.metrics.speechRatio>0.3?"#10b981":"#f59e0b"}/>
               <MetricCard label="QC Score"          value={qc.score+"/100"} color={qc.score>=75?"#10b981":qc.score>=50?"#f59e0b":"#ef4444"} sub={qc.deliveryRisk}/>
+              {vadResult&&<MetricCard label="Speech Regions" value={vadResult.speechRegions.length+""}  color="#10b981" sub={`${(vadResult.speechRatio*100).toFixed(1)}% speech`}/>}
+              {vadResult&&<MetricCard label="Dominant Pitch" value={vadResult.dominantPitch>0?vadResult.dominantPitch.toFixed(0)+" Hz":"—"} color="#22d3ee"/>}
+              {reverbResult&&<MetricCard label="RT60 Reverb"   value={reverbResult.rt60Ms.toFixed(0)+" ms"} color={reverbResult.rt60Ms<150?"#10b981":reverbResult.rt60Ms<400?"#f59e0b":"#ef4444"} sub={reverbResult.environment.toUpperCase()}/>}
+              {reverbResult&&<MetricCard label="C50 Clarity"   value={reverbResult.clarity.toFixed(1)+" dB"} color={reverbResult.clarity>0?"#10b981":"#ef4444"}/>}
             </div>
 
             {/* QC Problems */}
+            {reverbResult&&reverbResult.problems.length>0&&<div style={{marginBottom:8}}>
+              {reverbResult.problems.map((prob,i)=>(
+                <div key={i} style={{background:"#050d14",border:"1px solid #f59e0b33",
+                  borderRadius:6,padding:"5px 10px",display:"flex",gap:8,marginBottom:4}}>
+                  <span style={{fontSize:9,color:"#f59e0b",fontWeight:700}}>RT60</span>
+                  <span style={{fontSize:10,color:"#a0c4cc"}}>{prob}</span>
+                </div>
+              ))}
+            </div>}
             {qc.problems.length>0&&<div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
               <div style={{fontSize:9,color:"#4a8a9a",marginBottom:4}}>QC PROBLEMS DETECTED</div>
               {qc.problems.map((p,i)=>{
@@ -524,6 +546,14 @@ export default function AudioQualityAnalyzer() {
                   {label}
                 </div>
               ))}
+              {repairOpts.noiseReduction&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                <span style={{fontSize:9,color:"#4a8a9a"}}>Strength:</span>
+                <input type="range" min="0.1" max="1.0" step="0.1"
+                  value={repairOpts.noiseStrength||0.7}
+                  onChange={e=>setRepairOpts(p=>({...p,noiseStrength:parseFloat(e.target.value)}))}
+                  style={{width:80,accentColor:"#22d3ee"}}/>
+                <span style={{fontSize:9,color:"#22d3ee"}}>{((repairOpts.noiseStrength||0.7)*100).toFixed(0)}%</span>
+              </div>}
               {repairOpts.humRemoval&&<div style={{display:"flex",gap:4}}>
                 {([50,60]).map(f=>(
                   <div key={f} onClick={()=>setRepairOpts(p=>({...p,humFrequency:f}))}
