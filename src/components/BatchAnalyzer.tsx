@@ -363,10 +363,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;}
               color:r.gaps>0?"#ef4444":"#10b981",fontWeight:700}}>
               {r.gaps>0?"⚠ "+r.gaps:"✓"}
             </div>
-            {/* Problems */}
-            <div style={{fontSize:10,textAlign:"center",
-              color:r.problems>0?"#f59e0b":"#10b981"}}>
-              {r.problems||"✓"}
+            {/* Speaker */}
+            <div style={{fontSize:10,textAlign:"center",fontWeight:700}}>
+              {speakerWarnings.find(w=>w.file===r.name)
+                ? speakerWarnings.find(w=>w.file===r.name).verdict==="DIFFERENT_SPEAKER"
+                  ? <span style={{color:"#ef4444"}}>≠</span>
+                  : <span style={{color:"#f59e0b"}}>?</span>
+                : <span style={{color:"#10b981"}}>✓</span>}
             </div>
           </div>;
         })}
