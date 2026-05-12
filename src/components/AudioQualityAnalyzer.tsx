@@ -10,6 +10,7 @@ import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../lib/audi
 import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { computeAppenScore } from "../lib/audioQc/appenScore";
+import WaveformEditor from "./audio/WaveformEditor";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 import { trackEvent } from "../lib/tracking/activityTracker";
@@ -414,6 +415,25 @@ export default function AudioQualityAnalyzer() {
               <span style={{fontSize:8,color:"#2a5a6a"}}>-45 dB</span>
               <span style={{fontSize:8,color:"#2a5a6a"}}>0 dB</span>
             </div>
+          </div>}
+
+          {/* Waveform Workstation */}
+          {rep?._buf&&<div style={{marginBottom:0}}>
+            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8}}>
+              WAVEFORM WORKSTATION
+            </div>
+            <WaveformEditor
+              buffer={rep._buf}
+              fileName={rep.name}
+              qcMarkers={(rep.qc?.problems||[])
+                .filter(p=>p.type&&typeof p.type==="string")
+                .map(p=>({
+                  timeSec:  0,
+                  type:     p.type,
+                  severity: p.severity,
+                  message:  p.message,
+                }))}
+            />
           </div>}
 
           {/* Appen Delivery Score */}
