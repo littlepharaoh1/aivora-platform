@@ -8,6 +8,8 @@ import { renderWaveform, type QCMarker } from "../../lib/audioEditor/waveformRen
 import { xToTime, timeToX } from "../../lib/audioEditor/regionEditor";
 import { mixToMono, formatTime } from "../../lib/audioEditor/audioBufferUtils";
 import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../../lib/audioQc/spectrogram";
+import { stretchRegion, validateStretchRatio } from "../../lib/audioEditor/timeStretch";
+import { exportToWav, downloadWav } from "../../lib/audioQc/repair/wavExporter";
 
 const THEME = {
   bg:        "#040c14",
@@ -41,7 +43,15 @@ export default function WaveformEditor({ buffer, qcMarkers = [], fileName = "aud
   const [looping,     setLooping]     = useState(false);
   const [dimensions,  setDimensions]  = useState({ w: 800, h: 180 });
   const [hoveredMarker, setHoveredMarker] = useState(null);
-  const [markerTooltip, setMarkerTooltip] = useState(null);
+  const [markerTooltip,  setMarkerTooltip]  = useState(null);
+  const [editHistory,    setEditHistory]    = useState([]);
+  const [historyIndex,   setHistoryIndex]   = useState(-1);
+  const [workingBuffer,  setWorkingBuffer]  = useState(buffer);
+  const [targetDuration, setTargetDuration] = useState("");
+  const [stretchRatio,   setStretchRatio]   = useState(1.0);
+  const [stretchWarning, setStretchWarning] = useState("");
+  const [stretching,     setStretching]     = useState(false);
+  const [showStretch,    setShowStretch]    = useState(false);
 
   const mono       = React.useMemo(() => mixToMono(buffer), [buffer]);
   const duration   = buffer.duration;
@@ -304,6 +314,72 @@ export default function WaveformEditor({ buffer, qcMarkers = [], fileName = "aud
 
   const selDur = selection ? selection.endSec - selection.startSec : 0;
 
+  // Update working buffer when prop changes
+  React.useEffect(() => { setWorkingBuffer(buffer); setEditHistory([]); setHistoryIndex(-1); }, [buffer]);
+
+  function applyStretch() {
+    if (!selection || !workingBuffer) return;
+    const targetSec = parseFloat(targetDuration);
+    if (isNaN(targetSec) || targetSec <= 0) { setStretchWarning("Invalid target duration"); return; }
+    const ratio = targetSec / selDur;
+    const validation = validateStretchRatio(ratio);
+    if (!validation.valid) { setStretchWarning(validation.error || ""); return; }
+    setStretching(true);
+    setStretchWarning(validation.warning || "");
+    setTimeout(() => {
+      try {
+        const result = stretchRegion(workingBuffer, selection.startSec, selection.endSec, targetSec, { ratio });
+        const op = {
+          id:          Date.now(),
+          type:        "TIME_STRETCH",
+          startMs:     Math.round(selection.startSec * 1000),
+          endMs:       Math.round(selection.endSec   * 1000),
+          originalMs:  Math.round(selDur * 1000),
+          newMs:       Math.round(targetSec * 1000),
+          ratio:       result.ratio,
+          createdAt:   new Date().toISOString(),
+        };
+        const newHistory = [...editHistory.slice(0, historyIndex+1), { buffer: result.buffer, op }];
+        setEditHistory(newHistory);
+        setHistoryIndex(newHistory.length - 1);
+        setWorkingBuffer(result.buffer);
+        if (result.warning) setStretchWarning(result.warning);
+      } catch(e) { setStretchWarning("Stretch failed: " + e.message); }
+      setStretching(false);
+    }, 50);
+  }
+
+  function undo() {
+    if (historyIndex <= 0) { setWorkingBuffer(buffer); setHistoryIndex(-1); return; }
+    const newIdx = historyIndex - 1;
+    setHistoryIndex(newIdx);
+    setWorkingBuffer(editHistory[newIdx].buffer);
+  }
+
+  function redo() {
+    if (historyIndex >= editHistory.length - 1) return;
+    const newIdx = historyIndex + 1;
+    setHistoryIndex(newIdx);
+    setWorkingBuffer(editHistory[newIdx].buffer);
+  }
+
+  function exportEdited() {
+    if (!workingBuffer) return;
+    const wav = exportToWav(workingBuffer, fileName.replace(".wav","_edited"));
+    downloadWav(wav);
+    const manifest = {
+      originalFile: fileName,
+      edits: editHistory.map(h => h.op),
+      finalDuration: workingBuffer.duration,
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url; a.download = fileName.replace(".wav","_edits.json");
+    a.click(); URL.revokeObjectURL(url);
+  }
+
   const SEVERITY_COLORS = {
     critical:"#ef4444", high:"#f97316", warning:"#f59e0b", medium:"#f59e0b", low:"#22d3ee"
   };
@@ -457,6 +533,74 @@ export default function WaveformEditor({ buffer, qcMarkers = [], fileName = "aud
           })}
         </div>
       )}
+
+      {/* Time Stretch Panel */}
+      {selection && <div style={{borderTop:"1px solid #0f2a3a",padding:"8px 14px",background:"#050d14"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:showStretch?8:0}}>
+          <span style={{fontSize:9,color:"#8b5cf6",fontWeight:700}}>⏱ TIME STRETCH</span>
+          <span style={{fontSize:8,color:"#4a8a9a"}}>Selected: {formatTime(selDur)}</span>
+          <div onClick={()=>setShowStretch(s=>!s)}
+            style={{fontSize:8,padding:"2px 8px",borderRadius:4,cursor:"pointer",
+              background:"#8b5cf622",border:"1px solid #8b5cf644",color:"#8b5cf6",marginLeft:4}}>
+            {showStretch?"▲ Hide":"▼ Show"}
+          </div>
+          {editHistory.length > 0 && <>
+            <button onClick={undo} disabled={historyIndex < 0}
+              style={{...btnSm,color:historyIndex>=0?"#22d3ee":"#2a5a6a"}}>↩ Undo</button>
+            <button onClick={redo} disabled={historyIndex >= editHistory.length-1}
+              style={{...btnSm,color:historyIndex<editHistory.length-1?"#22d3ee":"#2a5a6a"}}>↪ Redo</button>
+            <button onClick={exportEdited}
+              style={{...btnSm,background:"#10b98122",border:"1px solid #10b98144",color:"#10b981"}}>
+              ⬇ Export WAV
+            </button>
+          </>}
+        </div>
+        {showStretch && <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <div>
+            <div style={{fontSize:8,color:"#4a8a9a",marginBottom:3}}>TARGET DURATION (s)</div>
+            <input type="number" step="0.1" min="0.1"
+              value={targetDuration}
+              onChange={e=>{
+                setTargetDuration(e.target.value);
+                const t = parseFloat(e.target.value);
+                if(!isNaN(t) && selDur > 0) {
+                  setStretchRatio(t/selDur);
+                  setStretchWarning(validateStretchRatio(t/selDur).warning||validateStretchRatio(t/selDur).error||"");
+                }
+              }}
+              placeholder={selDur.toFixed(2)}
+              style={{background:"#040c14",border:"1px solid #0f2a3a",borderRadius:4,
+                padding:"4px 8px",color:"#a0c4cc",fontSize:10,fontFamily:"monospace",width:80}}/>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:8,color:"#4a8a9a",marginBottom:3}}>
+              RATIO: {stretchRatio.toFixed(2)}x
+              {stretchRatio < 1 ? " (compress)" : stretchRatio > 1 ? " (stretch)" : ""}
+            </div>
+            <input type="range" min="0.65" max="1.80" step="0.01"
+              value={stretchRatio}
+              onChange={e=>{
+                const r = parseFloat(e.target.value);
+                setStretchRatio(r);
+                setTargetDuration((selDur * r).toFixed(2));
+                setStretchWarning(validateStretchRatio(r).warning||validateStretchRatio(r).error||"");
+              }}
+              style={{width:"100%",accentColor:"#8b5cf6"}}/>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:7,color:"#2a5a6a"}}>
+              <span>0.65x</span><span style={{color:"#4a8a9a"}}>safe: 0.80–1.25x</span><span>1.80x</span>
+            </div>
+          </div>
+          <button onClick={applyStretch} disabled={stretching||!targetDuration}
+            style={{background:"#8b5cf622",border:"1px solid #8b5cf644",borderRadius:6,
+              padding:"6px 14px",cursor:"pointer",color:"#8b5cf6",fontSize:10,fontWeight:700}}>
+            {stretching?"Processing...":"Apply Stretch"}
+          </button>
+        </div>}
+        {stretchWarning && <div style={{fontSize:9,color:"#f59e0b",marginTop:4}}>⚠ {stretchWarning}</div>}
+        {editHistory.length > 0 && <div style={{marginTop:6,fontSize:8,color:"#4a8a9a"}}>
+          {editHistory.length} edit(s) — index {historyIndex+1}/{editHistory.length}
+        </div>}
+      </div>}
 
       {/* Keyboard shortcuts hint */}
       <div style={{padding:"3px 14px",borderTop:"1px solid #0a1a24",
