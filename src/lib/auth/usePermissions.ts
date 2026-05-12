@@ -1,18 +1,18 @@
 /**
- * usePermissions.ts — Permission hook
+ * usePermissions.ts — Open access mode
  */
 import { useAuth } from "./AuthContext";
-import { canAccess, getAllowedTabs } from "./permissions";
 import type { AivoraModule, AivoraRole } from "./permissions";
+import { ROLE_MAP } from "./adminAllowlist";
 
 export function usePermissions() {
   const { user } = useAuth();
-  const role = (user?.role ?? "client_viewer") as AivoraRole;
+  const role = (ROLE_MAP[user?.email?.toLowerCase() ?? ""] ?? "client_viewer") as AivoraRole;
 
   return {
     role,
-    can:         (module: AivoraModule) => canAccess(role, module),
-    allowedTabs: getAllowedTabs(role),
+    can:         (_module: AivoraModule) => true,  // Open access
+    allowedTabs: [] as AivoraModule[],
     isOwner:     role === "owner",
     isAdmin:     role === "owner" || role === "admin",
     isQA:        ["owner","admin","qa_manager","qa_reviewer"].includes(role),
