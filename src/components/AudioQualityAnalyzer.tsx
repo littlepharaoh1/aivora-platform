@@ -25,6 +25,7 @@ function safeNum(v: number, decimals=1, fallback="—"): string {
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-28, rmsMax:-10, noiseMax:-60, snrMin:45, silMax:0.15 } },
+  wakeword_pro: { label:"Wake Word Pro", icon:"⭐", color:"#f59e0b", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-26, rmsMax:-14, noiseMax:-60, snrMin:30, silMax:0.30 } },
   asr:          { label:"ASR / Speech", icon:"🗣️", color:"#10b981", th:{ pkMin:-9,  pkMax:-2,  rmsMin:-32, rmsMax:-12, noiseMax:-55, snrMin:35, silMax:0.30 } },
   tts:          { label:"TTS Training", icon:"🔊", color:"#f59e0b", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-24, rmsMax:-8,  noiseMax:-65, snrMin:50, silMax:0.20 } },
   conversation: { label:"Conversation", icon:"💬", color:"#8b5cf6", th:{ pkMin:-12, pkMax:-3,  rmsMin:-35, rmsMax:-15, noiseMax:-50, snrMin:25, silMax:0.40 } },
