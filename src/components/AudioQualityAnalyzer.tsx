@@ -34,7 +34,7 @@ const PROFILES = {
 function toDb(v) { return v <= 0 ? -120 : 20 * Math.log10(v); }
 
 async function analyze(buf, name, pk) {
-  const profileMap = { wakeword:"wakeword_studio", asr:"asr_studio", tts:"tts_studio", conversation:"conversation_studio" };
+  const profileMap = { wakeword:"wakeword_studio", wakeword_pro:"wakeword_studio", asr:"asr_studio", tts:"tts_studio", conversation:"conversation_studio" };
   const p = PROFILES[pk];
   const analysis = await analyzeAudioBuffer(buf);
   const scored   = scoreAnalysis(analysis, pk);
@@ -212,7 +212,7 @@ export default function AudioQualityAnalyzer() {
     if(!rep)return;
     openQCReport({
       fileName:    rep.name,
-      profile:     pk,
+      profile:     (pk === "wakeword_pro" ? "wakeword_pro" : pk) as "wakeword" | "asr" | "tts" | "conversation" | "wakeword_pro",
       score:       rep.total,
       grade:       rep.grade,
       verdict:     rep.verdict,
@@ -250,7 +250,7 @@ export default function AudioQualityAnalyzer() {
     if(!rep?._buf)return;
     setRepairing(true);setRepairResult(null);
     try{
-      const profileTargets={wakeword:-20,asr:-20,tts:-20,conversation:-23};
+      const profileTargets={wakeword:-20,wakeword_pro:-20,asr:-20,tts:-20,conversation:-23};
       const result=repairAudioBuffer(rep._buf,{
         ...repairOpts,
         humFrequency:repairOpts.humFrequency,
