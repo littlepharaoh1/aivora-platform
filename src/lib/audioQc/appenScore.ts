@@ -31,7 +31,7 @@ export interface AppenDeliveryResult {
 
 export interface AppenInput {
   fileName:   string;
-  profile:    "wakeword" | "asr" | "tts" | "conversation";
+  profile:    "wakeword" | "asr" | "tts" | "conversation" | "byd_wakeword";
   sampleRate: number;
   duration:   number;
   lufs:       LUFSResult;
@@ -80,6 +80,17 @@ const REQUIREMENTS = {
     maxDuration:    15.0,
     requiredSR:     [44100, 48000],
   },
+  byd_wakeword: {
+    minSNR:         30,
+    minSpeechRatio: 0.30,
+    maxLeadingSec:  0.5,
+    maxTrailingSec: 0.5,
+    lufsMin:        -26,
+    lufsMax:        -14,
+    minDuration:    0.35,
+    maxDuration:    1.45,
+    requiredSR:     [48000],
+  },
   conversation: {
     minSNR:         15,
     minSpeechRatio: 0.15,
@@ -94,7 +105,7 @@ const REQUIREMENTS = {
 };
 
 export function computeAppenScore(input: AppenInput): AppenDeliveryResult {
-  const req    = REQUIREMENTS[input.profile];
+  const req    = REQUIREMENTS[input.profile] ?? REQUIREMENTS['wakeword'];
   const checks: AppenCheck[] = [];
 
   // ── 1. Sample Rate ────────────────────────────────────────────────────────
