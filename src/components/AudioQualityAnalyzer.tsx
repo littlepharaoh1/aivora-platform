@@ -25,7 +25,6 @@ function safeNum(v: number, decimals=1, fallback="—"): string {
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-28, rmsMax:-10, noiseMax:-60, snrMin:45, silMax:0.15 } },
-  wakeword_pro: { label:"Wake Word Pro", icon:"⭐", color:"#f59e0b", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-26, rmsMax:-14, noiseMax:-60, snrMin:30, silMax:0.30 } },
   asr:          { label:"ASR / Speech", icon:"🗣️", color:"#10b981", th:{ pkMin:-9,  pkMax:-2,  rmsMin:-32, rmsMax:-12, noiseMax:-55, snrMin:35, silMax:0.30 } },
   tts:          { label:"TTS Training", icon:"🔊", color:"#f59e0b", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-24, rmsMax:-8,  noiseMax:-65, snrMin:50, silMax:0.20 } },
   conversation: { label:"Conversation", icon:"💬", color:"#8b5cf6", th:{ pkMin:-12, pkMax:-3,  rmsMin:-35, rmsMax:-15, noiseMax:-50, snrMin:25, silMax:0.40 } },
@@ -34,7 +33,7 @@ const PROFILES = {
 function toDb(v) { return v <= 0 ? -120 : 20 * Math.log10(v); }
 
 async function analyze(buf, name, pk) {
-  const profileMap = { wakeword:"wakeword_studio", wakeword_pro:"wakeword_studio", asr:"asr_studio", tts:"tts_studio", conversation:"conversation_studio" };
+  const profileMap = { wakeword:"wakeword_studio", asr:"asr_studio", tts:"tts_studio", conversation:"conversation_studio" };
   const p = PROFILES[pk];
   const analysis = await analyzeAudioBuffer(buf);
   const scored   = scoreAnalysis(analysis, pk);
@@ -160,7 +159,7 @@ export default function AudioQualityAnalyzer() {
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
       setAudioFile(file,pk);
       // Advanced VAD + Reverb
-      const advVad = analyzeAdvancedVAD(buf, pk === "wakeword_pro" ? "wakeword" : pk);
+      const advVad = analyzeAdvancedVAD(buf, pk);
       setVadResult(advVad);
       const reverb = detectReverb(buf);
       setReverbResult(reverb);
@@ -176,7 +175,7 @@ export default function AudioQualityAnalyzer() {
         const gaps=r.qc.problems.filter(p=>p.type==="DIGITAL_SILENCE"||p.type==="SILENCE_GAP").length;
         const as=computeAppenScore({
           fileName:   file.name,
-          profile:    (pk === "wakeword_pro" ? "wakeword_pro" : pk) as any,
+          profile:    pk,
           sampleRate: buf.sampleRate,
           duration:   buf.duration,
           lufs:       {integrated:r.qc.metrics.lufs,truePeak:r.qc.metrics.truePeak,lra:r.qc.metrics.lra,problems:[]},
@@ -250,7 +249,7 @@ export default function AudioQualityAnalyzer() {
     if(!rep?._buf)return;
     setRepairing(true);setRepairResult(null);
     try{
-      const profileTargets={wakeword:-20,wakeword_pro:-20,asr:-20,tts:-20,conversation:-23};
+      const profileTargets={wakeword:-20,asr:-20,tts:-20,conversation:-23};
       const result=repairAudioBuffer(rep._buf,{
         ...repairOpts,
         humFrequency:repairOpts.humFrequency,
