@@ -18,6 +18,11 @@ import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 import { trackEvent } from "../lib/tracking/activityTracker";
 import { useAuth } from "../lib/auth/AuthContext";
 
+function safeNum(v: number, decimals=1, fallback="—"): string {
+  if (!isFinite(v) || isNaN(v)) return fallback;
+  return v.toFixed(decimals);
+}
+
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-28, rmsMax:-10, noiseMax:-60, snrMin:45, silMax:0.15 } },
   asr:          { label:"ASR / Speech", icon:"🗣️", color:"#10b981", th:{ pkMin:-9,  pkMax:-2,  rmsMin:-32, rmsMax:-12, noiseMax:-55, snrMin:35, silMax:0.30 } },
@@ -117,6 +122,7 @@ export default function AudioQualityAnalyzer() {
   const [restoring,setRestoring]=useState(false);
   const [restored,setRestored]=useState(null);
   const [repairing,setRepairing]=useState(false);
+  const [beforeAfter,setBeforeAfter]=useState(null);
   const [repairResult,setRepairResult]=useState(null);
   const [appenResult,setAppenResult]=useState(null);
   const [vadResult,setVadResult]=useState(null);
@@ -251,6 +257,15 @@ export default function AudioQualityAnalyzer() {
         profile:pk,
       },rep.name);
       setRepairResult(result);
+      // Re-run QC on repaired buffer for before/after comparison
+      if(result.changed && result.repairedBuffer){
+        const mono2 = result.repairedBuffer.getChannelData(0);
+        const qcAfter = await analyzeAudioQuality(mono2, result.repairedBuffer.sampleRate, pk);
+        setBeforeAfter({
+          before: { score: rep?.qc?.score||0, lufs: rep?.qc?.metrics.lufs||0, snr: rep?.qc?.metrics.snrDb||0 },
+          after:  { score: qcAfter.score, lufs: qcAfter.metrics.lufs, snr: qcAfter.metrics.snrDb },
+        });
+      }
       if(result.changed){
         trackEvent({
           eventType: "repair_applied",
@@ -356,7 +371,12 @@ export default function AudioQualityAnalyzer() {
               </div>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              <Badge label="HUM"   value={rep.hum.detected?"DETECTED":"CLEAN"}   ok={!rep.hum.detected}/>
+              <Badge label="HUM"
+                value={
+                  rep.qc?.metrics.noiseClass?.includes("hum") || rep.hum.detected
+                    ? "DETECTED" : "CLEAN"
+                }
+                ok={!rep.qc?.metrics.noiseClass?.includes("hum") && !rep.hum.detected}/>
               <Badge label="VOICE" value={rep.voice.present?"PRESENT":"WEAK"}     ok={rep.voice.present}/>
             </div>
           </div>
@@ -365,18 +385,24 @@ export default function AudioQualityAnalyzer() {
           {qc&&<div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:12,padding:14}}>
             <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:10}}>DSP ENGINE · EBU R128 + FFT + VAD + SNR</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
-              <MetricCard label="LUFS (Integrated)" value={qc.metrics.lufs.toFixed(1)+" LUFS"} color={lufsColor}/>
-              <MetricCard label="True Peak"         value={qc.metrics.truePeak.toFixed(2)+" dBTP"} color={qc.metrics.truePeak>-1?"#ef4444":"#10b981"}/>
+              <MetricCard label="LUFS (Integrated)" value={safeNum(qc.metrics.lufs)+" LUFS"} color={lufsColor}/>
+              <MetricCard label="True Peak"         value={safeNum(qc.metrics.truePeak,2)+" dBTP"} color={qc.metrics.truePeak>-1?"#ef4444":"#10b981"}/>
               <MetricCard label="LRA"               value={qc.metrics.lra.toFixed(1)+" LU"} color="#a0c4cc"/>
-              <MetricCard label="SNR"               value={qc.metrics.snrDb.toFixed(1)+" dB"} color={snrColor} sub={qc.metrics.quality.toUpperCase()}/>
+              <MetricCard label="SNR"               value={safeNum(qc.metrics.snrDb)+" dB"} color={snrColor} sub={qc.metrics.quality.toUpperCase()}/>
               <MetricCard label="Noise Class"       value={qc.metrics.noiseClass.replace("_"," ").toUpperCase()} color={noiseColor}/>
               <MetricCard label="Environment"       value={qc.metrics.environment.replace("_"," ").toUpperCase()} color={envColor}/>
               <MetricCard label="Speech Ratio"      value={(qc.metrics.speechRatio*100).toFixed(1)+"%" } color={qc.metrics.speechRatio>0.3?"#10b981":"#f59e0b"}/>
               <MetricCard label="QC Score"          value={qc.score+"/100"} color={qc.score>=75?"#10b981":qc.score>=50?"#f59e0b":"#ef4444"} sub={qc.deliveryRisk}/>
               {vadResult&&<MetricCard label="Speech Regions" value={vadResult.speechRegions.length+""}  color="#10b981" sub={`${(vadResult.speechRatio*100).toFixed(1)}% speech`}/>}
               {vadResult&&<MetricCard label="Dominant Pitch" value={vadResult.dominantPitch>0?vadResult.dominantPitch.toFixed(0)+" Hz":"—"} color="#22d3ee"/>}
-              {reverbResult&&<MetricCard label="RT60 Reverb"   value={reverbResult.rt60Ms.toFixed(0)+" ms"} color={reverbResult.rt60Ms<150?"#10b981":reverbResult.rt60Ms<400?"#f59e0b":"#ef4444"} sub={reverbResult.environment.toUpperCase()}/>}
-              {reverbResult&&<MetricCard label="C50 Clarity"   value={reverbResult.clarity.toFixed(1)+" dB"} color={reverbResult.clarity>0?"#10b981":"#ef4444"}/>}
+              {reverbResult&&<MetricCard label="RT60 Reverb"
+                value={reverbResult.rt60Ms > 0 ? reverbResult.rt60Ms.toFixed(0)+" ms" : "Not measurable"}
+                color={reverbResult.rt60Ms<150?"#10b981":reverbResult.rt60Ms<400?"#f59e0b":"#ef4444"}
+                sub={reverbResult.environment.toUpperCase()}/>}
+              {reverbResult&&<MetricCard label="C50 Clarity"
+                value={reverbResult.clarity <= -40 ? "Not measurable" : reverbResult.clarity.toFixed(1)+" dB"}
+                color={reverbResult.clarity>0?"#10b981":reverbResult.clarity<=-40?"#ef4444":"#f59e0b"}
+                sub={reverbResult.clarity<=-40?"Reverb dominant":undefined}/>}
             </div>
 
             {/* QC Problems */}
@@ -598,6 +624,27 @@ export default function AudioQualityAnalyzer() {
                 ))}
               </div>}
               {!repairResult.changed&&<div style={{fontSize:10,color:"#4a8a9a"}}>No changes were needed.</div>}
+              {beforeAfter&&<div style={{marginTop:8,padding:"8px 10px",background:"#040c14",
+                borderRadius:6,border:"1px solid #0f2a3a"}}>
+                <div style={{fontSize:9,color:"#4a8a9a",marginBottom:6,fontWeight:700}}>BEFORE / AFTER COMPARISON</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  {[
+                    ["QC Score", beforeAfter.before.score+"/100", beforeAfter.after.score+"/100",
+                      beforeAfter.after.score > beforeAfter.before.score],
+                    ["LUFS", safeNum(beforeAfter.before.lufs)+" LUFS", safeNum(beforeAfter.after.lufs)+" LUFS",
+                      Math.abs(beforeAfter.after.lufs+20) < Math.abs(beforeAfter.before.lufs+20)],
+                    ["SNR",  safeNum(beforeAfter.before.snr)+" dB",   safeNum(beforeAfter.after.snr)+" dB",
+                      beforeAfter.after.snr > beforeAfter.before.snr],
+                  ].map(([label,before,after,improved])=>(
+                    <div key={label} style={{textAlign:"center"}}>
+                      <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4}}>{label}</div>
+                      <div style={{fontSize:9,color:"#ef4444"}}>{before}</div>
+                      <div style={{fontSize:9,color:"#4a8a9a"}}>↓</div>
+                      <div style={{fontSize:9,color:improved?"#10b981":"#f59e0b",fontWeight:700}}>{after}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>}
             </div>}
           </div>
 

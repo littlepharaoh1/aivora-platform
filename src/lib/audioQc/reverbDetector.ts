@@ -91,5 +91,9 @@ export function detectReverb(buffer: AudioBuffer): ReverbResult {
   if (c50 < 0)      problems.push(`Poor speech clarity: C50 = ${c50.toFixed(1)}dB`);
   if (drr < -5)     problems.push(`Low DRR: ${drr.toFixed(1)}dB — reverb dominant`);
 
-  return { rt60Ms, environment, drr, clarity: c50, problems };
+  // Clamp -Infinity values
+  const safeC50 = isFinite(c50) ? c50 : -40;
+  const safeDrr = isFinite(drr) ? drr : -40;
+
+  return { rt60Ms, environment, drr: safeDrr, clarity: safeC50, problems };
 }
