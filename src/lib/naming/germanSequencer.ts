@@ -63,14 +63,14 @@ export function buildFileName(
 }
 
 export function extractNumberFromFileName(fileName: string): number | null {
-  // Match leading number: "93. Hey Denza (fast).wav" → 93
-  // Or "120_rec.wav" → 120
-  // Or "recording_085.wav" → 85
-  const match = fileName.match(/^(\d+)[.\s_-]/);
-  if (match) return parseInt(match[1], 10);
-  // Also try any number in filename
-  const anyNum = fileName.match(/(\d+)/);
-  if (anyNum) return parseInt(anyNum[1], 10);
+  // Case 1: Leading number "93. Hey Denza (fast).wav" → 93
+  const leadingNum = fileName.match(/^(\d+)[.\s_-]/);
+  if (leadingNum) return parseInt(leadingNum[1], 10);
+
+  // Case 2: Appen format "DE-DE_D1065_S0199_query_normal.wav" → 199
+  const appenFormat = fileName.match(/_S(\d{4})_/);
+  if (appenFormat) return parseInt(appenFormat[1], 10);
+
   return null;
 }
 
