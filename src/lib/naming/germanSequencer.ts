@@ -62,6 +62,18 @@ export function buildFileName(
   return `${locale}_${speakerId}_S${seq}_${suffix}.wav`;
 }
 
+export function extractNumberFromFileName(fileName: string): number | null {
+  // Match leading number: "93. Hey Denza (fast).wav" → 93
+  // Or "120_rec.wav" → 120
+  // Or "recording_085.wav" → 85
+  const match = fileName.match(/^(\d+)[.\s_-]/);
+  if (match) return parseInt(match[1], 10);
+  // Also try any number in filename
+  const anyNum = fileName.match(/(\d+)/);
+  if (anyNum) return parseInt(anyNum[1], 10);
+  return null;
+}
+
 export function generateSequence(
   files:   File[],
   options: SequencerOptions
@@ -71,7 +83,9 @@ export function generateSequence(
   const usedSequences = new Set<number>();
 
   for (let i = 0; i < files.length; i++) {
-    const index = startIndex + i;
+    // Try to extract number from filename first
+    const fileNum = extractNumberFromFileName(files[i].name);
+    const index   = fileNum !== null ? fileNum : startIndex + i;
 
     if (index > 200) {
       results.push({
