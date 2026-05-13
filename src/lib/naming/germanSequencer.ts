@@ -68,7 +68,7 @@ export function extractNumberFromFileName(fileName: string): number | null {
   if (leadingNum) return parseInt(leadingNum[1], 10);
 
   // Case 2: Appen format "DE-DE_D1065_S0199_query_normal.wav" → 199
-  const appenFormat = fileName.match(/_S(\d{4})_/);
+  const appenFormat = fileName.match(/_S(\d{3,5})_/);
   if (appenFormat) return parseInt(appenFormat[1], 10);
 
   return null;
