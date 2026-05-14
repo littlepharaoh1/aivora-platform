@@ -10,6 +10,7 @@ import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../lib/audi
 import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { computeAppenScore } from "../lib/audioQc/appenScore";
+import { fmt } from "../lib/dsp/metricGuards";
 import { analyzeAdvancedVAD } from "../lib/audioQc/advancedVAD";
 import { detectReverb } from "../lib/audioQc/reverbDetector";
 import WaveformEditor from "./audio/WaveformEditor";
@@ -394,13 +395,13 @@ export default function AudioQualityAnalyzer() {
               <MetricCard label="Speech Ratio"      value={(qc.metrics.speechRatio*100).toFixed(1)+"%" } color={qc.metrics.speechRatio>0.3?"#10b981":"#f59e0b"}/>
               <MetricCard label="QC Score"          value={qc.score+"/100"} color={qc.score>=75?"#10b981":qc.score>=50?"#f59e0b":"#ef4444"} sub={qc.deliveryRisk}/>
               {vadResult&&<MetricCard label="Speech Regions" value={vadResult.speechRegions.length+""}  color="#10b981" sub={`${(vadResult.speechRatio*100).toFixed(1)}% speech`}/>}
-              {vadResult&&<MetricCard label="Dominant Pitch" value={vadResult.dominantPitch>0?vadResult.dominantPitch.toFixed(0)+" Hz":"—"} color="#22d3ee"/>}
+              {vadResult&&<MetricCard label="Dominant Pitch" value={fmt.pitch(vadResult.dominantPitch)} color="#22d3ee"/>}
               {reverbResult&&<MetricCard label="RT60 Reverb"
-                value={reverbResult.rt60Ms > 0 ? reverbResult.rt60Ms.toFixed(0)+" ms" : "Not measurable"}
+                value={fmt.rt60(reverbResult.rt60Ms)}
                 color={reverbResult.rt60Ms<150?"#10b981":reverbResult.rt60Ms<400?"#f59e0b":"#ef4444"}
                 sub={reverbResult.environment.toUpperCase()}/>}
               {reverbResult&&<MetricCard label="C50 Clarity"
-                value={reverbResult.clarity <= -40 ? "Not measurable" : reverbResult.clarity.toFixed(1)+" dB"}
+                value={fmt.c50(reverbResult.clarity)}
                 color={reverbResult.clarity>0?"#10b981":reverbResult.clarity<=-40?"#ef4444":"#f59e0b"}
                 sub={reverbResult.clarity<=-40?"Reverb dominant":undefined}/>}
             </div>
