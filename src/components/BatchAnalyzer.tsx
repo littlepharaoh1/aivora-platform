@@ -7,7 +7,7 @@ import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, FileText, Download } from "lucide-react";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 import { audioWorker, makeTaskId } from "../lib/workers/audioWorkerClient";
-import { extractSpeakerProfile, verifySpeaker } from "../lib/audioQc/speakerVerifier";
+import { extractSpeakerEmbedding, verifySpeaker } from "../lib/audioQc/speakerVerifier";
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee" },
@@ -92,7 +92,7 @@ export default function BatchAnalyzer() {
       const ctx2 = new AudioContext();
       const ab2  = await wavFiles[i].arrayBuffer();
       const buf2 = await ctx2.decodeAudioData(ab2);
-      r._speakerProfile = extractSpeakerProfile(buf2, wavFiles[i].name);
+      r._speakerProfile = extractSpeakerEmbedding(buf2, wavFiles[i].name);
         out.push(r);
         setResults([...out]);
         setProgress({done:i+1,total:wavFiles.length});
