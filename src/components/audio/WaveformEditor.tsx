@@ -8,6 +8,7 @@ import { renderWaveform, type QCMarker } from "../../lib/audioEditor/waveformRen
 import { xToTime, timeToX } from "../../lib/audioEditor/regionEditor";
 import { mixToMono, formatTime } from "../../lib/audioEditor/audioBufferUtils";
 import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../../lib/audioQc/spectrogram";
+import { computeSpectrogramPro, drawSpectrogramPro } from "../../lib/audioQc/spectrogramPro";
 import { stretchRegion, validateStretchRatio } from "../../lib/audioEditor/timeStretch";
 import { exportToWav, downloadWav } from "../../lib/audioQc/repair/wavExporter";
 
@@ -52,6 +53,9 @@ export default function WaveformEditor({ buffer, qcMarkers = [], fileName = "aud
   const [stretchWarning, setStretchWarning] = useState("");
   const [stretching,     setStretching]     = useState(false);
   const [showStretch,    setShowStretch]    = useState(false);
+  const [fftSize,       setFftSize]       = useState(4096);
+  const [colorMap,      setColorMap]      = useState<"aivora"|"plasma"|"viridis"|"inferno">("aivora");
+  const [specGain,      setSpecGain]      = useState(1.2);
 
   const mono       = React.useMemo(() => mixToMono(buffer), [buffer]);
   const duration   = buffer.duration;
@@ -92,15 +96,15 @@ export default function WaveformEditor({ buffer, qcMarkers = [], fileName = "aud
   useEffect(() => {
     if (!specCanvasRef.current || view === "waveform") return;
     const canvas = specCanvasRef.current;
-    const spec = computeSpectrogram(buffer, { fftSize: 2048, sampleRate });
+    const spec = computeSpectrogramPro(buffer, { fftSize, minDb:-90, maxDb:-10, gain: specGain, colorMap });
 
     // Create a clipped view matching zoom/pan
     canvas.width  = dimensions.w;
-    canvas.height = 120;
+    canvas.height = 180;
     const offscreen = document.createElement("canvas");
     offscreen.width  = dimensions.w;
-    offscreen.height = 120;
-    drawSpectrogram(offscreen, spec);
+    offscreen.height = 180;
+    drawSpectrogramPro(offscreen, spec, { colorMap, gain: specGain, logFreq: true, showGrid: true });
 
     // Draw zoomed portion
     const ctx = canvas.getContext("2d");
@@ -119,7 +123,7 @@ export default function WaveformEditor({ buffer, qcMarkers = [], fileName = "aud
       ctx.lineWidth   = 2;
       ctx.beginPath();
       ctx.moveTo(px, 0);
-      ctx.lineTo(px, 120);
+      ctx.lineTo(px, 180);
       ctx.stroke();
     }
 
