@@ -129,10 +129,8 @@ function Sidebar({ activeTab, onTabChange }:{ activeTab:Tab; onTabChange:(t:Tab)
       <div style={{height:52,display:"flex",alignItems:"center",
         padding:"0 14px",borderBottom:`1px solid ${colors.bg.border}`,
         gap:10,flexShrink:0}}>
-        <div style={{width:28,height:28,borderRadius:8,flexShrink:0,
-          background:`linear-gradient(135deg,${colors.accent.sky},${colors.accent.purple})`,
-          display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:14,fontWeight:800,color:"#fff"}}>A</div>
+        <img src="/aivora-logo.svg" alt="Aivora"
+          style={{width:32,height:32,flexShrink:0,objectFit:"contain"}}/>
         {expanded&&<div style={{fontSize:13,fontWeight:700,
           color:colors.text.primary,letterSpacing:2,whiteSpace:"nowrap"}}>AIVORA</div>}
       </div>
