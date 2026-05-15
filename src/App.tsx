@@ -130,7 +130,7 @@ function Sidebar({ activeTab, onTabChange }:{ activeTab:Tab; onTabChange:(t:Tab)
         padding:"0 14px",borderBottom:`1px solid ${colors.bg.border}`,
         gap:10,flexShrink:0}}>
         <img src="/aivora-logo.svg" alt="Aivora"
-          style={{width:32,height:32,flexShrink:0,objectFit:"contain"}}/>
+          style={{width:36,height:36,flexShrink:0,objectFit:"contain"}}/>
         {expanded&&<div style={{fontSize:13,fontWeight:700,
           color:colors.text.primary,letterSpacing:2,whiteSpace:"nowrap"}}>AIVORA</div>}
       </div>
@@ -273,9 +273,8 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
         border:`1px solid ${colors.bg.border}`,
         borderRadius:16,padding:"20px 24px",marginBottom:24,
         display:"flex",alignItems:"center",gap:16}}>
-        <div style={{width:48,height:48,borderRadius:14,flexShrink:0,
-          background:`linear-gradient(135deg,${colors.accent.sky},${colors.accent.purple})`,
-          display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>⬡</div>
+        <img src="/aivora-logo.svg" alt="Aivora Logo"
+          style={{width:52,height:52,flexShrink:0,objectFit:"contain"}}/>
         <div>
           <div style={{fontSize:18,fontWeight:700,color:colors.text.primary}}>
             Welcome to Aivora
@@ -295,7 +294,7 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
         QUICK ACCESS
       </div>
       <div style={{display:"grid",
-        gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+        gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
         {cards.map(card=>(
           <div key={card.tab} onClick={()=>onNavigate(card.tab)}
             style={{background:colors.bg.surface,
