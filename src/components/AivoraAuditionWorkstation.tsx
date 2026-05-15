@@ -16,6 +16,10 @@ import type { ClipboardEntry } from "../lib/audioEditor/silenceClipboard";
 import type { RegionQAResult } from "../lib/audioEditor/regionQa";
 import type { SpeechProtectionResult } from "../lib/audioEditor/speechProtection";
 import type { ReplaceMode } from "../lib/audioEditor/regionReplace";
+import { runAdobeGate } from "../lib/audioForensics/adobeGate";
+import { simulateAdobeQA } from "../lib/audioForensics/adobeQaSimulator";
+import { verifySpeechPreservation } from "../lib/audioForensics/speechPreservation";
+import type { GateResult } from "../lib/audioForensics/adobeGate";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -306,6 +310,8 @@ export default function AivoraAuditionWorkstation(){
   const [lastQA,setLastQA]=useState<RegionQAResult|null>(null);
   const [protection,setProtection]=useState<SpeechProtectionResult|null>(null);
   const [loading,setLoading]=useState("");
+  const [gateResult,setGateResult]=useState<GateResult|null>(null);
+  const [showRoundtrip,setShowRoundtrip]=useState(false);
   const [status,setStatus]=useState("");
 
   const targetRef=useRef<HTMLInputElement>(null);
@@ -493,6 +499,19 @@ export default function AivoraAuditionWorkstation(){
   }
 
   // ── Export ─────────────────────────────────────────────────────────────────
+
+  async function handleValidateFile(){
+    if(!editedBuffer||!targetBuffer) return;
+    setLoading("Validating...");
+    await new Promise(r=>setTimeout(r,0));
+    const qa=simulateAdobeQA({original:targetBuffer,repaired:editedBuffer,repairedRegionCount:repairedRegions.length,totalRepairedMs:repairedRegions.reduce((s,r)=>s+r.durationMs,0)});
+    const sp=verifySpeechPreservation(targetBuffer,editedBuffer);
+    const af=analyzeSilenceForensics(editedBuffer);
+    const gate=runAdobeGate(qa,sp,af);
+    setGateResult(gate);setShowRoundtrip(true);
+    setStatus(gate.passed?"✅ Passed":"⚠ "+gate.gateStatus.replace(/_/g," "));
+    setLoading("");
+  }
 
   function handleExport(){
     const buf=editedBuffer??targetBuffer; if(!buf) return;
@@ -752,6 +771,8 @@ export default function AivoraAuditionWorkstation(){
                 padding:"2px 8px",cursor:"pointer",color:"#f59e0b",fontSize:8,opacity:!activeBuffer?0.4:1}}>
               🔬 Analyze
             </button>
+            <button onClick={handleValidateFile} disabled={!editedBuffer||!targetBuffer} style={{background:"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:4,padding:"2px 8px",cursor:"pointer",color:"#22d3ee",fontSize:8,opacity:(!editedBuffer||!targetBuffer)?0.4:1}}>✅ Validate</button>
+            <button onClick={()=>setShowRoundtrip(v=>!v)} disabled={!gateResult} style={{background:"#8b5cf622",border:"1px solid #8b5cf644",borderRadius:4,padding:"2px 8px",cursor:"pointer",color:"#8b5cf6",fontSize:8,opacity:!gateResult?0.4:1}}>🎯 Roundtrip</button>
             <div style={{marginLeft:"auto",fontSize:7,color:"#2a5a6a"}}>
               SPACE=Play  Ctrl+C=Copy  Ctrl+V=Paste  +=In  -=Out
             </div>
@@ -866,6 +887,33 @@ export default function AivoraAuditionWorkstation(){
           </div>}
         </div>
       </div>
+
+      {showRoundtrip&&gateResult&&(
+        <div style={{position:"fixed",top:40,right:0,bottom:0,width:260,background:"#030c14",borderLeft:"1px solid #0f2a3a",zIndex:100,overflow:"auto",padding:12}}>
+          <div style={{display:"flex",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#8b5cf6"}}>ROUNDTRIP READINESS</div>
+            <button onClick={()=>setShowRoundtrip(false)} style={{marginLeft:"auto",background:"transparent",border:"none",color:"#4a8a9a",cursor:"pointer",fontSize:14}}>{"✕"}</button>
+          </div>
+          <div style={{padding:"8px",borderRadius:8,marginBottom:10,background:gateResult.passed?"#10b98122":"#ef444422",border:"1px solid "+(gateResult.passed?"#10b98144":"#ef444444")}}>
+            <div style={{fontSize:11,fontWeight:700,color:gateResult.passed?"#10b981":"#ef4444"}}>{gateResult.gateStatus.replace(/_/g," ")}</div>
+            <div style={{fontSize:7,color:"#4a8a9a"}}>{"Adobe-style QA — NOT official certification"}</div>
+          </div>
+          <PBar score={gateResult.scores.silenceRealism}     label="Silence Realism"/>
+          <PBar score={1-gateResult.scores.seamRisk}         label="Seam Invisibility"/>
+          <PBar score={gateResult.scores.speechPreservation} label="Speech Preserved"/>
+          <PBar score={1-gateResult.scores.reviewerRisk}     label="Reviewer Safety"/>
+          <PBar score={gateResult.scores.overallGate}        label="Overall Score"/>
+          <div style={{marginTop:6}}>
+            {gateResult.blockingReasons.map((r,i)=>(<div key={i} style={{fontSize:8,color:"#ef4444",marginBottom:2}}>{"✗ "+r}</div>))}
+            {gateResult.warnings.map((w,i)=>(<div key={i} style={{fontSize:8,color:"#f59e0b",marginBottom:2}}>{"⚠ "+w}</div>))}
+          </div>
+          <div style={{marginTop:8,padding:"6px",background:"#040c14",borderRadius:6,border:"1px solid #0f2a3a"}}>
+            <div style={{fontSize:8,fontWeight:700,color:gateResult.exportAllowed?"#10b981":"#ef4444"}}>{gateResult.exportAllowed?"✅ Export allowed":"⛔ Export blocked"}</div>
+            {editedBuffer&&<div style={{fontSize:7,color:"#22d3ee",marginTop:2}}>{"32-bit Float · "+editedBuffer.sampleRate+"Hz"}</div>}
+          </div>
+          <button onClick={handleExport} disabled={!gateResult.exportAllowed} style={{marginTop:8,width:"100%",background:gateResult.exportAllowed?"#10b98122":"#0a1a24",border:"1px solid "+(gateResult.exportAllowed?"#10b98144":"#0f2a3a"),borderRadius:6,padding:"7px",cursor:gateResult.exportAllowed?"pointer":"not-allowed",color:gateResult.exportAllowed?"#10b981":"#2a5a6a",fontSize:10,fontWeight:700}}>{gateResult.exportAllowed?"⬇ Export 32-bit Float WAV":"⛔ Export Blocked"}</button>
+        </div>
+      )}
     </div>
   );
 }
