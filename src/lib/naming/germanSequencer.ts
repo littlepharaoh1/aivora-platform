@@ -62,7 +62,24 @@ export function buildFileName(
   return `${locale}_${speakerId}_S${seq}_${suffix}.wav`;
 }
 
+
+// ── Arabic Numeral Converter ──────────────────────────────────────────────────
+
+const ARABIC_TO_WESTERN: Record<string, string> = {
+  "٠":"0","١":"1","٢":"2","٣":"3","٤":"4",
+  "٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+  // Persian/Urdu variants
+  "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4",
+  "۵":"5","۶":"6","۷":"7","۸":"8","۹":"9",
+};
+
+export function convertArabicNumerals(str: string): string {
+  return str.replace(/[٠-٩۰-۹]/g, d => ARABIC_TO_WESTERN[d] ?? d);
+}
+
 export function extractNumberFromFileName(fileName: string): number | null {
+  // Convert Arabic/Persian numerals to Western first
+  fileName = convertArabicNumerals(fileName);
   // Case 1: Leading number "93. Hey Denza (fast).wav" → 93
   const leadingNum = fileName.match(/^(\d+)[.\s_-]/);
   if (leadingNum) return parseInt(leadingNum[1], 10);
