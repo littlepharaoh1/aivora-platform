@@ -14,6 +14,7 @@ import { colors }  from "./lib/design/tokens";
 
 // Auth
 import AuthGate        from "./components/AuthGate";
+import LandingPage     from "./components/LandingPage";
 import { useAuth }     from "./lib/auth/AuthContext";
 import UserAvatar      from "./components/UserAvatar";
 import NetworkStatus   from "./components/NetworkStatus";
@@ -364,6 +365,7 @@ function ComingSoon({ title }:{ title:string }){
 // ── App Content ───────────────────────────────────────────────────────────────
 
 function AppContent(){
+  const [showLanding,setShowLanding]=useState(true);
   const [tab,setTab]=useState<Tab>("dashboard");
   const { records, setRecords } = useAivora();
   const meta=TAB_META[tab];
@@ -372,6 +374,9 @@ function AppContent(){
   useEffect(()=>{
     trackEvent("tab_opened",{tab});
   },[tab]);
+
+  // Landing page
+  if(showLanding) return <LandingPage onEnter={()=>setShowLanding(false)}/>;
 
   // Audition = full screen
   if(tab==="audition") return <AivoraAuditionWorkstation/>;
