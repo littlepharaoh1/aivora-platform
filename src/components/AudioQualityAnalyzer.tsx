@@ -7,6 +7,7 @@ import { restoreNaturalSilence } from "../lib/audioQc/silenceRestorer";
 import { Upload, BarChart3, CheckCircle2, XCircle, AlertTriangle, Download, Wand2, Wrench, FileText } from "lucide-react";
 import { repairAudioBuffer } from "../lib/audioQc/repair/repairPipeline";
 import { computeSpectrogram, drawSpectrogram, drawGapMarkers } from "../lib/audioQc/spectrogram";
+import { computeSpectrogramPro, drawSpectrogramPro } from "../lib/audioQc/spectrogramPro";
 import { detectDigitalGaps } from "../lib/audioQc/silenceRestorer";
 import { openQCReport } from "../lib/audioQc/report/pdfReporter";
 import { computeAppenScore } from "../lib/audioQc/appenScore";
@@ -138,7 +139,7 @@ export default function AudioQualityAnalyzer() {
       const buf=currentFile.buffer;
       analyze(buf,currentFile.name,currentFile.profile||pk).then(r=>{
         setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
-        const spec=computeSpectrogram(buf,{fftSize:2048,sampleRate:buf.sampleRate});
+        const spec=computeSpectrogramPro(buf,{fftSize:4096,minDb:-90,maxDb:-10,gain:1.3,colorMap:"aivora"});
         setSpectrogramData(spec);
         const gaps=detectDigitalGaps(buf);
         setDigitalGaps(gaps);
@@ -190,7 +191,7 @@ export default function AudioQualityAnalyzer() {
         });
         setAppenResult(as);
       }
-      const spec=computeSpectrogram(buf,{fftSize:2048,sampleRate:buf.sampleRate});
+      const spec=computeSpectrogramPro(buf,{fftSize:4096,minDb:-90,maxDb:-10,gain:1.3,colorMap:"aivora"});
       setSpectrogramData(spec);
       const gaps=detectDigitalGaps(buf);
       setDigitalGaps(gaps);
@@ -297,7 +298,7 @@ export default function AudioQualityAnalyzer() {
 
   useEffect(()=>{
     if(canvasRef.current&&spectrogramData){
-      drawSpectrogram(canvasRef.current,spectrogramData);
+      drawSpectrogramPro(canvasRef.current,spectrogramData,{colorMap:"aivora",gain:1.3,logFreq:true,showGrid:true,showLabels:true});
       if(digitalGaps.length>0){
         drawGapMarkers(canvasRef.current,digitalGaps,spectrogramData.durationSec);
       }
