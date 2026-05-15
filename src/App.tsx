@@ -18,6 +18,7 @@ import SmartNamingSequencer from "./components/SmartNamingSequencer";
 import ActivityMonitor from "./components/ActivityMonitor";
 import DspValidationDashboard from "./components/DspValidationDashboard";
 import ForensicSilenceRepair from "./components/ForensicSilenceRepair";
+import AivoraAuditionWorkstation from "./components/AivoraAuditionWorkstation";
 import { useGlobalAudio } from "./lib/store/GlobalAudioContext";
 
 type Tab =
@@ -40,7 +41,8 @@ type Tab =
   | "sequencer"
   | "monitor"
   | "dsp_validation"
-  | "forensic_repair";
+  | "forensic_repair"
+  | "audition";
 type Decision = "Pending" | "Approved" | "Review" | "Rejected";
 type Speed = "slow" | "normal" | "fast";
 type Role = "Admin" | "Manager" | "QA Reviewer" | "Viewer";
@@ -752,6 +754,7 @@ ctx.stroke();
 ["monitor", "Activity Monitor"],
 ["dsp_validation", "DSP Validation"],
 ["forensic_repair", "Forensic Silence Repair"],
+["audition", "Audition Workstation"],
 ["pipeline", "Audio Pipeline"],
       ["store", "Aivora Store"],
   ];
@@ -1610,6 +1613,7 @@ namingTemplate: t.namingTemplate ?? t.naming_pattern ?? "{locale}_{speaker}_S{in
 {tab === "monitor" && <ActivityMonitor />}
 {tab === "dsp_validation" && <DspValidationDashboard />}
 {tab === "forensic_repair" && <ForensicSilenceRepair />}
+{tab === "audition" && <AivoraAuditionWorkstation />}
 {tab === "pipeline" && <AudioPipeline />}
         {tab === "store" && <StorePanel />}
       <GlobalAudioPlayer />
