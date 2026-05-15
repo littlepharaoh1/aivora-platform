@@ -42,6 +42,7 @@ import AivoraAuditionWorkstation  from "./components/AivoraAuditionWorkstation";
 import ActivityMonitor      from "./components/ActivityMonitor";
 import DspValidationDashboard from "./components/DspValidationDashboard";
 import StorePanel           from "./components/StorePanel";
+import ConversationRooms    from "./components/ConversationRooms";
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,8 @@ type Tab =
   | "contributors"
   | "monitor"
   | "dsp_validation"
-  | "store";
+  | "store"
+  | "rooms";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -76,6 +78,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   monitor:        { title:"Activity Monitor",         subtitle:"REAL-TIME TRACKING" },
   dsp_validation: { title:"DSP Validation",           subtitle:"ACCURACY TESTING SUITE" },
   store:          { title:"Aivora Store",             subtitle:"RESOURCES & TOOLS" },
+  rooms:          { title:"Conversation Rooms",       subtitle:"DUAL SPEAKER STEREO MERGE V8" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
@@ -98,6 +101,7 @@ const NAV_ITEMS = [
   // System
   { id:"dsp_validation",  icon:"⚗",  label:"DSP Validation",    group:"system"     },
   { id:"store",           icon:"🛍", label:"Store",              group:"system"     },
+  { id:"rooms",           icon:"🎙", label:"Conversation Rooms", group:"production" },
 ];
 
 const GROUP_LABELS = {
@@ -398,6 +402,7 @@ function AppContent(){
           {tab==="dsp_validation"  && <DspValidationDashboard/>}
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <ComingSoon title="Contributors"/>}
+          {tab==="rooms"           && <ConversationRooms/>}
         </div>
       </div>
 
