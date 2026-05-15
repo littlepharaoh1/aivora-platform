@@ -61,7 +61,7 @@ function Dashboard({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 24, animation: "fadeIn 0.3s ease" }}>
       {/* Welcome */}
       <div style={{
         background: `linear-gradient(135deg, ${colors.bg.elevated}, ${colors.bg.surface})`,

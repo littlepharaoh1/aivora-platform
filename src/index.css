@@ -1,0 +1,80 @@
+
+/* Aivora Design System — Global Styles */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: #080F1A;
+  color: #E2EEF6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #080F1A;
+}
+::-webkit-scrollbar-thumb {
+  background: #1A3045;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0EA5E9;
+}
+
+/* Selection */
+::selection {
+  background: #0EA5E933;
+  color: #E2EEF6;
+}
+
+/* Transitions */
+button {
+  transition: all 0.15s ease;
+}
+
+/* Remove button defaults */
+button {
+  font-family: inherit;
+}
+
+/* Numeric values use mono font */
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Pulse animation */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease forwards;
+}
+
+/* Glow effect for active elements */
+.glow-sky {
+  box-shadow: 0 0 12px #0EA5E933;
+}
