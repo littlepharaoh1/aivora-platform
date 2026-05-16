@@ -128,6 +128,77 @@ Acceptance criteria:
       oracleExists: true,
     },
   },
+
+  // ── Task 4: ASR Readiness ──────────────────────────────────────────────
+  {
+    id:         "ABT-004",
+    version:    "1.0.0",
+    category:   "asr_readiness",
+    difficulty: "hard",
+    title:      "ASR Dataset Readiness Validation",
+    instructions: `
+You are given a WAV file intended for ASR (Automatic Speech Recognition) training.
+
+Your task:
+1. Verify LUFS is between -23 and -16 (EBU R128 broadcast standard)
+2. Verify True Peak <= -1.0 dBTP
+3. Verify SNR >= 20 dB
+4. Verify silence regions are clean (RMS -65 to -50 dB)
+5. Verify hum probability < 0.10
+6. Verify no clipping (True Peak <= -1.0 dBTP)
+7. Verify sample rate is exactly 48000 Hz
+8. If any metric fails, apply minimal corrections only
+9. Export as 32-bit float WAV at 48kHz mono
+
+ASR datasets require the strictest quality standards.
+Any speech modification will cause model training degradation.
+    `.trim(),
+    inputFiles:  ["asr_input.wav"],
+    thresholds:  DEFAULT_THRESHOLDS.asr_readiness,
+    metadata: {
+      createdAt:    "2026-01-01",
+      author:       "Aivora Audio Bench",
+      tags:         ["asr", "speech-recognition", "dataset-qa", "broadcast"],
+      description:  "Validate and prepare audio for ASR model training",
+      oracleExists: true,
+    },
+  },
+
+  // ── Task 5: Dead Silence Detection ──────────────────────────────────────
+  {
+    id:         "ABT-005",
+    version:    "1.0.0",
+    category:   "silence_repair",
+    difficulty: "easy",
+    title:      "Dead Silence Detection and Replacement",
+    instructions: `
+You are given a WAV file containing regions of digital mute (dead silence).
+Digital silence has RMS < -90 dB and is unnatural for recording environments.
+
+Your task:
+1. Detect all digital silence regions (RMS < -90 dB)
+2. Replace with synthesized room tone at -55 to -45 dB RMS
+3. Match the spectral slope of adjacent non-silent regions
+4. Apply 5ms crossfades at boundaries
+5. Verify no digital mute remains in output
+6. Export as 32-bit float WAV at 48kHz mono
+
+Detection criteria: a region is digital mute if RMS < -90 dB for > 10ms
+    `.trim(),
+    inputFiles:  ["dead_silence_input.wav"],
+    thresholds:  {
+      ...DEFAULT_THRESHOLDS.silence_repair,
+      maxSilenceRmsDb: -45,
+      maxSeamRisk: 0.15,
+    },
+    metadata: {
+      createdAt:    "2026-01-01",
+      author:       "Aivora Audio Bench",
+      tags:         ["digital-mute", "dead-silence", "room-tone", "easy"],
+      description:  "Replace unnatural digital silence with synthesized room tone",
+      oracleExists: true,
+    },
+  },
 ];
 
 export function getTask(id: string): BenchmarkTask | undefined {

@@ -11,6 +11,7 @@ import { validateTask } from "../lib/audioBench/taskSchema";
 import { gradeToColor, scoreToGrade } from "../lib/audioBench/verifierResult";
 import type { VerifierResult } from "../lib/audioBench/verifierResult";
 import type { BenchmarkTask, TaskOutput, AudioMetadata } from "../lib/audioBench/types";
+import { buildTrainingExample, exportToJsonl, buildManifest } from "../lib/audioBench/trainingExport";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -236,6 +237,35 @@ export default function AivoraAudioBench() {
   });
 
   const [filter, setFilter] = useState<string>("all");
+  const [exporting, setExporting] = useState(false);
+
+  function handleExport() {
+    setExporting(true);
+    try {
+      const done = Object.values(runs).filter(r=>r.status==="done"&&r.result);
+      const examples = done.map(r => buildTrainingExample(
+        r.task, r.result!, null, [], r.duration
+      ));
+      const jsonl    = exportToJsonl(examples);
+      const manifest = buildManifest(examples);
+
+      // Download JSONL
+      const blob1 = new Blob([jsonl], {type:"application/jsonl"});
+      const a1 = document.createElement("a");
+      a1.href = URL.createObjectURL(blob1);
+      a1.download = `aivora_bench_${Date.now()}.jsonl`;
+      a1.click();
+
+      // Download manifest
+      const blob2 = new Blob([JSON.stringify(manifest,null,2)], {type:"application/json"});
+      const a2 = document.createElement("a");
+      a2.href = URL.createObjectURL(blob2);
+      a2.download = `aivora_bench_manifest_${Date.now()}.json`;
+      a2.click();
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const setRun = useCallback((id:string, patch: Partial<TaskRun>) => {
     setRuns(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -342,6 +372,21 @@ export default function AivoraAudioBench() {
           </div>
         ))}
       </div>
+
+      {/* Export */}
+      {done.length > 0 && (
+        <div style={{marginBottom:14}}>
+          <button onClick={handleExport} disabled={exporting}
+            style={{background:"#10B98120",border:"1px solid #10B98140",
+              borderRadius:6,padding:"6px 14px",cursor:"pointer",
+              color:"#10B981",fontSize:10,fontFamily:"inherit",fontWeight:600}}>
+            {exporting?"⟳ Exporting...":"⬇ Export Training Data (JSONL + Manifest)"}
+          </button>
+          <span style={{marginLeft:8,fontSize:8,color:"#2a5a6a"}}>
+            {done.length} completed run{done.length>1?"s":""}
+          </span>
+        </div>
+      )}
 
       {/* Filter */}
       <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
