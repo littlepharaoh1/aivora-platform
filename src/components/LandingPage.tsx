@@ -395,16 +395,29 @@ export default function LandingPage({ onEnter }: Props) {
             </div>
           </div>
         </div>
-        <button onClick={onEnter}
-          style={{
-            background:"linear-gradient(135deg,#0EA5E9,#8B5CF6)",
-            border:"none",borderRadius:8,
-            padding:"10px 24px",cursor:"pointer",
-            color:"#fff",fontSize:12,fontWeight:700,
-            letterSpacing:1,fontFamily:"inherit",
-          }}>
-          OPEN PLATFORM →
-        </button>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button onClick={()=>setShowAbout(true)}
+            style={{display:"flex",alignItems:"center",gap:5,
+              background:"transparent",border:"1px solid #1a3a5a",
+              borderRadius:6,padding:"6px 12px",cursor:"pointer",
+              color:"#64A0B8",fontSize:11,fontFamily:"inherit"}}>
+            About
+          </button>
+          <a href="mailto:Info@aivoraailtd.com"
+            style={{display:"flex",alignItems:"center",gap:5,
+              background:"transparent",border:"1px solid #1a3a5a",
+              borderRadius:6,padding:"6px 12px",
+              color:"#64A0B8",fontSize:11,textDecoration:"none"}}>
+            Contact
+          </a>
+          <button onClick={onEnter}
+            style={{background:"linear-gradient(135deg,#0EA5E9,#8B5CF6)",
+              border:"none",borderRadius:8,padding:"10px 24px",cursor:"pointer",
+              color:"#fff",fontSize:12,fontWeight:700,
+              letterSpacing:1,fontFamily:"inherit"}}>
+            OPEN PLATFORM →
+          </button>
+        </div>
       </nav>
 
       {/* Hero */}
