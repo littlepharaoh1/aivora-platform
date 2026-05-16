@@ -94,6 +94,8 @@ function ProfessionalAudioEditorInner() {
   const [colorMap,   setColorMap]   = useState<"aivora"|"plasma"|"inferno"|"forensic">("plasma");
   const [windowFn,   setWindowFn]   = useState<WindowFunction>("hann");
   const [overlap,    setOverlap]    = useState(0.875);
+  const [melScale,   setMelScale]   = useState(false);
+  const pinchRef = useRef<{dist:number; pan:number; zoom:number}|null>(null);
   const [waveH,      setWaveH]      = useState(220);
   const [specH,      setSpecH]      = useState(200);
   const [showLeft,   setShowLeft]   = useState(true);
@@ -328,7 +330,7 @@ function ProfessionalAudioEditorInner() {
       const offscreen = document.createElement("canvas");
       offscreen.width  = fullW;
       offscreen.height = specH;
-      const spec = computeSpectrogramPro(buffer,{fftSize,minDb:-90,maxDb:-10,gain:1.4,colorMap,windowFn,overlap});
+      const spec = computeSpectrogramPro(buffer,{fftSize,minDb:-90,maxDb:-10,gain:1.4,colorMap,windowFn,overlap,melScale});
       drawSpectrogramPro(offscreen,spec,{colorMap,gain:1.4,logFreq:true,showGrid:true,showLabels:true});
       (specCacheRef.current as any) = {canvas:offscreen, fftSize, colorMap, bufferId:bid, windowFn};
     }
@@ -387,7 +389,7 @@ function ProfessionalAudioEditorInner() {
       ctx.lineWidth=1;
       ctx.strokeRect(sx,0,ex-sx,specH);
     }
-  },[buffer,zoom,panOffset,playhead,selection,fftSize,colorMap,specH,windowFn,overlap]);
+  },[buffer,zoom,panOffset,playhead,selection,fftSize,colorMap,specH,windowFn,overlap,melScale]);
 
   // ── Mouse on Waveform ────────────────────────────────────────────────────────
 
@@ -421,15 +423,41 @@ function ProfessionalAudioEditorInner() {
   const touchRef = useRef<{x:number; pan:number}|null>(null);
 
   function onTouchStart(e: React.TouchEvent) {
-    touchRef.current = {x: e.touches[0].clientX, pan: panOffset};
+    if(e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      pinchRef.current = {dist, pan: panOffset, zoom};
+    } else {
+      touchRef.current = {x: e.touches[0].clientX, pan: panOffset};
+    }
   }
   function onTouchMove(e: React.TouchEvent) {
-    if(!touchRef.current) return;
-    const dx = e.touches[0].clientX - touchRef.current.x;
-    const newPan = Math.max(0, Math.min(Math.max(0,duration-1), touchRef.current.pan - dx/zoom));
-    setPanOffset(newPan);
+    if(e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      const scale = dist / pinchRef.current.dist;
+      const newZoom = Math.max(5, Math.min(50000, pinchRef.current.zoom * scale));
+      // Center pinch on midpoint
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const rect = waveRef.current?.getBoundingClientRect();
+      const cursorX = rect ? midX - rect.left : 0;
+      const cursorSec = pinchRef.current.pan + cursorX / pinchRef.current.zoom;
+      const newPan = Math.max(0, cursorSec - cursorX / newZoom);
+      setZoom(newZoom);
+      setPanOffset(newPan);
+    } else if(touchRef.current) {
+      const dx = e.touches[0].clientX - touchRef.current.x;
+      const newPan = Math.max(0, Math.min(Math.max(0,duration-1), touchRef.current.pan - dx/zoom));
+      setPanOffset(newPan);
+    }
   }
-  function onTouchEnd() { touchRef.current = null; }
+  function onTouchEnd() {
+    touchRef.current = null;
+    pinchRef.current = null;
+  }
 
   // ── Scroll zoom ──────────────────────────────────────────────────────────────
 
@@ -630,6 +658,16 @@ function ProfessionalAudioEditorInner() {
       <div style={{height:32,display:"flex",alignItems:"center",gap:4,
         padding:"0 8px",overflowX:"auto",overflowY:"hidden"}}>
         {/* Density modes */}
+        <div onClick={()=>setMelScale(v=>!v)}
+          style={{fontSize:8,padding:"2px 6px",borderRadius:3,cursor:"pointer",
+            background:melScale?"#f59e0b22":"transparent",
+            color:melScale?"#f59e0b":"#2a5a6a",border:"1px solid",
+            borderColor:melScale?"#f59e0b":"transparent"}}>
+          MEL
+        </div>
+
+        <div style={{width:1,height:18,background:"#0a1520",margin:"0 2px"}}/>
+
         <span style={{fontSize:8,color:"#2a5a6a"}}>WIN</span>
         {(["hann","hamming","blackman","blackman-harris","kaiser"] as const).map(w=>(
           <div key={w} onClick={()=>setWindowFn(w)}
