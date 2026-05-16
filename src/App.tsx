@@ -4,6 +4,7 @@
  * Unified — GPT components + Custom components + New Design System
  */
 import React, { useEffect, useState } from "react";
+import NavIcon, { GROUP_COLORS } from "./components/ui/NavIcon";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
 
