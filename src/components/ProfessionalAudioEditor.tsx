@@ -487,10 +487,12 @@ function ProfessionalAudioEditorInner() {
       boxShadow:"inset 0 0 60px rgba(0,0,0,0.5)"}}>
 
       {/* ── TOP TOOLBAR ─────────────────────────────────────────────────────── */}
-      <div style={{height:38,background:"#010508",borderBottom:"2px solid #0a1a28",
-        display:"flex",alignItems:"center",gap:4,padding:"0 8px",flexShrink:0,
-        overflowX:"auto",overflowY:"hidden",
+      <div style={{background:"#010508",borderBottom:"2px solid #0a1a28",
+        display:"flex",flexDirection:"column",flexShrink:0,
         boxShadow:"0 2px 12px rgba(0,0,0,0.5)"}}>
+      <div style={{height:38,display:"flex",alignItems:"center",gap:4,
+        padding:"0 8px",overflowX:"auto",overflowY:"hidden",
+        borderBottom:"1px solid #0a1520"}}>
 
         {/* File input */}
         <label style={{background:"linear-gradient(135deg,#0d2a40,#0a1e30)",
@@ -566,6 +568,9 @@ function ProfessionalAudioEditorInner() {
 
         <div style={{flex:1}}/>
 
+      </div>
+      <div style={{height:32,display:"flex",alignItems:"center",gap:4,
+        padding:"0 8px",overflowX:"auto",overflowY:"hidden"}}>
         <button onClick={()=>setDiffMode(v=>!v)}
           style={{background:diffMode?"#8B5CF622":"transparent",
             border:`1px solid ${diffMode?"#8B5CF6":"#1a3a5a"}`,borderRadius:4,
@@ -623,6 +628,7 @@ function ProfessionalAudioEditorInner() {
         </button>
       </div>
 
+      </div>
       {/* ── MAIN AREA ───────────────────────────────────────────────────────── */}
       <div style={{flex:1,display:"flex",overflow:"hidden"}}>
 
