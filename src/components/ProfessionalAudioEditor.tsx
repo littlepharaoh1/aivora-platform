@@ -71,6 +71,18 @@ export default function ProfessionalAudioEditor() {
   const [showLeft,   setShowLeft]   = useState(true);
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
+
+  // Fill canvases with dark background on mount
+  useEffect(()=>{
+    if(waveRef.current){
+      const ctx=waveRef.current.getContext("2d");
+      if(ctx){ctx.fillStyle="#070d14";ctx.fillRect(0,0,waveRef.current.width||800,waveRef.current.height||220);}
+    }
+    if(specRef.current){
+      const ctx=specRef.current.getContext("2d");
+      if(ctx){ctx.fillStyle="#040a10";ctx.fillRect(0,0,specRef.current.width||800,specRef.current.height||200);}
+    }
+  },[]);
   const specRef    = useRef<HTMLCanvasElement>(null);
   const mainRef    = useRef<HTMLDivElement>(null);
   const dragRef    = useRef({active:false,startX:0,startSel:null as any});
@@ -452,7 +464,7 @@ export default function ProfessionalAudioEditor() {
               cursor:"crosshair",userSelect:"none"}}
               onWheel={onWheel}>
               <canvas ref={waveRef}
-                style={{display:"block",width:"100%",height:"100%"}}
+                style={{display:"block",width:"100%",height:"100%",background:"#070d14"}}
                 onMouseDown={onMouseDown}
                 onMouseMove={onMouseMove}
                 onMouseUp={onMouseUp}/>
@@ -481,7 +493,7 @@ export default function ProfessionalAudioEditor() {
             <div style={{flex:1,position:"relative",overflow:"hidden",
               minHeight:80}}>
               <canvas ref={specRef}
-                style={{display:"block",width:"100%",height:"100%"}}
+                style={{display:"block",width:"100%",height:"100%",background:"#040a10"}}
                 onWheel={onWheel}/>
               {/* Freq label */}
               <div style={{position:"absolute",top:4,right:40,
