@@ -89,24 +89,24 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
 
 const NAV_ITEMS = [
   // Production
-  { id:"dashboard",       icon:"dashboard",    label:"Dashboard",          group:"production" },
-  { id:"qc",              icon:"qc",           label:"QC Workstation",      group:"production" },
-  { id:"batch",           icon:"batch",        label:"Batch Analyzer",      group:"production" },
-  { id:"naming",          icon:"naming",       label:"Smart Naming",        group:"production" },
-  { id:"enhancement",     icon:"enhancement",  label:"Enhancement Lab",     group:"production" },
-  { id:"pipeline",        icon:"pipeline",     label:"Audio Pipeline",      group:"production" },
-  { id:"readiness",       icon:"delivery",     label:"Delivery Readiness",  group:"production" },
+  { id:"dashboard",       icon:"⬡",  label:"Dashboard",          group:"production" },
+  { id:"qc",              icon:"🎙", label:"QC Workstation",      group:"production" },
+  { id:"batch",           icon:"📊", label:"Batch Analyzer",      group:"production" },
+  { id:"naming",          icon:"🏷", label:"Smart Naming",        group:"production" },
+  { id:"enhancement",     icon:"🔧", label:"Enhancement Lab",     group:"production" },
+  { id:"pipeline",        icon:"⚡", label:"Audio Pipeline",      group:"production" },
+  { id:"readiness",       icon:"✅", label:"Delivery Readiness",  group:"production" },
   // Repair
-  { id:"forensic_repair", icon:"forensic",     label:"Forensic Repair",    group:"repair"     },
-  { id:"audition",        icon:"audition",     label:"Audition Editor",    group:"repair"     },
+  { id:"forensic_repair", icon:"🔬", label:"Forensic Repair",    group:"repair"     },
+  { id:"audition",        icon:"🎛", label:"Audition Editor",    group:"repair"     },
   // Manage
-  { id:"contributors",    icon:"contributors", label:"Contributors",       group:"manage"     },
-  { id:"monitor",         icon:"monitor",      label:"Activity Monitor",   group:"manage"     },
+  { id:"contributors",    icon:"👥", label:"Contributors",       group:"manage"     },
+  { id:"monitor",         icon:"📈", label:"Activity Monitor",   group:"manage"     },
   // System
-  { id:"dsp_validation",  icon:"dsp",          label:"DSP Validation",    group:"system"     },
-  { id:"store",           icon:"store",        label:"Store",              group:"system"     },
-  { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",         group:"repair"     },
-  { id:"rooms",           icon:"rooms",        label:"Conversation Rooms", group:"production" },
+  { id:"dsp_validation",  icon:"⚗",  label:"DSP Validation",    group:"system"     },
+  { id:"store",           icon:"🛍", label:"Store",              group:"system"     },
+  { id:"proeditor",       icon:"🎚", label:"Pro Editor",         group:"repair"     },
+  { id:"rooms",           icon:"🎙", label:"Conversation Rooms", group:"production" },
 ];
 
 const GROUP_LABELS = {
@@ -116,44 +116,6 @@ const GROUP_LABELS = {
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
-
-// ── SVG Icons ─────────────────────────────────────────────────────────────────
-const ICON_PATHS: Record<string,string> = {
-  dashboard:    "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
-  qc:           "M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3",
-  batch:        "M18 20V10 M12 20V4 M6 20v-6",
-  naming:       "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z M7 7h.01",
-  forensic:     "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M21 21l-4.35-4.35 M11 8v3l2 2",
-  audition:     "M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6",
-  contributors: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75",
-  monitor:      "M22 12h-4l-3 9L9 3l-3 9H2",
-  dsp:          "M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18",
-  store:        "M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z M3 6h18 M16 10a4 4 0 0 1-8 0",
-  proeditor:    "M9 18V5l12-2v13 M6 15.7a3 3 0 1 0 0-5.4 M18 13.7a3 3 0 1 0 0-5.4",
-  enhancement:  "M12 20h9 M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z",
-  pipeline:     "M5 12h14 M12 5l7 7-7 7",
-  delivery:     "M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4L12 14.01l-3-3",
-  rooms:        "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
-};
-
-const GROUP_ICON_COLORS: Record<string,string> = {
-  production:"#0EA5E9", repair:"#8B5CF6",
-  manage:"#10B981",     system:"#F59E0B",
-};
-
-function NavIcon({name, active, group}: {name:string; active:boolean; group:string}) {
-  const d = ICON_PATHS[name] ?? "M12 12h.01";
-  const color = active ? (GROUP_ICON_COLORS[group] ?? "#0EA5E9") : "#4a6a7a";
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      {d.split(" M").filter(Boolean).map((part,i)=>(
-        <path key={i} d={i===0&&!part.startsWith("M")?"M"+part:"M"+part.replace(/^M/,"")}/>
-      ))}
-    </svg>
-  );
-}
-
 function Sidebar({ activeTab, onTabChange }:{ activeTab:Tab; onTabChange:(t:Tab)=>void }){
   const [expanded,setExpanded]=useState(false);
   const [tooltip,setTooltip]=useState<{label:string;y:number}|null>(null);
@@ -162,7 +124,7 @@ function Sidebar({ activeTab, onTabChange }:{ activeTab:Tab; onTabChange:(t:Tab)
 
   return(
     <div style={{width:W,minWidth:W,height:"100%",
-      background:"#000000",
+      background:colors.bg.surface,
       borderRight:`1px solid ${colors.bg.border}`,
       display:"flex",flexDirection:"column",
       transition:"width 0.2s ease",overflow:"hidden",
@@ -212,10 +174,8 @@ function Sidebar({ activeTab, onTabChange }:{ activeTab:Tab; onTabChange:(t:Tab)
                         ?`2px solid ${colors.accent.sky}`
                         :"2px solid transparent",
                       transition:"all 0.15s"}}>
-                    <span style={{width:20,display:"flex",alignItems:"center",
-                      justifyContent:"center",flexShrink:0,opacity:active?1:0.75}}>
-                      <NavIcon name={item.icon} active={active} group={item.group}/>
-                    </span>
+                    <span style={{fontSize:16,width:20,textAlign:"center",
+                      flexShrink:0,opacity:active?1:0.7}}>{item.icon}</span>
                     {expanded&&<span style={{fontSize:11,fontWeight:active?600:400,
                       whiteSpace:"nowrap",
                       color:active?colors.text.primary:colors.text.secondary}}>
@@ -263,7 +223,7 @@ function TopBar({ title, subtitle }:{ title:string; subtitle:string }){
   const { user, signOut } = useAuth();
   return(
     <div style={{height:52,flexShrink:0,
-      background:"#000000",
+      background:colors.bg.surface,
       borderBottom:`1px solid ${colors.bg.border}`,
       display:"flex",alignItems:"center",
       padding:"0 20px",gap:12}}>
@@ -342,7 +302,7 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
         gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
         {cards.map(card=>(
           <div key={card.tab} onClick={()=>onNavigate(card.tab)}
-            style={{background:"#000000",
+            style={{background:colors.bg.surface,
               border:`1px solid ${colors.bg.border}`,
               borderTop:`2px solid ${card.color}`,
               borderRadius:12,padding:"14px 16px",
@@ -359,16 +319,7 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
               el.style.transform="translateY(0)";
               el.style.boxShadow="none";
             }}>
-            <div style={{width:40,height:40,marginBottom:12,
-              display:"flex",alignItems:"center",justifyContent:"center",
-              borderRadius:10,background:`${card.color}15`,
-              border:`1px solid ${card.color}30`}}>
-              <NavIcon name={card.icon} active={true} group={
-                card.color==="#0EA5E9"?"production":
-                card.color==="#8B5CF6"?"repair":
-                card.color==="#10B981"?"manage":"system"
-              }/>
-            </div>
+            <div style={{fontSize:22,marginBottom:8}}>{card.icon}</div>
             <div style={{fontSize:12,fontWeight:600,
               color:colors.text.primary,marginBottom:3}}>{card.label}</div>
             <div style={{fontSize:10,color:colors.text.secondary}}>{card.sub}</div>
@@ -389,7 +340,7 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
           ["6","Repair Tools",    colors.accent.green],
           ["11","Forensic Files", colors.accent.sky],
         ].map(([v,l,c])=>(
-          <div key={l} style={{background:"#000000",
+          <div key={l} style={{background:colors.bg.surface,
             border:`1px solid ${colors.bg.border}`,
             borderRadius:10,padding:"10px 14px",
             flex:1,minWidth:90,textAlign:"center"}}>
