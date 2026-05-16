@@ -16,6 +16,7 @@ import { analyzeForensicSilence, drawForensicSilenceOverlay, ForensicSilenceRepo
 import { computeSpectralDensity, drawSpectralDensityOverlay, SpectralDensityData } from "../lib/audioEditor/spectralDensityMap";
 import { trackHarmonics, fingerPrintRoomTone, drawHarmonicOverlay, HarmonicFrame, RoomToneProfile } from "../lib/audioEditor/harmonicTracker";
 import { computeRepairComparison, drawRepairHeatmap, RepairComparisonData } from "../lib/audioEditor/repairComparison";
+import { WebGLRenderer } from "../lib/audioEditor/webglRenderer";
 
 // ── File List Item ────────────────────────────────────────────────────────────
 
@@ -118,6 +119,10 @@ function ProfessionalAudioEditorInner() {
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
+  const webglWaveRef  = useRef<HTMLCanvasElement>(null);
+  const webglSpecRef  = useRef<HTMLCanvasElement>(null);
+  const webglRendererRef = useRef<WebGLRenderer|null>(null);
+  const [useWebGL, setUseWebGL] = useState(false);
 
   // Fill canvases with dark background on mount
   useEffect(()=>{
@@ -138,6 +143,18 @@ function ProfessionalAudioEditorInner() {
   const rafRef     = useRef(0);
   const startTimeRef = useRef(0);
   const startOffRef  = useRef(0);
+
+  // Init WebGL
+  useEffect(()=>{
+    if(webglWaveRef.current) {
+      const renderer = new WebGLRenderer(webglWaveRef.current);
+      if(renderer.isAvailable()) {
+        webglRendererRef.current = renderer;
+        setUseWebGL(true);
+      }
+    }
+    return ()=>{ webglRendererRef.current?.dispose(); };
+  },[]);
 
   const duration = buffer?.duration ?? 0;
   const sr       = buffer?.sampleRate ?? 48000;
@@ -235,7 +252,22 @@ function ProfessionalAudioEditorInner() {
     if(sampleLevel && mono) {
       drawSampleLevel(waveRef.current, mono, sr, zoom, panOffset, waveH, playhead);
     }
-  },[mono,zoom,panOffset,playhead,selection,waveH]);
+
+    // WebGL accelerated waveform overlay
+    if(useWebGL && webglRendererRef.current && mono && webglWaveRef.current) {
+      const W = mainRef.current?.clientWidth ?? 800;
+      webglWaveRef.current.width  = W * (window.devicePixelRatio||1);
+      webglWaveRef.current.height = waveH * (window.devicePixelRatio||1);
+      webglWaveRef.current.style.width  = W+"px";
+      webglWaveRef.current.style.height = waveH+"px";
+      let globalPeak=0;
+      const ss=Math.floor(panOffset*sr);
+      const se=Math.min(mono.length,Math.ceil((panOffset+W/zoom)*sr));
+      for(let i=ss;i<se;i++) { const a=Math.abs(mono[i]); if(a>globalPeak) globalPeak=a; }
+      const ag = globalPeak>0.001 ? Math.min(1/globalPeak,4) : 1;
+      webglRendererRef.current.renderWaveform(mono,sr,zoom,panOffset,W,waveH,ag);
+    }
+  },[mono,zoom,panOffset,playhead,selection,waveH,useWebGL]);
 
   // ── Draw Forensic Overlay ────────────────────────────────────────────────
   useEffect(()=>{
@@ -815,6 +847,15 @@ function ProfessionalAudioEditorInner() {
           style={{background:"transparent",border:"1px solid #1a3a5a",borderRadius:4,
             padding:"3px 8px",cursor:"pointer",color:"#4a6a7a",fontSize:9,fontFamily:"inherit"}}>
           ↺ Reset
+        </button>
+
+        <button onClick={()=>setUseWebGL(v=>!v)}
+          style={{background:useWebGL?"#0EA5E922":"transparent",
+            border:`1px solid ${useWebGL?"#0EA5E9":"#1a3a5a"}`,borderRadius:4,
+            padding:"3px 8px",cursor:"pointer",
+            color:useWebGL?"#0EA5E9":"#4a6a7a",
+            fontSize:9,fontFamily:"inherit"}}>
+          {useWebGL?"⚡GPU":"CPU"}
         </button>
 
         <button onClick={()=>setShowLeft(v=>!v)}
