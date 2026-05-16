@@ -98,10 +98,13 @@ export default function ProfessionalAudioEditor() {
   // ── Load files ──────────────────────────────────────────────────────────────
 
   async function loadFile(file: File) {
+    try {
     const ab  = await file.arrayBuffer();
-    const ctx = new AudioContext();
-    ctxRef.current = ctx;
-    const buf = await ctx.decodeAudioData(ab);
+    if(!ctxRef.current || ctxRef.current.state === "closed") {
+      ctxRef.current = new AudioContext();
+    }
+    const ctx = ctxRef.current;
+    const buf = await ctx.decodeAudioData(ab.slice(0));
     const m   = new Float32Array(buf.length);
     for(let ch=0;ch<buf.numberOfChannels;ch++){
       const d=buf.getChannelData(ch);
@@ -114,6 +117,9 @@ export default function ProfessionalAudioEditor() {
     setPanOffset(0);
     setPlayhead(0);
     setSelection(null);
+    } catch(err) {
+      console.error("loadFile error:", err);
+    }
   }
 
   async function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -222,10 +228,9 @@ export default function ProfessionalAudioEditor() {
   }
 
   function play(startSec=startOffRef.current) {
-    if(!buffer||!ctxRef.current) return;
+    if(!buffer) return;
     stopPlay();
-    const actx=new AudioContext();
-    ctxRef.current=actx;
+    const actx = new AudioContext();
     const src=actx.createBufferSource();
     src.buffer=buffer;
 
