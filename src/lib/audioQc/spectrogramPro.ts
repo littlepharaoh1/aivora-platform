@@ -135,7 +135,7 @@ export function computeSpectrogramPro(
   const minDb   = options.minDb  ?? -90;
   const maxDb   = options.maxDb  ?? -10;
   const sr      = buffer.sampleRate;
-  const hopSize = Math.floor(fftSize/4);
+  const hopSize = Math.floor(fftSize/8);  // 87.5% overlap = smoother
   const numBins = fftSize/2;
   const window  = hannWindow(fftSize);
 
@@ -195,31 +195,45 @@ export function drawSpectrogramPro(
   const imageData=ctx.createImageData(W,H);
   const pixels=imageData.data;
 
+  const logMin20 = Math.log10(20);
+  const logMaxNy = Math.log10(nyquist);
+
   for(let px=0;px<W;px++){
-    const frameIdx=Math.min(Math.floor((px/W)*numFrames),numFrames-1);
-    const frame=frames[frameIdx];
+    // Bilinear interpolation between frames
+    const fExact = (px/W)*numFrames;
+    const f0 = Math.min(Math.floor(fExact), numFrames-1);
+    const f1 = Math.min(f0+1, numFrames-1);
+    const fFrac = fExact - f0;
+    const frame0 = frames[f0];
+    const frame1 = frames[f1];
 
     for(let py=0;py<H;py++){
-      // Linear or log frequency mapping
-      let binIdx: number;
-      const yNorm=(H-1-py)/H; // 0=bottom(low), 1=top(high)
+      const yNorm=(H-1-py)/H;
 
+      // Frequency bin with interpolation
+      let binExact: number;
       if(logFreq){
-        const minHz=20, maxHz=nyquist;
-        const logMin=Math.log10(minHz);
-        const logMax=Math.log10(maxHz);
-        const hz=Math.pow(10,logMin+yNorm*(logMax-logMin));
-        binIdx=Math.round((hz/nyquist)*numBins);
+        const hz=Math.pow(10, logMin20 + yNorm*(logMaxNy-logMin20));
+        binExact=(hz/nyquist)*numBins;
       } else {
-        binIdx=Math.round(yNorm*numBins);
+        binExact=yNorm*numBins;
       }
 
-      binIdx=Math.max(0,Math.min(numBins-1,binIdx));
-      const db=frame[binIdx];
-      const t=Math.pow((db-minDb)/(maxDb-minDb)*gain,0.8);
-      const [r,g,b]=interpolateColor(Math.min(1,t),colorMap);
-      const i=(py*W+px)*4;
-      pixels[i]=r; pixels[i+1]=g; pixels[i+2]=b; pixels[i+3]=255;
+      const b0=Math.max(0,Math.min(numBins-1,Math.floor(binExact)));
+      const b1=Math.min(b0+1,numBins-1);
+      const bFrac=binExact-b0;
+
+      // Bilinear interpolation: time + frequency
+      const db =
+        frame0[b0]*(1-fFrac)*(1-bFrac) +
+        frame0[b1]*(1-fFrac)*bFrac     +
+        frame1[b0]*fFrac    *(1-bFrac) +
+        frame1[b1]*fFrac    *bFrac;
+
+      const t=Math.pow(Math.max(0,(db-minDb)/(maxDb-minDb))*gain, 0.75);
+      const [r,g,b2]=interpolateColor(Math.min(1,t),colorMap);
+      const idx=(py*W+px)*4;
+      pixels[idx]=r; pixels[idx+1]=g; pixels[idx+2]=b2; pixels[idx+3]=255;
     }
   }
 
