@@ -13,6 +13,7 @@ import { drawSampleLevel } from "../lib/audioEditor/zoomEngine";
 import { inspectForensicCursor, ForensicCursorInfo } from "../lib/audioEditor/forensicCursorInspector";
 import { analyzeSilence, drawForensicOverlay } from "../lib/audioEditor/forensicSilenceOverlay";
 import { analyzeForensicSilence, drawForensicSilenceOverlay, ForensicSilenceReport } from "../lib/audioEditor/forensicSilenceMode";
+import { computeSpectralDensity, drawSpectralDensityOverlay, SpectralDensityData } from "../lib/audioEditor/spectralDensityMap";
 
 // ── File List Item ────────────────────────────────────────────────────────────
 
@@ -101,6 +102,8 @@ function ProfessionalAudioEditorInner() {
   const [origMono,       setOrigMono]       = useState<Float32Array|null>(null);
   const [silenceReport,  setSilenceReport]  = useState<ForensicSilenceReport|null>(null);
   const [silenceMode,    setSilenceMode]    = useState(false);
+  const [densityData,    setDensityData]    = useState<SpectralDensityData|null>(null);
+  const [densityMode,    setDensityMode]    = useState<"off"|"energy"|"entropy"|"transient">("off");
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
 
@@ -151,6 +154,8 @@ function ProfessionalAudioEditorInner() {
     setOrigMono(prev => prev === null ? m : prev);
     const sr2 = analyzeForensicSilence(m, buf.sampleRate);
     setSilenceReport(sr2);
+    const dd = computeSpectralDensity(m, buf.sampleRate);
+    setDensityData(dd);
     setZoom(Math.max(10,mainRef.current?.clientWidth??800/buf.duration));
     setPanOffset(0);
     setPlayhead(0);
@@ -211,6 +216,15 @@ function ProfessionalAudioEditorInner() {
       zoom, panOffset, height: waveH, width: W,
     });
   },[silenceReport,silenceMode,zoom,panOffset,waveH]);
+
+  // ── Spectral Density Overlay ─────────────────────────────────────────────
+  useEffect(()=>{
+    if(!waveRef.current||!densityData||densityMode==="off") return;
+    const W = mainRef.current?.clientWidth ?? 800;
+    drawSpectralDensityOverlay(waveRef.current, densityData, {
+      zoom, panOffset, height: waveH, width: W, mode: densityMode as any,
+    });
+  },[densityData,densityMode,zoom,panOffset,waveH]);
 
   // ── Difference View ──────────────────────────────────────────────────────
   useEffect(()=>{
@@ -571,6 +585,20 @@ function ProfessionalAudioEditorInner() {
       </div>
       <div style={{height:32,display:"flex",alignItems:"center",gap:4,
         padding:"0 8px",overflowX:"auto",overflowY:"hidden"}}>
+        {/* Density modes */}
+        <span style={{fontSize:8,color:"#2a5a6a"}}>DSP</span>
+        {([["off","●"],["energy","⚡"],["entropy","∿"],["transient","↯"]] as const).map(([mode,icon])=>(
+          <div key={mode} onClick={()=>setDensityMode(mode)}
+            style={{fontSize:8,padding:"2px 6px",borderRadius:3,cursor:"pointer",
+              background:densityMode===mode?"#00cc6622":"transparent",
+              color:densityMode===mode?"#00cc66":"#2a5a6a",border:"1px solid",
+              borderColor:densityMode===mode?"#00cc66":"transparent"}}>
+            {icon} {mode}
+          </div>
+        ))}
+
+        <div style={{width:1,height:18,background:"#0a1520",margin:"0 2px"}}/>
+
         <button onClick={()=>setDiffMode(v=>!v)}
           style={{background:diffMode?"#8B5CF622":"transparent",
             border:`1px solid ${diffMode?"#8B5CF6":"#1a3a5a"}`,borderRadius:4,
