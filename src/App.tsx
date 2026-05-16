@@ -136,24 +136,6 @@ const ICON_PATHS: Record<string,string> = {
   rooms:        "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
 };
 
-const CARD_ICONS: Record<string,string> = {
-  qc:           "◉",
-  batch:        "▦",
-  naming:       "◈",
-  enhancement:  "✦",
-  pipeline:     "⟶",
-  delivery:     "✓",
-  forensic:     "⊕",
-  audition:     "≡",
-  contributors: "⊞",
-  monitor:      "∿",
-  dsp:          "⊗",
-  store:        "◇",
-  proeditor:    "♪",
-  dashboard:    "⬡",
-  rooms:        "◎",
-};
-
 const GROUP_ICON_COLORS: Record<string,string> = {
   production:"#0EA5E9", repair:"#8B5CF6",
   manage:"#10B981",     system:"#F59E0B",
@@ -379,12 +361,15 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
               el.style.transform="translateY(0)";
               el.style.boxShadow="none";
             }}>
-            <div style={{width:44,height:44,marginBottom:12,
+            <div style={{width:40,height:40,marginBottom:12,
               display:"flex",alignItems:"center",justifyContent:"center",
-              borderRadius:10,background:`${card.color}20`,
-              border:`1px solid ${card.color}40`,
-              fontSize:20,lineHeight:1}}>
-              {CARD_ICONS[card.icon] ?? "◆"}
+              borderRadius:10,background:`${card.color}15`,
+              border:`1px solid ${card.color}30`}}>
+              <NavIcon name={card.icon} active={true} group={
+                card.color==="#0EA5E9"?"production":
+                card.color==="#8B5CF6"?"repair":
+                card.color==="#10B981"?"manage":"system"
+              }/>
             </div>
             <div style={{fontSize:12,fontWeight:600,
               color:colors.text.primary,marginBottom:3}}>{card.label}</div>
