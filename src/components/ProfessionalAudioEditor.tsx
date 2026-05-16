@@ -482,17 +482,21 @@ function ProfessionalAudioEditorInner() {
 
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100%",
-      background:"#040a10",fontFamily:"'JetBrains Mono',monospace",
-      color:"#a0c4cc",overflow:"hidden"}}>
+      background:"#020608",fontFamily:"'JetBrains Mono','Courier New',monospace",
+      color:"#a0c4cc",overflow:"hidden",
+      boxShadow:"inset 0 0 60px rgba(0,0,0,0.5)"}}>
 
       {/* ── TOP TOOLBAR ─────────────────────────────────────────────────────── */}
-      <div style={{height:36,background:"#030810",borderBottom:"1px solid #0a1520",
-        display:"flex",alignItems:"center",gap:4,padding:"0 6px",flexShrink:0,
-        overflowX:"auto",overflowY:"hidden"}}>
+      <div style={{height:38,background:"#010508",borderBottom:"2px solid #0a1a28",
+        display:"flex",alignItems:"center",gap:4,padding:"0 8px",flexShrink:0,
+        overflowX:"auto",overflowY:"hidden",
+        boxShadow:"0 2px 12px rgba(0,0,0,0.5)"}}>
 
         {/* File input */}
-        <label style={{background:"#0d2030",border:"1px solid #1a3a5a",borderRadius:4,
-          padding:"3px 10px",cursor:"pointer",fontSize:9,color:"#0EA5E9",fontWeight:600}}>
+        <label style={{background:"linear-gradient(135deg,#0d2a40,#0a1e30)",
+          border:"1px solid #1a4a6a",borderRadius:4,
+          padding:"4px 12px",cursor:"pointer",fontSize:9,color:"#00aaff",
+          fontWeight:700,letterSpacing:1,boxShadow:"0 0 8px rgba(0,170,255,0.2)"}}>
           + Open WAV
           <input type="file" accept=".wav" multiple style={{display:"none"}}
             onChange={handleFileInput}/>
@@ -503,14 +507,18 @@ function ProfessionalAudioEditorInner() {
         {/* Transport */}
         {[
           {icon:"⏮",action:()=>{stopPlay();setPlayhead(0);startOffRef.current=0;}},
-          {icon:playing?"⏸":"▶",action:()=>playing?stopPlay():play(selection?.start??playhead)},
+          {icon:playing?"⏸":"▶",action:()=>playing?stopPlay():play(selection?.start??playhead),active:playing},
           {icon:"⏹",action:stopPlay},
           {icon:"⏭",action:()=>{stopPlay();setPlayhead(duration);startOffRef.current=duration;}},
-        ].map(({icon,action})=>(
+        ].map(({icon,action,active})=>(
           <button key={icon} onClick={action}
-            style={{background:"#0d2030",border:"1px solid #1a3a5a",borderRadius:4,
-              padding:"3px 8px",cursor:"pointer",color:"#00cc66",
-              fontSize:13,fontFamily:"inherit"}}>
+            style={{background:active?"#00cc6622":"#0a1828",
+              border:`1px solid ${active?"#00cc66":"#1a3a5a"}`,borderRadius:4,
+              padding:"4px 10px",cursor:"pointer",
+              color:active?"#00ff88":"#00cc66",
+              fontSize:14,fontFamily:"inherit",
+              boxShadow:active?"0 0 8px rgba(0,204,102,0.3)":"none",
+              transition:"all 0.1s"}}>
             {icon}
           </button>
         ))}
@@ -624,11 +632,12 @@ function ProfessionalAudioEditorInner() {
           display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
           {/* Header */}
-          <div style={{padding:"6px 8px",borderBottom:"1px solid #0a1520",
-            fontSize:8,color:"#2a5a6a",letterSpacing:2,display:"flex",
-            justifyContent:"space-between",alignItems:"center"}}>
-            <span>FILES ({files.length})</span>
-            <span style={{color:"#4a6a7a"}}>STATUS · DURATION</span>
+          <div style={{padding:"6px 8px",borderBottom:"1px solid #0a1a28",
+            fontSize:8,color:"#1a6a8a",letterSpacing:2,display:"flex",
+            justifyContent:"space-between",alignItems:"center",
+            background:"#010508"}}>
+            <span style={{color:"#2a8aaa"}}>FILES ({files.length})</span>
+            <span style={{color:"#1a4a5a"}}>STATUS · DURATION</span>
           </div>
 
           {/* File list */}
@@ -756,12 +765,14 @@ function ProfessionalAudioEditorInner() {
       </div>}
 
       {/* ── BOTTOM STATUS BAR ───────────────────────────────────────────────── */}
-      <div style={{height:28,background:"#030810",borderTop:"1px solid #0a1520",
-        display:"flex",alignItems:"center",padding:"0 12px",gap:16,flexShrink:0}}>
+      <div style={{height:28,background:"#010508",borderTop:"2px solid #0a1a28",
+        display:"flex",alignItems:"center",padding:"0 12px",gap:16,flexShrink:0,
+        boxShadow:"0 -2px 12px rgba(0,0,0,0.4)"}}>
 
         {/* Time display */}
-        <div style={{fontSize:11,color:"#00cc66",fontWeight:700,letterSpacing:1,
-          minWidth:80}}>
+        <div style={{fontSize:12,color:"#00ff88",fontWeight:700,letterSpacing:2,
+          minWidth:90,fontFamily:"monospace",
+          textShadow:"0 0 8px rgba(0,255,136,0.5)"}}>
           {fmtDur(playhead)}
         </div>
 
