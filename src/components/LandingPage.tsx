@@ -408,7 +408,14 @@ export default function LandingPage({ onEnter }: Props) {
               background:"transparent",border:"1px solid #1a3a5a",
               borderRadius:6,padding:"6px 12px",
               color:"#64A0B8",fontSize:11,textDecoration:"none"}}>
-            Contact
+            Info@aivoraailtd.com
+          </a>
+          <a href="mailto:Contact@aivoraailtd.com"
+            style={{display:"flex",alignItems:"center",gap:5,
+              background:"transparent",border:"1px solid #1a3a5a",
+              borderRadius:6,padding:"6px 12px",
+              color:"#64A0B8",fontSize:11,textDecoration:"none"}}>
+            Contact@aivoraailtd.com
           </a>
           <button onClick={onEnter}
             style={{background:"linear-gradient(135deg,#0EA5E9,#8B5CF6)",
