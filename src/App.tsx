@@ -234,10 +234,7 @@ function Sidebar({ activeTab, onTabChange }:{ activeTab:Tab; onTabChange:(t:Tab)
                       transition:"all 0.15s"}}>
                     <span style={{width:20,display:"flex",alignItems:"center",
                       justifyContent:"center",flexShrink:0,opacity:active?1:0.75}}>
-                      {React.createElement(CARD_ICON_MAP[item.icon] ?? Home, {
-                        size:18, strokeWidth:1.5,
-                        color:active?(GROUP_ICON_COLORS[item.group]??"#0EA5E9"):"#4a6a7a"
-                      })}
+                      <NavIcon name={item.icon} active={active} group={item.group}/>
                     </span>
                     {expanded&&<span style={{fontSize:11,fontWeight:active?600:400,
                       whiteSpace:"nowrap",
