@@ -397,24 +397,40 @@ export default function LandingPage({ onEnter }: Props) {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <button onClick={()=>setShowAbout(true)}
-            style={{display:"flex",alignItems:"center",gap:5,
-              background:"transparent",border:"1px solid #1a3a5a",
-              borderRadius:6,padding:"6px 12px",cursor:"pointer",
-              color:"#64A0B8",fontSize:11,fontFamily:"inherit"}}>
+            style={{display:"flex",alignItems:"center",gap:6,
+              background:"#050a10",border:"1px solid #1a3a5a",
+              borderRadius:6,padding:"6px 14px",cursor:"pointer",
+              color:"#64A0B8",fontSize:12,fontFamily:"inherit"}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="#0EA5E9" strokeWidth="1.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
             About
           </button>
           <a href="mailto:Info@aivoraailtd.com"
-            style={{display:"flex",alignItems:"center",gap:5,
-              background:"transparent",border:"1px solid #1a3a5a",
-              borderRadius:6,padding:"6px 12px",
-              color:"#64A0B8",fontSize:11,textDecoration:"none"}}>
+            style={{display:"flex",alignItems:"center",gap:6,
+              background:"#050a10",border:"1px solid #1a3a5a",
+              borderRadius:6,padding:"6px 14px",
+              color:"#64A0B8",fontSize:12,textDecoration:"none"}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="#0EA5E9" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
             Info@aivoraailtd.com
           </a>
           <a href="mailto:Contact@aivoraailtd.com"
-            style={{display:"flex",alignItems:"center",gap:5,
-              background:"transparent",border:"1px solid #1a3a5a",
-              borderRadius:6,padding:"6px 12px",
-              color:"#64A0B8",fontSize:11,textDecoration:"none"}}>
+            style={{display:"flex",alignItems:"center",gap:6,
+              background:"#050a10",border:"1px solid #1a3a5a",
+              borderRadius:6,padding:"6px 14px",
+              color:"#64A0B8",fontSize:12,textDecoration:"none"}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
             Contact@aivoraailtd.com
           </a>
           <button onClick={onEnter}
