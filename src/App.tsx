@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useState } from "react";
 import NavIcon, { GROUP_COLORS } from "./components/ui/NavIcon";
+import AivoraAudioBench from "./components/AivoraAudioBench";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
 
@@ -64,7 +65,8 @@ type Tab =
   | "dsp_validation"
   | "store"
   | "rooms"
-  | "proeditor";
+  | "proeditor"
+  | "audiobench";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +85,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   dsp_validation: { title:"DSP Validation",           subtitle:"ACCURACY TESTING SUITE" },
   store:          { title:"Aivora Store",             subtitle:"RESOURCES & TOOLS" },
   proeditor:      { title:"Professional Editor",       subtitle:"ADOBE-STYLE FULL SCREEN EDITOR" },
+  audiobench:     { title:"Audio Bench",                subtitle:"VERIFIER-BACKED FORENSIC BENCHMARK" },
   rooms:          { title:"Conversation Rooms",       subtitle:"DUAL SPEAKER STEREO MERGE V8" },
 };
 
@@ -104,6 +107,7 @@ const NAV_ITEMS = [
   { id:"dsp_validation",  icon:"dsp",          label:"DSP Validation",      group:"system"     },
   { id:"store",           icon:"store",        label:"Store",               group:"system"     },
   { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",          group:"repair"     },
+  { id:"audiobench",      icon:"dsp",          label:"Audio Bench",         group:"system"     },
   { id:"rooms",           icon:"rooms",        label:"Conversation Rooms",  group:"production" },
 ];
 
@@ -414,6 +418,7 @@ function AppContent(){
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <ComingSoon title="Contributors"/>}
           {tab==="rooms"           && <ConversationRooms/>}
+          {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"      && <ProfessionalAudioEditor/>}
         </div>
       </div>
