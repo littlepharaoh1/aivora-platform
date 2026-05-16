@@ -466,7 +466,8 @@ function ProfessionalAudioEditorInner() {
 
       {/* ── TOP TOOLBAR ─────────────────────────────────────────────────────── */}
       <div style={{height:36,background:"#030810",borderBottom:"1px solid #0a1520",
-        display:"flex",alignItems:"center",gap:6,padding:"0 10px",flexShrink:0}}>
+        display:"flex",alignItems:"center",gap:4,padding:"0 6px",flexShrink:0,
+        overflowX:"auto",overflowY:"hidden"}}>
 
         {/* File input */}
         <label style={{background:"#0d2030",border:"1px solid #1a3a5a",borderRadius:4,
