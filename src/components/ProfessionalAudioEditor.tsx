@@ -53,7 +53,27 @@ function DbMeter({ level }: { level: number }) {
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
 
-export default function ProfessionalAudioEditor() {
+class EditorErrorBoundary extends React.Component<{children:React.ReactNode},{error:string|null}> {
+  constructor(props:any){super(props);this.state={error:null};}
+  static getDerivedStateFromError(e:any){return {error:String(e)};}
+  render(){
+    if(this.state.error) return (
+      <div style={{padding:40,color:"#ef4444",fontFamily:"monospace",background:"#040a10",height:"100%"}}>
+        <div style={{fontSize:14,marginBottom:8}}>⚠ Editor Error</div>
+        <div style={{fontSize:10,color:"#a0c4cc"}}>{this.state.error}</div>
+        <button onClick={()=>this.setState({error:null})}
+          style={{marginTop:16,padding:"6px 16px",background:"#0d2030",border:"1px solid #1a3a5a",
+            color:"#00cc66",borderRadius:4,cursor:"pointer",fontFamily:"inherit"}}>
+          Retry
+        </button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
+
+function ProfessionalAudioEditorInner() {
   const [files,      setFiles]      = useState<File[]>([]);
   const [activeIdx,  setActiveIdx]  = useState(0);
   const [buffer,     setBuffer]     = useState<AudioBuffer|null>(null);
@@ -556,4 +576,8 @@ export default function ProfessionalAudioEditor() {
       </div>
     </div>
   );
+}
+
+export default function ProfessionalAudioEditor() {
+  return <EditorErrorBoundary><ProfessionalAudioEditorInner/></EditorErrorBoundary>;
 }
