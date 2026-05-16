@@ -8,6 +8,8 @@ import { computeSpectrogramPro, drawSpectrogramPro } from "../lib/audioQc/spectr
 import { renderWaveform } from "../lib/audioEditor/waveformRenderer";
 import { mixToMono } from "../lib/audioEditor/audioBufferUtils";
 import { exportFloat32Wav, downloadWavBlob } from "../lib/audioForensics/floatWavExporter";
+import { inspectCursor } from "../lib/audioEditor/cursorInspector";
+import { analyzeSilence, drawForensicOverlay } from "../lib/audioEditor/forensicSilenceOverlay";
 
 // ── File List Item ────────────────────────────────────────────────────────────
 
@@ -89,6 +91,9 @@ function ProfessionalAudioEditorInner() {
   const [waveH,      setWaveH]      = useState(220);
   const [specH,      setSpecH]      = useState(200);
   const [showLeft,   setShowLeft]   = useState(true);
+  const [forensicMode, setForensicMode] = useState(false);
+  const [cursorInfo,   setCursorInfo]   = useState<any>(null);
+  const [forensicData, setForensicData] = useState<any>(null);
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
 
@@ -134,6 +139,8 @@ function ProfessionalAudioEditorInner() {
     bufferIdRef.current += 1;
     setBuffer(buf);
     setMono(m);
+    const fd = analyzeSilence(m, buf.sampleRate);
+    setForensicData(fd);
     setZoom(Math.max(10,mainRef.current?.clientWidth??800/buf.duration));
     setPanOffset(0);
     setPlayhead(0);
@@ -171,6 +178,15 @@ function ProfessionalAudioEditorInner() {
       },
     });
   },[mono,zoom,panOffset,playhead,selection,waveH]);
+
+  // ── Draw Forensic Overlay ────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!waveRef.current||!forensicData||!forensicMode) return;
+    const W = mainRef.current?.clientWidth ?? 800;
+    drawForensicOverlay(waveRef.current, forensicData, {
+      zoom, panOffset, height: waveH, width: W, duration,
+    });
+  },[forensicData,forensicMode,zoom,panOffset,waveH]);
 
   // ── Draw Spectrogram ─────────────────────────────────────────────────────
 
@@ -269,6 +285,14 @@ function ProfessionalAudioEditorInner() {
     dragRef.current={active:true,startX:getSec(e),startSel:null};
   }
   function onMouseMove(e: React.MouseEvent) {
+    // Cursor inspector
+    if(mono && buffer) {
+      const sec = getSec(e);
+      if(sec >= 0 && sec <= duration) {
+        const info = inspectCursor(mono, buffer.sampleRate, sec, 512);
+        setCursorInfo(info);
+      }
+    }
     if(!dragRef.current.active) return;
     const cur=getSec(e);
     const start=Math.min(dragRef.current.startX,cur);
@@ -475,6 +499,15 @@ function ProfessionalAudioEditorInner() {
 
         <div style={{flex:1}}/>
 
+        <button onClick={()=>setForensicMode(v=>!v)}
+          style={{background:forensicMode?"#ef444422":"transparent",
+            border:`1px solid ${forensicMode?"#ef4444":"#1a3a5a"}`,borderRadius:4,
+            padding:"3px 10px",cursor:"pointer",
+            color:forensicMode?"#ef4444":"#4a6a7a",
+            fontSize:9,fontFamily:"inherit"}}>
+          🔬 Forensic
+        </button>
+
         <button onClick={handleExport} disabled={!buffer}
           style={{background:"#10b98122",border:"1px solid #10b98144",borderRadius:4,
             padding:"3px 10px",cursor:"pointer",color:"#10b981",fontSize:9,
@@ -616,6 +649,18 @@ function ProfessionalAudioEditorInner() {
           </div>
         </div>
       </div>
+
+      {/* ── CURSOR INSPECTOR ───────────────────────────────────────────────── */}
+      {cursorInfo&&<div style={{height:22,background:"#020609",
+        borderTop:"1px solid #0a1520",display:"flex",alignItems:"center",
+        padding:"0 12px",gap:16,flexShrink:0,fontSize:8,color:"#4a8a9a"}}>
+        <span style={{color:"#00cc66"}}>⏱ {cursorInfo.smpte}</span>
+        <span>PEAK: <span style={{color:cursorInfo.peakDb>-6?"#ef4444":cursorInfo.peakDb>-18?"#f59e0b":"#00cc66"}}>{cursorInfo.peakDb.toFixed(1)}dB</span></span>
+        <span>RMS: <span style={{color:"#64A0B8"}}>{cursorInfo.rmsDb.toFixed(1)}dB</span></span>
+        <span>FREQ: <span style={{color:"#8B5CF6"}}>{cursorInfo.dominantHz.toFixed(0)}Hz</span></span>
+        <span>IDX: <span style={{color:"#2a5a6a"}}>{cursorInfo.sampleIndex.toLocaleString()}</span></span>
+        {cursorInfo.humPresence&&<span style={{color:"#ef4444"}}>⚠ HUM DETECTED</span>}
+      </div>}
 
       {/* ── BOTTOM STATUS BAR ───────────────────────────────────────────────── */}
       <div style={{height:28,background:"#030810",borderTop:"1px solid #0a1520",
