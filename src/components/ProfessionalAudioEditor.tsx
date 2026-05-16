@@ -106,6 +106,7 @@ function ProfessionalAudioEditorInner() {
   const [densityMode,    setDensityMode]    = useState<"off"|"energy"|"entropy"|"transient">("off");
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
+  const minimapRef = useRef<HTMLCanvasElement>(null);
 
   // Fill canvases with dark background on mount
   useEffect(()=>{
@@ -156,6 +157,26 @@ function ProfessionalAudioEditorInner() {
     setSilenceReport(sr2);
     const dd = computeSpectralDensity(m, buf.sampleRate);
     setDensityData(dd);
+    // Draw minimap
+    setTimeout(()=>{
+      if(!minimapRef.current) return;
+      const mc = minimapRef.current;
+      const mctx = mc.getContext("2d");
+      if(!mctx) return;
+      const MW = mc.width, MH = mc.height;
+      mctx.fillStyle = "#010508";
+      mctx.fillRect(0,0,MW,MH);
+      const spp = m.length/MW;
+      for(let px=0;px<MW;px++){
+        const s0=Math.floor(px*spp);
+        const s1=Math.min(m.length,Math.floor((px+1)*spp));
+        let max=0;
+        for(let i=s0;i<s1;i++) if(Math.abs(m[i])>max) max=Math.abs(m[i]);
+        const h = max*(MH/2-1);
+        mctx.fillStyle="#00cc6688";
+        mctx.fillRect(px,MH/2-h,1,h*2);
+      }
+    },100);
     setZoom(Math.max(10,mainRef.current?.clientWidth??800/buf.duration));
     setPanOffset(0);
     setPlayhead(0);
@@ -216,6 +237,26 @@ function ProfessionalAudioEditorInner() {
       zoom, panOffset, height: waveH, width: W,
     });
   },[silenceReport,silenceMode,zoom,panOffset,waveH]);
+
+  // ── Minimap viewport indicator ───────────────────────────────────────────
+  useEffect(()=>{
+    if(!minimapRef.current||!duration) return;
+    const mc = minimapRef.current;
+    const mctx = mc.getContext("2d");
+    if(!mctx) return;
+    const MW = mc.width, MH = mc.height;
+
+    // Redraw viewport box
+    mctx.clearRect(0,MH-8,MW,8);
+    const vStart = (panOffset/duration)*MW;
+    const W = mainRef.current?.clientWidth ?? 800;
+    const vEnd   = Math.min(MW,((panOffset+W/zoom)/duration)*MW);
+    mctx.fillStyle="rgba(0,255,136,0.15)";
+    mctx.fillRect(vStart,0,vEnd-vStart,MH);
+    mctx.strokeStyle="rgba(0,255,136,0.6)";
+    mctx.lineWidth=1;
+    mctx.strokeRect(vStart,0,vEnd-vStart,MH);
+  },[panOffset,zoom,duration]);
 
   // ── Spectral Density Overlay ─────────────────────────────────────────────
   useEffect(()=>{
@@ -657,6 +698,23 @@ function ProfessionalAudioEditorInner() {
       </div>
 
       </div>
+      {/* ── MINIMAP ─────────────────────────────────────────────────────────── */}
+      {buffer&&<div style={{height:32,background:"#010508",
+        borderBottom:"1px solid #0a1520",position:"relative",cursor:"pointer"}}
+        onClick={(e)=>{
+          if(!minimapRef.current||!duration) return;
+          const rect=minimapRef.current.getBoundingClientRect();
+          const x=e.clientX-rect.left;
+          const sec=(x/rect.width)*duration;
+          const W=mainRef.current?.clientWidth??800;
+          setPanOffset(Math.max(0,Math.min(duration-W/zoom,sec-W/zoom/2)));
+        }}>
+        <canvas ref={minimapRef} width={1200} height={32}
+          style={{width:"100%",height:"100%",display:"block"}}/>
+        <div style={{position:"absolute",top:2,left:4,fontSize:7,
+          color:"rgba(0,255,136,0.4)",letterSpacing:1}}>OVERVIEW</div>
+      </div>}
+
       {/* ── MAIN AREA ───────────────────────────────────────────────────────── */}
       <div style={{flex:1,display:"flex",overflow:"hidden"}}>
 
