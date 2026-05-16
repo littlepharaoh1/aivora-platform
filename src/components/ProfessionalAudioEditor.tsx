@@ -9,6 +9,7 @@ import { renderWaveform } from "../lib/audioEditor/waveformRenderer";
 import { mixToMono } from "../lib/audioEditor/audioBufferUtils";
 import { exportFloat32Wav, downloadWavBlob } from "../lib/audioForensics/floatWavExporter";
 import { inspectCursor } from "../lib/audioEditor/cursorInspector";
+import { drawSampleLevel } from "../lib/audioEditor/zoomEngine";
 import { analyzeSilence, drawForensicOverlay } from "../lib/audioEditor/forensicSilenceOverlay";
 import { analyzeForensicSilence, drawForensicSilenceOverlay, ForensicSilenceReport } from "../lib/audioEditor/forensicSilenceMode";
 
@@ -185,6 +186,11 @@ function ProfessionalAudioEditorInner() {
         rulerText:"#2a5a6a",
       },
     });
+    // Sample-level overlay at deep zoom
+    const sampleLevel = zoom > (sr * 0.05);
+    if(sampleLevel && mono) {
+      drawSampleLevel(waveRef.current, mono, sr, zoom, panOffset, waveH, playhead);
+    }
   },[mono,zoom,panOffset,playhead,selection,waveH]);
 
   // ── Draw Forensic Overlay ────────────────────────────────────────────────
@@ -770,7 +776,9 @@ function ProfessionalAudioEditorInner() {
           <span>{sr}Hz</span>
           <span>{buffer.numberOfChannels}ch</span>
           <span>32-bit Float (IEEE)</span>
-          <span>Zoom: {zoom.toFixed(0)}px/s</span>
+          <span style={{color:zoom>sr*0.05?"#00ff88":"#2a5a6a"}}>
+            {zoom>sr*0.05?"⬤ SAMPLE":"●"} Zoom: {zoom.toFixed(0)}px/s
+          </span>
         </div>}
 
         {/* Keyboard hints */}
