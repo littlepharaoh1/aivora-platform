@@ -159,6 +159,15 @@ function ProfessionalAudioEditorInner() {
       mono, sampleRate:sr, duration, zoom, panOffset,
       playheadSec:playhead, selection,
       qcMarkers:[], width:W, height:waveH,
+      theme:{
+        bg:"#040a10",
+        grid:"#0a1520",
+        wave:"#00cc66",
+        playhead:"#f59e0b",
+        selection:"rgba(34,211,238,0.15)",
+        ruler:"#030810",
+        rulerText:"#2a5a6a",
+      },
     });
   },[mono,zoom,panOffset,playhead,selection,waveH]);
 
