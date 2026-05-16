@@ -192,7 +192,7 @@ function ProfessionalAudioEditorInner() {
        specCacheRef.current.colorMap  !== colorMap ||
        specCacheRef.current.bufferId  !== bid) {
 
-      const fullW = Math.max(W, Math.floor(buffer.duration * 4));
+      const fullW = Math.max(4096, Math.floor(buffer.duration * zoom * 2));
       const offscreen = document.createElement("canvas");
       offscreen.width  = fullW;
       offscreen.height = specH;
@@ -253,6 +253,20 @@ function ProfessionalAudioEditorInner() {
     setSelection({start,end});
   }
   function onMouseUp() { dragRef.current.active=false; }
+
+  // ── Touch Pan ────────────────────────────────────────────────────────────
+  const touchRef = useRef<{x:number; pan:number}|null>(null);
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchRef.current = {x: e.touches[0].clientX, pan: panOffset};
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if(!touchRef.current) return;
+    const dx = e.touches[0].clientX - touchRef.current.x;
+    const newPan = Math.max(0, Math.min(Math.max(0,duration-1), touchRef.current.pan - dx/zoom));
+    setPanOffset(newPan);
+  }
+  function onTouchEnd() { touchRef.current = null; }
 
   // ── Scroll zoom ──────────────────────────────────────────────────────────────
 
