@@ -15,6 +15,7 @@ import { analyzeSilence, drawForensicOverlay } from "../lib/audioEditor/forensic
 import { analyzeForensicSilence, drawForensicSilenceOverlay, ForensicSilenceReport } from "../lib/audioEditor/forensicSilenceMode";
 import { computeSpectralDensity, drawSpectralDensityOverlay, SpectralDensityData } from "../lib/audioEditor/spectralDensityMap";
 import { trackHarmonics, fingerPrintRoomTone, drawHarmonicOverlay, HarmonicFrame, RoomToneProfile } from "../lib/audioEditor/harmonicTracker";
+import { computeRepairComparison, drawRepairHeatmap, RepairComparisonData } from "../lib/audioEditor/repairComparison";
 
 // ── File List Item ────────────────────────────────────────────────────────────
 
@@ -112,6 +113,8 @@ function ProfessionalAudioEditorInner() {
   const [harmonicFrames, setHarmonicFrames] = useState<HarmonicFrame[]>([]);
   const [roomTone,       setRoomTone]       = useState<RoomToneProfile|null>(null);
   const [harmonicMode,   setHarmonicMode]   = useState(false);
+  const [repairData,     setRepairData]     = useState<RepairComparisonData|null>(null);
+  const [repairMode,     setRepairMode]     = useState<"off"|"diff"|"speech"|"silence"|"confidence">("off");
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
@@ -169,6 +172,8 @@ function ProfessionalAudioEditorInner() {
     setHarmonicFrames(hf);
     const rt = fingerPrintRoomTone(m, buf.sampleRate);
     setRoomTone(rt);
+    // Repair comparison will be computed when origMono differs from mono
+    setRepairData(null);
     // Draw minimap
     setTimeout(()=>{
       if(!minimapRef.current) return;
@@ -278,6 +283,22 @@ function ProfessionalAudioEditorInner() {
       zoom, panOffset, height: waveH, width: W, mode: densityMode as any,
     });
   },[densityData,densityMode,zoom,panOffset,waveH]);
+
+  // ── Repair Comparison ───────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!mono||!origMono||mono===origMono) return;
+    const rd = computeRepairComparison(origMono, mono, sr);
+    setRepairData(rd);
+  },[mono,origMono]);
+
+  // ── Repair Heatmap Overlay ───────────────────────────────────────────────
+  useEffect(()=>{
+    if(!waveRef.current||!repairData||repairMode==="off") return;
+    const W = mainRef.current?.clientWidth??800;
+    drawRepairHeatmap(waveRef.current, repairData, {
+      zoom, panOffset, height: waveH, width: W, mode: repairMode as any,
+    });
+  },[repairData,repairMode,zoom,panOffset,waveH]);
 
   // ── Harmonic Overlay ─────────────────────────────────────────────────────
   useEffect(()=>{
@@ -726,6 +747,23 @@ function ProfessionalAudioEditorInner() {
           </span>
           <span>floor:{roomTone.noiseFloorDb.toFixed(0)}dB</span>
         </div>}
+
+        <div style={{width:1,height:18,background:"#0a1520",margin:"0 2px"}}/>
+
+        <div style={{width:1,height:18,background:"#0a1520",margin:"0 2px"}}/>
+        <span style={{fontSize:8,color:"#2a5a6a"}}>REPAIR</span>
+        {(["off","diff","speech","silence","confidence"] as const).map(m=>(
+          <div key={m} onClick={()=>setRepairMode(m)}
+            style={{fontSize:7,padding:"2px 5px",borderRadius:3,cursor:"pointer",
+              background:repairMode===m?"#f59e0b22":"transparent",
+              color:repairMode===m
+                ? m==="speech"?"#ef4444":m==="confidence"?"#00cc66":"#f59e0b"
+                : "#2a5a6a",
+              border:"1px solid",
+              borderColor:repairMode===m?"currentColor":"transparent"}}>
+            {m}
+          </div>
+        ))}
 
         <div style={{width:1,height:18,background:"#0a1520",margin:"0 2px"}}/>
 
