@@ -14,6 +14,7 @@ import { inspectForensicCursor, ForensicCursorInfo } from "../lib/audioEditor/fo
 import { analyzeSilence, drawForensicOverlay } from "../lib/audioEditor/forensicSilenceOverlay";
 import { analyzeForensicSilence, drawForensicSilenceOverlay, ForensicSilenceReport } from "../lib/audioEditor/forensicSilenceMode";
 import { computeSpectralDensity, drawSpectralDensityOverlay, SpectralDensityData } from "../lib/audioEditor/spectralDensityMap";
+import { trackHarmonics, fingerPrintRoomTone, drawHarmonicOverlay, HarmonicFrame, RoomToneProfile } from "../lib/audioEditor/harmonicTracker";
 
 // ── File List Item ────────────────────────────────────────────────────────────
 
@@ -108,6 +109,9 @@ function ProfessionalAudioEditorInner() {
   const [silenceMode,    setSilenceMode]    = useState(false);
   const [densityData,    setDensityData]    = useState<SpectralDensityData|null>(null);
   const [densityMode,    setDensityMode]    = useState<"off"|"energy"|"entropy"|"transient">("off");
+  const [harmonicFrames, setHarmonicFrames] = useState<HarmonicFrame[]>([]);
+  const [roomTone,       setRoomTone]       = useState<RoomToneProfile|null>(null);
+  const [harmonicMode,   setHarmonicMode]   = useState(false);
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
@@ -161,6 +165,10 @@ function ProfessionalAudioEditorInner() {
     setSilenceReport(sr2);
     const dd = computeSpectralDensity(m, buf.sampleRate);
     setDensityData(dd);
+    const hf = trackHarmonics(m, buf.sampleRate);
+    setHarmonicFrames(hf);
+    const rt = fingerPrintRoomTone(m, buf.sampleRate);
+    setRoomTone(rt);
     // Draw minimap
     setTimeout(()=>{
       if(!minimapRef.current) return;
@@ -270,6 +278,16 @@ function ProfessionalAudioEditorInner() {
       zoom, panOffset, height: waveH, width: W, mode: densityMode as any,
     });
   },[densityData,densityMode,zoom,panOffset,waveH]);
+
+  // ── Harmonic Overlay ─────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!waveRef.current||!harmonicFrames.length||!harmonicMode) return;
+    drawHarmonicOverlay(waveRef.current, harmonicFrames, {
+      zoom, panOffset, height: waveH,
+      width: mainRef.current?.clientWidth??800,
+      sampleRate: sr,
+    });
+  },[harmonicFrames,harmonicMode,zoom,panOffset,waveH]);
 
   // ── Difference View ──────────────────────────────────────────────────────
   useEffect(()=>{
@@ -690,6 +708,24 @@ function ProfessionalAudioEditorInner() {
             {icon} {mode}
           </div>
         ))}
+
+        <div style={{width:1,height:18,background:"#0a1520",margin:"0 2px"}}/>
+
+        <div onClick={()=>setHarmonicMode(v=>!v)}
+          style={{fontSize:8,padding:"2px 6px",borderRadius:3,cursor:"pointer",
+            background:harmonicMode?"#22d3ee22":"transparent",
+            color:harmonicMode?"#22d3ee":"#2a5a6a",border:"1px solid",
+            borderColor:harmonicMode?"#22d3ee":"transparent"}}>
+          ♪ Harmonic
+        </div>
+
+        {roomTone&&harmonicMode&&<div style={{fontSize:7,color:"#2a5a6a",
+          display:"flex",gap:6,alignItems:"center"}}>
+          <span style={{color:"#22d3ee"}}>
+            Room: {roomTone.dominantHz.slice(0,3).map(h=>Math.round(h)+"Hz").join(" ")}
+          </span>
+          <span>floor:{roomTone.noiseFloorDb.toFixed(0)}dB</span>
+        </div>}
 
         <div style={{width:1,height:18,background:"#0a1520",margin:"0 2px"}}/>
 
