@@ -138,7 +138,6 @@ interface Props { onEnter: () => void; }
 // ── About Modal ──────────────────────────────────────────────────────────────
 
 function AboutModal({ onClose }: { onClose: () => void }) {
-  const [showAbout, setShowAbout] = useState(false);
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:1000,
