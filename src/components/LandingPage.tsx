@@ -135,6 +135,234 @@ function FeatureCard({icon,title,desc,color}:{
 
 interface Props { onEnter: () => void; }
 
+// ── About Modal ──────────────────────────────────────────────────────────────
+
+function AboutModal({ onClose }: { onClose: () => void }) {
+  const [showAbout, setShowAbout] = React.useState(false);
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1000,
+      background:"rgba(0,0,0,0.88)",display:"flex",
+      alignItems:"center",justifyContent:"center",padding:16}}
+      onClick={onClose}>
+      <div style={{background:"#080808",border:"1px solid #1a3a5a",
+        borderRadius:16,maxWidth:640,width:"100%",maxHeight:"90vh",
+        overflow:"auto",padding:28}}
+        onClick={e=>e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",
+          alignItems:"flex-start",marginBottom:24}}>
+          <div>
+            <div style={{fontSize:9,color:"#0EA5E9",letterSpacing:3,marginBottom:4}}>
+              ABOUT AIVORA
+            </div>
+            <div style={{fontSize:20,fontWeight:700,color:"#E2EEF6"}}>
+              Aivora AI LTD
+            </div>
+            <div style={{fontSize:10,color:"#4a6a7a",marginTop:2}}>
+              AI Data Infrastructure Company · UK Registered · Global Operations
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{background:"transparent",border:"1px solid #1a3a5a",
+              borderRadius:6,padding:"4px 10px",cursor:"pointer",
+              color:"#4a6a7a",fontSize:13,flexShrink:0}}>✕</button>
+        </div>
+
+        {/* Who We Are */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:9,color:"#0EA5E9",letterSpacing:2,marginBottom:8}}>
+            WHO WE ARE
+          </div>
+          <div style={{fontSize:11,color:"#64A0B8",lineHeight:1.8}}>
+            Aivora AI LTD is a UK-registered AI data operations company specializing
+            in AI Training Data, Multilingual Data Annotation, and Audio & Speech Data
+            solutions. We support AI builders and enterprises by delivering secure,
+            high-quality, production-ready datasets across text, audio, image, video,
+            and multimodal use cases.
+          </div>
+        </div>
+
+        {/* Vision */}
+        <div style={{marginBottom:20,padding:14,borderRadius:8,
+          background:"#050d18",border:"1px solid #0f2030"}}>
+          <div style={{fontSize:9,color:"#8B5CF6",letterSpacing:2,marginBottom:6}}>
+            OUR VISION
+          </div>
+          <div style={{fontSize:11,color:"#64A0B8",lineHeight:1.8}}>
+            To become a trusted long-term AI data partner for global technology
+            companies — delivering reliable data, scalable operations, multilingual
+            expertise, and consistent quality with secure compliant workflows.
+          </div>
+        </div>
+
+        {/* Aivora Platform */}
+        <div style={{marginBottom:20,padding:14,borderRadius:8,
+          background:"#050d18",border:"1px solid #0EA5E930"}}>
+          <div style={{fontSize:9,color:"#0EA5E9",letterSpacing:2,marginBottom:10}}>
+            AIVORA PLATFORM — HOW IT HELPS YOU
+          </div>
+          <div style={{fontSize:11,color:"#64A0B8",lineHeight:1.8,marginBottom:12}}>
+            The Aivora Platform is our internal forensic audio infrastructure tool —
+            built to guarantee the highest quality of every audio file before delivery.
+            Any client working with us benefits directly from this platform.
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {[
+              {
+                icon:"🔬",
+                title:"Forensic Audio QA",
+                desc:"Every WAV file is inspected for hum, hiss, clipping, dead silence, and spectral anomalies before it reaches you. No bad files slip through.",
+                who:"ASR / TTS / Voice AI clients"
+              },
+              {
+                icon:"🎛",
+                title:"Professional Audio Editor",
+                desc:"Adobe Audition-style waveform + spectrogram editor with HDR visualization. Our team reviews files sample-by-sample when needed.",
+                who:"Studios · Dataset teams · QA engineers"
+              },
+              {
+                icon:"🤖",
+                title:"Audio Bench — Verifier System",
+                desc:"Automated benchmark that scores every repaired audio file against ITU-R BS.1770-4 standards. You get verified, scored output — not just 'checked'.",
+                who:"AI companies · Model trainers · Research teams"
+              },
+              {
+                icon:"⚡",
+                title:"Batch Processing",
+                desc:"Process 200+ files simultaneously with automatic QC scoring, silence repair, loudness normalization, and format validation.",
+                who:"Large-scale dataset clients · Production teams"
+              },
+              {
+                icon:"🏷",
+                title:"Smart Naming",
+                desc:"Automatic file sequencing and naming in any format (S0001–S0200, speaker codes, task IDs). Zero manual renaming errors.",
+                who:"Appen-format · Custom delivery formats"
+              },
+              {
+                icon:"📊",
+                title:"Delivery Readiness Score",
+                desc:"Before any delivery, every file gets a compliance score. Files that don't meet your spec are flagged automatically — before they reach you.",
+                who:"All clients receiving audio deliveries"
+              },
+            ].map(({icon,title,desc,who})=>(
+              <div key={title} style={{padding:"10px 12px",borderRadius:8,
+                background:"#030810",border:"1px solid #0f2030",
+                display:"flex",gap:12}}>
+                <div style={{fontSize:20,flexShrink:0,marginTop:2}}>{icon}</div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#E2EEF6",marginBottom:3}}>
+                    {title}
+                  </div>
+                  <div style={{fontSize:10,color:"#4a6a7a",lineHeight:1.6,marginBottom:4}}>
+                    {desc}
+                  </div>
+                  <div style={{fontSize:8,color:"#0EA5E9",letterSpacing:1}}>
+                    → {who}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Core Services */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:9,color:"#0EA5E9",letterSpacing:2,marginBottom:10}}>
+            CORE SERVICES
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {[
+              {icon:"🎙", title:"Audio & Speech Data",   desc:"ASR, TTS, multilingual recording, 30+ languages"},
+              {icon:"📝", title:"Data Annotation",        desc:"Text, image, video, audio annotation"},
+              {icon:"🤖", title:"LLM Training Data",      desc:"Prompt evaluation & fine-tuning datasets"},
+              {icon:"📊", title:"Model Evaluation",       desc:"Benchmarking, scoring & QA reporting"},
+              {icon:"🌍", title:"Multilingual Coverage",  desc:"3,000+ native speakers, MENA & global"},
+              {icon:"🔒", title:"Secure & Compliant",     desc:"GDPR · NDA · Controlled access"},
+            ].map(({icon,title,desc})=>(
+              <div key={title} style={{padding:"10px 12px",borderRadius:8,
+                background:"#030810",border:"1px solid #0f2030"}}>
+                <div style={{fontSize:16,marginBottom:4}}>{icon}</div>
+                <div style={{fontSize:10,fontWeight:700,color:"#E2EEF6",marginBottom:3}}>
+                  {title}
+                </div>
+                <div style={{fontSize:9,color:"#4a6a7a",lineHeight:1.5}}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Global Structure */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:9,color:"#0EA5E9",letterSpacing:2,marginBottom:10}}>
+            GLOBAL STRUCTURE
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[
+              {loc:"🇬🇧 UK Headquarters", role:"Corporate governance · Client relations · Compliance oversight"},
+              {loc:"🌍 Egypt Operations",  role:"Project management · QA leadership · Contributor coordination"},
+              {loc:"🌐 Global Network",    role:"3,000+ native speakers · 30+ languages & dialects"},
+            ].map(({loc,role})=>(
+              <div key={loc} style={{flex:"1 1 160px",padding:"10px 12px",
+                borderRadius:8,background:"#030810",border:"1px solid #0f2030"}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#E2EEF6",marginBottom:4}}>
+                  {loc}
+                </div>
+                <div style={{fontSize:9,color:"#4a6a7a",lineHeight:1.5}}>{role}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Key Stats */}
+        <div style={{marginBottom:20}}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[
+              {v:"3,000+", l:"Contributors", c:"#0EA5E9"},
+              {v:"30+",    l:"Languages",    c:"#8B5CF6"},
+              {v:"5",      l:"QA Stages",    c:"#10B981"},
+              {v:"GDPR",   l:"Compliant",    c:"#F59E0B"},
+              {v:"32-bit", l:"Float Export", c:"#22d3ee"},
+              {v:"200+",   l:"Batch Files",  c:"#F97316"},
+            ].map(({v,l,c})=>(
+              <div key={l} style={{flex:"1 1 70px",textAlign:"center",
+                padding:"10px 8px",borderRadius:8,
+                background:"#050d18",border:`1px solid ${c}30`}}>
+                <div style={{fontSize:15,fontWeight:700,color:c}}>{v}</div>
+                <div style={{fontSize:8,color:"#4a6a7a",marginTop:2}}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Contact */}
+        <div style={{borderTop:"1px solid #0a1520",paddingTop:16,
+          display:"flex",gap:10,flexWrap:"wrap"}}>
+          {[
+            {email:"Info@aivoraailtd.com",    color:"#0EA5E9"},
+            {email:"Contact@aivoraailtd.com", color:"#8B5CF6"},
+          ].map(({email,color})=>(
+            <a key={email} href={`mailto:${email}`}
+              style={{display:"flex",alignItems:"center",gap:6,
+                color:color,fontSize:11,textDecoration:"none",
+                padding:"6px 14px",borderRadius:6,
+                border:`1px solid ${color}40`,background:`${color}10`}}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke={color} strokeWidth="1.5" strokeLinecap="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+              {email}
+            </a>
+          ))}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage({ onEnter }: Props) {
   const [visible,setVisible]=useState(false);
   useEffect(()=>{ setTimeout(()=>setVisible(true),100); },[]);
@@ -371,6 +599,22 @@ export default function LandingPage({ onEnter }: Props) {
               </a>
             ))}
           </div>
+
+          {showAbout && <AboutModal onClose={()=>setShowAbout(false)}/>}
+
+          <button onClick={()=>setShowAbout(true)}
+            style={{display:"flex",alignItems:"center",gap:6,marginBottom:16,
+              background:"transparent",border:"1px solid #1a3a5a",
+              borderRadius:6,padding:"6px 14px",cursor:"pointer",color:"#4a6a7a",
+              fontSize:11,fontFamily:"inherit"}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="#0EA5E9" strokeWidth="1.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            About Aivora
+          </button>
 
           <span style={{fontSize:10,color:"#2a4a5a",letterSpacing:2}}>
             AIVORA AI © 2026
