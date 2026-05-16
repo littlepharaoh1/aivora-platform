@@ -49,7 +49,16 @@ export function renderWaveform(
   if (!ctx) return;
 
   const { mono, sampleRate, zoom, panOffset, playheadSec,
-          selection, qcMarkers, width, height, theme } = opts;
+          selection, qcMarkers, width, height, theme: rawTheme } = opts;
+  const theme = rawTheme ?? {
+    bg:"#040a10",
+    grid:"#0a1520",
+    wave:"#00cc66",
+    playhead:"#f59e0b",
+    selection:"rgba(34,211,238,0.15)",
+    ruler:"#030810",
+    rulerText:"#2a5a6a",
+  };
 
   const dpr = window.devicePixelRatio || 1;
   canvas.width  = width  * dpr;
