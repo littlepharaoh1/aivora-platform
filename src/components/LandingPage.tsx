@@ -109,7 +109,7 @@ function Stat({value,label}:{value:string;label:string}){
 // ── Feature Card ──────────────────────────────────────────────────────────────
 
 function FeatureCard({icon,title,desc,color}:{
-  icon:string; title:string; desc:string; color:string;
+  icon:string;title:string;desc:string;color:string;
 }){
   const [hovered,setHovered]=useState(false);
   return(
@@ -119,16 +119,10 @@ function FeatureCard({icon,title,desc,color}:{
         border:`1px solid ${hovered?color+"66":"#1a2a3a"}`,
         borderTop:`2px solid ${hovered?color:"#1a2a3a"}`,
         borderRadius:16,padding:"24px 20px",
-        background:hovered?"#0a0a0a":"#000000",
+        background:hovered?"#0a1520":"transparent",
         transition:"all 0.3s",cursor:"default",
       }}>
-      <div style={{width:36,height:36,marginBottom:12,display:"flex",
-        alignItems:"center",justifyContent:"center",
-        borderRadius:8,background:`${color}15`,border:`1px solid ${color}33`}}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-          stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-          dangerouslySetInnerHTML={{__html:icon}}/>
-      </div>
+      <div style={{fontSize:28,marginBottom:12}}>{icon}</div>
       <div style={{fontSize:14,fontWeight:700,color:"#E2EEF6",marginBottom:8}}>
         {title}
       </div>
@@ -147,7 +141,7 @@ export default function LandingPage({ onEnter }: Props) {
 
   return(
     <div style={{
-      minHeight:"100vh", background:"#000000",
+      minHeight:"100vh", background:"#080808",
       color:"#E2EEF6", overflow:"auto",
       fontFamily:"'Inter','Segoe UI',system-ui,sans-serif",
     }}>
@@ -157,7 +151,7 @@ export default function LandingPage({ onEnter }: Props) {
         position:"fixed",top:0,left:0,right:0,zIndex:100,
         height:60,display:"flex",alignItems:"center",
         padding:"0 32px",justifyContent:"space-between",
-        background:"rgba(0,0,0,0.95)",
+        background:"rgba(8,8,8,0.9)",
         backdropFilter:"blur(12px)",
         borderBottom:"1px solid #111",
       }}>
@@ -298,22 +292,22 @@ export default function LandingPage({ onEnter }: Props) {
         </div>
         <div style={{display:"grid",
           gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:16}}>
-          <FeatureCard icon='<path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>' color="#0EA5E9"
+          <FeatureCard icon="🎙" color="#0EA5E9"
             title="QC Workstation"
             desc="Professional audio quality control with 13 DSP phases, LUFS, True Peak, SNR, RT60 analysis."/>
-          <FeatureCard icon='<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>' color="#8B5CF6"
+          <FeatureCard icon="🔬" color="#8B5CF6"
             title="Forensic Silence Repair"
             desc="Adobe-style silence reconstruction using grain synthesis and spectral matching."/>
-          <FeatureCard icon='<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>' color="#10B981"
+          <FeatureCard icon="🎛" color="#10B981"
             title="Audition Workstation"
             desc="Professional waveform editor with speech protection and region QA after every edit."/>
-          <FeatureCard icon='<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>' color="#F59E0B"
+          <FeatureCard icon="📊" color="#F59E0B"
             title="Batch Processing"
             desc="Process 200 files simultaneously with progress tracking and cancellation support."/>
-          <FeatureCard icon='<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>' color="#0EA5E9"
+          <FeatureCard icon="🏷" color="#0EA5E9"
             title="Smart Naming"
             desc="German Appen sequencer S0001–S0200 with automatic task and speed detection."/>
-          <FeatureCard icon='<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' color="#8B5CF6"
+          <FeatureCard icon="⚡" color="#8B5CF6"
             title="Audio Pipeline"
             desc="End-to-end processing from upload to delivery-ready export in 32-bit float WAV."/>
         </div>
@@ -356,38 +350,6 @@ export default function LandingPage({ onEnter }: Props) {
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <img src="/aivora-logo.svg" alt="Aivora"
             style={{width:24,height:24,objectFit:"contain"}}/>
-          {/* Contact */}
-          <div style={{display:"flex",gap:24,marginBottom:20,flexWrap:"wrap",
-            justifyContent:"center"}}>
-            <a href="mailto:Info@aivoraailtd.com"
-              style={{display:"flex",alignItems:"center",gap:8,
-                color:"#4a6a7a",fontSize:11,textDecoration:"none",
-                padding:"6px 14px",border:"1px solid #1a2a3a",borderRadius:6,
-                transition:"all 0.2s"}}
-              onMouseEnter={e=>(e.currentTarget.style.color="#0EA5E9",e.currentTarget.style.borderColor="#0EA5E9")}
-              onMouseLeave={e=>(e.currentTarget.style.color="#4a6a7a",e.currentTarget.style.borderColor="#1a2a3a")}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                <polyline points="22,6 12,13 2,6"/>
-              </svg>
-              Info@aivoraailtd.com
-            </a>
-            <a href="mailto:Contact@aivoraailtd.com"
-              style={{display:"flex",alignItems:"center",gap:8,
-                color:"#4a6a7a",fontSize:11,textDecoration:"none",
-                padding:"6px 14px",border:"1px solid #1a2a3a",borderRadius:6}}
-              onMouseEnter={e=>(e.currentTarget.style.color="#8B5CF6",e.currentTarget.style.borderColor="#8B5CF6")}
-              onMouseLeave={e=>(e.currentTarget.style.color="#4a6a7a",e.currentTarget.style.borderColor="#1a2a3a")}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                <polyline points="22,6 12,13 2,6"/>
-              </svg>
-              Contact@aivoraailtd.com
-            </a>
-          </div>
-
           <span style={{fontSize:10,color:"#2a4a5a",letterSpacing:2}}>
             AIVORA AI © 2026
           </span>
