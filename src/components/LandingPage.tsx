@@ -591,27 +591,7 @@ export default function LandingPage({ onEnter }: Props) {
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <img src="/aivora-logo.svg" alt="Aivora"
             style={{width:24,height:24,objectFit:"contain"}}/>
-          {/* Contact */}
-          <div style={{display:"flex",gap:20,marginBottom:24,
-            flexWrap:"wrap",justifyContent:"center"}}>
-            {[
-              {email:"Info@aivoraailtd.com",    color:"#0EA5E9"},
-              {email:"Contact@aivoraailtd.com", color:"#8B5CF6"},
-            ].map(({email,color})=>(
-              <a key={email} href={`mailto:${email}`}
-                style={{display:"flex",alignItems:"center",gap:8,
-                  color:"#64A0B8",fontSize:12,textDecoration:"none",
-                  padding:"8px 16px",borderRadius:6,
-                  border:`1px solid #1a3a5a`,background:"#050a10"}}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                  stroke={color} strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                  <polyline points="22,6 12,13 2,6"/>
-                </svg>
-                {email}
-              </a>
-            ))}
-          </div>
+
 
           {showAbout && <AboutModal onClose={()=>setShowAbout(false)}/>}
 
