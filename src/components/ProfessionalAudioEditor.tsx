@@ -10,6 +10,7 @@ import { mixToMono } from "../lib/audioEditor/audioBufferUtils";
 import { exportFloat32Wav, downloadWavBlob } from "../lib/audioForensics/floatWavExporter";
 import { inspectCursor } from "../lib/audioEditor/cursorInspector";
 import { analyzeSilence, drawForensicOverlay } from "../lib/audioEditor/forensicSilenceOverlay";
+import { analyzeForensicSilence, drawForensicSilenceOverlay, ForensicSilenceReport } from "../lib/audioEditor/forensicSilenceMode";
 
 // ── File List Item ────────────────────────────────────────────────────────────
 
@@ -94,8 +95,10 @@ function ProfessionalAudioEditorInner() {
   const [forensicMode, setForensicMode] = useState(false);
   const [cursorInfo,   setCursorInfo]   = useState<any>(null);
   const [forensicData, setForensicData] = useState<any>(null);
-  const [diffMode,     setDiffMode]     = useState(false);
-  const [origMono,     setOrigMono]     = useState<Float32Array|null>(null);
+  const [diffMode,       setDiffMode]       = useState(false);
+  const [origMono,       setOrigMono]       = useState<Float32Array|null>(null);
+  const [silenceReport,  setSilenceReport]  = useState<ForensicSilenceReport|null>(null);
+  const [silenceMode,    setSilenceMode]    = useState(false);
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
 
@@ -144,6 +147,8 @@ function ProfessionalAudioEditorInner() {
     const fd = analyzeSilence(m, buf.sampleRate);
     setForensicData(fd);
     setOrigMono(prev => prev === null ? m : prev);
+    const sr2 = analyzeForensicSilence(m, buf.sampleRate);
+    setSilenceReport(sr2);
     setZoom(Math.max(10,mainRef.current?.clientWidth??800/buf.duration));
     setPanOffset(0);
     setPlayhead(0);
@@ -190,6 +195,15 @@ function ProfessionalAudioEditorInner() {
       zoom, panOffset, height: waveH, width: W, duration,
     });
   },[forensicData,forensicMode,zoom,panOffset,waveH]);
+
+  // ── Draw Forensic Silence Overlay ────────────────────────────────────────
+  useEffect(()=>{
+    if(!waveRef.current||!silenceReport||!silenceMode) return;
+    const W = mainRef.current?.clientWidth ?? 800;
+    drawForensicSilenceOverlay(waveRef.current, silenceReport, {
+      zoom, panOffset, height: waveH, width: W,
+    });
+  },[silenceReport,silenceMode,zoom,panOffset,waveH]);
 
   // ── Difference View ──────────────────────────────────────────────────────
   useEffect(()=>{
@@ -526,7 +540,7 @@ function ProfessionalAudioEditorInner() {
 
         {/* Colormap */}
         <span style={{fontSize:8,color:"#2a5a6a"}}>MAP</span>
-        {(["plasma","inferno","aivora"] as const).map(m=>(
+        {(["plasma","inferno","aivora","forensic"] as const).map(m=>(
           <div key={m} onClick={()=>setColorMap(m)}
             style={{fontSize:8,padding:"2px 6px",borderRadius:3,cursor:"pointer",
               background:colorMap===m?"#8B5CF622":"transparent",
@@ -554,6 +568,25 @@ function ProfessionalAudioEditorInner() {
             fontSize:9,fontFamily:"inherit"}}>
           🔬 Forensic
         </button>
+
+        <button onClick={()=>setSilenceMode(v=>!v)}
+          style={{background:silenceMode?"#f59e0b22":"transparent",
+            border:`1px solid ${silenceMode?"#f59e0b":"#1a3a5a"}`,borderRadius:4,
+            padding:"3px 10px",cursor:"pointer",
+            color:silenceMode?"#f59e0b":"#4a6a7a",
+            fontSize:9,fontFamily:"inherit"}}>
+          🔍 Silence
+        </button>
+
+        {silenceReport&&silenceMode&&<div style={{fontSize:8,color:"#4a6a7a",
+          display:"flex",gap:8,alignItems:"center"}}>
+          <span style={{color:silenceReport.contaminationPct>20?"#ef4444":"#00cc66"}}>
+            {silenceReport.contaminationPct.toFixed(0)}% contaminated
+          </span>
+          <span>floor:{silenceReport.noiseFloorDb.toFixed(0)}dB</span>
+          {silenceReport.humBands.length>0&&
+            <span style={{color:"#ef4444"}}>⚠ HUM {silenceReport.humBands.join("/")}Hz</span>}
+        </div>}
 
         <button onClick={handleExport} disabled={!buffer}
           style={{background:"#10b98122",border:"1px solid #10b98144",borderRadius:4,
