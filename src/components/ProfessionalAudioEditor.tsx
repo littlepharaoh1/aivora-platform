@@ -256,8 +256,9 @@ function ProfessionalAudioEditorInner() {
     // WebGL accelerated waveform overlay
     if(useWebGL && webglRendererRef.current && mono && webglWaveRef.current) {
       const W = mainRef.current?.clientWidth ?? 800;
-      webglWaveRef.current.width  = W * (window.devicePixelRatio||1);
-      webglWaveRef.current.height = waveH * (window.devicePixelRatio||1);
+      const dpr = window.devicePixelRatio||1;
+      webglWaveRef.current.width  = W * dpr;
+      webglWaveRef.current.height = waveH * dpr;
       webglWaveRef.current.style.width  = W+"px";
       webglWaveRef.current.style.height = waveH+"px";
       let globalPeak=0;
@@ -265,7 +266,7 @@ function ProfessionalAudioEditorInner() {
       const se=Math.min(mono.length,Math.ceil((panOffset+W/zoom)*sr));
       for(let i=ss;i<se;i++) { const a=Math.abs(mono[i]); if(a>globalPeak) globalPeak=a; }
       const ag = globalPeak>0.001 ? Math.min(1/globalPeak,4) : 1;
-      webglRendererRef.current.renderWaveform(mono,sr,zoom,panOffset,W,waveH,ag);
+      webglRendererRef.current.renderWaveform(mono,sr,zoom,panOffset,W*dpr,waveH*dpr,ag);
     }
   },[mono,zoom,panOffset,playhead,selection,waveH,useWebGL]);
 
@@ -380,6 +381,7 @@ function ProfessionalAudioEditorInner() {
 
   const specCacheRef = useRef<{canvas:HTMLCanvasElement;fftSize:number;colorMap:string;bufferId:number}|null>(null);
   const bufferIdRef  = useRef(0);
+  const specDataRef  = useRef<any>(null);
 
   useEffect(()=>{
     if(!specRef.current||!buffer) return;
@@ -418,6 +420,28 @@ function ProfessionalAudioEditorInner() {
 
     ctx.clearRect(0,0,W,specH);
     if(srcW > 0) ctx.drawImage(offscreen, srcX, 0, srcW, specH, 0, 0, W, specH);
+
+    // WebGL spectrogram overlay
+    const spec = specDataRef.current;
+    if(useWebGL && webglRendererRef.current && webglSpecRef.current && spec) {
+      const dpr = window.devicePixelRatio||1;
+      webglSpecRef.current.width  = W*dpr;
+      webglSpecRef.current.height = specH*dpr;
+      webglSpecRef.current.style.width  = W+"px";
+      webglSpecRef.current.style.height = specH+"px";
+      const cmIdx = colorMap==="plasma"?1:colorMap==="forensic"?2:0;
+      // Render viewport slice only
+      const viewFrames = spec.frames.slice(
+        Math.floor(startFrac*spec.numFrames),
+        Math.ceil(endFrac*spec.numFrames)
+      );
+      if(viewFrames.length>0) {
+        webglRendererRef.current.renderSpectrogramTexture(
+          viewFrames, viewFrames.length, spec.numBins,
+          spec.minDb, spec.maxDb, cmIdx, 1.4, W*dpr, specH*dpr
+        );
+      }
+    }
 
     // Hz Labels on canvas
     const nyquist = (buffer?.sampleRate ?? 48000) / 2;
