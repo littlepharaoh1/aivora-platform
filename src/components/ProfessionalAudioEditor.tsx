@@ -214,6 +214,29 @@ function ProfessionalAudioEditorInner() {
     ctx.clearRect(0,0,W,specH);
     if(srcW > 0) ctx.drawImage(offscreen, srcX, 0, srcW, specH, 0, 0, W, specH);
 
+    // Hz Labels on canvas
+    const nyquist = (buffer?.sampleRate ?? 48000) / 2;
+    const hzLabels = [16000,8000,4000,2000,1000,500,200,100,50];
+    const logMin = Math.log10(20);
+    const logMax = Math.log10(nyquist);
+    hzLabels.forEach(hz => {
+      if(hz > nyquist) return;
+      const yPos = specH - ((Math.log10(hz) - logMin) / (logMax - logMin)) * specH;
+      ctx.strokeStyle = "rgba(100,160,184,0.25)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2,4]);
+      ctx.beginPath(); ctx.moveTo(36,yPos); ctx.lineTo(W,yPos); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(100,160,184,0.9)";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "left";
+      const label = hz >= 1000 ? `${hz/1000}k` : `${hz}`;
+      ctx.fillStyle = "rgba(3,8,16,0.7)";
+      ctx.fillRect(2, yPos-9, 32, 11);
+      ctx.fillStyle = "rgba(100,160,184,0.9)";
+      ctx.fillText(label, 3, yPos);
+    });
+
     // Playhead
     const phx=(playhead-panOffset)*zoom;
     if(phx>=0&&phx<=W){
