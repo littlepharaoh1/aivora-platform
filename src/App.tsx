@@ -38,6 +38,7 @@ import DeliveryReadinessScore from "./components/DeliveryReadinessScore";
 // Components — Repair
 import ForensicSilenceRepair      from "./components/ForensicSilenceRepair";
 import AivoraAuditionWorkstation  from "./components/AivoraAuditionWorkstation";
+import ProfessionalAudioEditor     from "./components/ProfessionalAudioEditor";
 
 // Components — Manage
 import ActivityMonitor      from "./components/ActivityMonitor";
@@ -61,7 +62,8 @@ type Tab =
   | "monitor"
   | "dsp_validation"
   | "store"
-  | "rooms";
+  | "rooms"
+  | "proeditor";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -79,6 +81,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   monitor:        { title:"Activity Monitor",         subtitle:"REAL-TIME TRACKING" },
   dsp_validation: { title:"DSP Validation",           subtitle:"ACCURACY TESTING SUITE" },
   store:          { title:"Aivora Store",             subtitle:"RESOURCES & TOOLS" },
+  proeditor:      { title:"Professional Editor",       subtitle:"ADOBE-STYLE FULL SCREEN EDITOR" },
   rooms:          { title:"Conversation Rooms",       subtitle:"DUAL SPEAKER STEREO MERGE V8" },
 };
 
@@ -102,6 +105,7 @@ const NAV_ITEMS = [
   // System
   { id:"dsp_validation",  icon:"⚗",  label:"DSP Validation",    group:"system"     },
   { id:"store",           icon:"🛍", label:"Store",              group:"system"     },
+  { id:"proeditor",       icon:"🎚", label:"Pro Editor",         group:"repair"     },
   { id:"rooms",           icon:"🎙", label:"Conversation Rooms", group:"production" },
 ];
 
@@ -405,6 +409,7 @@ function AppContent(){
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <ComingSoon title="Contributors"/>}
           {tab==="rooms"           && <ConversationRooms/>}
+          {tab==="proeditor"      && <ProfessionalAudioEditor/>}
         </div>
       </div>
 
