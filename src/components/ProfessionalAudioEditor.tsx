@@ -94,6 +94,8 @@ function ProfessionalAudioEditorInner() {
   const [forensicMode, setForensicMode] = useState(false);
   const [cursorInfo,   setCursorInfo]   = useState<any>(null);
   const [forensicData, setForensicData] = useState<any>(null);
+  const [diffMode,     setDiffMode]     = useState(false);
+  const [origMono,     setOrigMono]     = useState<Float32Array|null>(null);
 
   const waveRef    = useRef<HTMLCanvasElement>(null);
 
@@ -141,6 +143,7 @@ function ProfessionalAudioEditorInner() {
     setMono(m);
     const fd = analyzeSilence(m, buf.sampleRate);
     setForensicData(fd);
+    setOrigMono(prev => prev === null ? m : prev);
     setZoom(Math.max(10,mainRef.current?.clientWidth??800/buf.duration));
     setPanOffset(0);
     setPlayhead(0);
@@ -187,6 +190,40 @@ function ProfessionalAudioEditorInner() {
       zoom, panOffset, height: waveH, width: W, duration,
     });
   },[forensicData,forensicMode,zoom,panOffset,waveH]);
+
+  // ── Difference View ──────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!waveRef.current||!mono||!origMono||!diffMode) return;
+    const W = mainRef.current?.clientWidth ?? 800;
+    const canvas = waveRef.current;
+    const ctx = canvas.getContext("2d");
+    if(!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const RULER_H = 24;
+    const WAVE_H  = waveH - RULER_H;
+    const centerY = RULER_H + WAVE_H / 2;
+    const startSample = Math.floor(panOffset * sr);
+    const endSample   = Math.min(mono.length, Math.ceil((panOffset + W/zoom) * sr));
+    const samplesPerPixel = Math.max(1,(endSample-startSample)/W);
+
+    for(let px=0;px<W;px++){
+      const s0 = Math.floor(startSample + px*samplesPerPixel);
+      const s1 = Math.min(Math.floor(s0+samplesPerPixel)+1, mono.length);
+      let diffPeak=0, isSpeech=false;
+      for(let i=s0;i<s1;i++){
+        const d = Math.abs((mono[i]??0)-(origMono[i]??0));
+        if(d>diffPeak) diffPeak=d;
+        if(Math.abs(mono[i]??0)>0.01) isSpeech=true;
+      }
+      if(diffPeak>0.001){
+        const h = diffPeak*(WAVE_H/2-4)*4;
+        ctx.fillStyle = isSpeech
+          ? `rgba(239,68,68,${Math.min(0.8,diffPeak*10)})`
+          : `rgba(0,255,136,${Math.min(0.8,diffPeak*10)})`;
+        ctx.fillRect(px, centerY-h, 1, h*2);
+      }
+    }
+  },[mono,origMono,diffMode,zoom,panOffset,waveH]);
 
   // ── Draw Spectrogram ─────────────────────────────────────────────────────
 
@@ -499,6 +536,15 @@ function ProfessionalAudioEditorInner() {
 
         <div style={{flex:1}}/>
 
+        <button onClick={()=>setDiffMode(v=>!v)}
+          style={{background:diffMode?"#8B5CF622":"transparent",
+            border:`1px solid ${diffMode?"#8B5CF6":"#1a3a5a"}`,borderRadius:4,
+            padding:"3px 10px",cursor:"pointer",
+            color:diffMode?"#8B5CF6":"#4a6a7a",
+            fontSize:9,fontFamily:"inherit"}}>
+          ⚡ Diff
+        </button>
+
         <button onClick={()=>setForensicMode(v=>!v)}
           style={{background:forensicMode?"#ef444422":"transparent",
             border:`1px solid ${forensicMode?"#ef4444":"#1a3a5a"}`,borderRadius:4,
@@ -513,6 +559,12 @@ function ProfessionalAudioEditorInner() {
             padding:"3px 10px",cursor:"pointer",color:"#10b981",fontSize:9,
             fontFamily:"inherit",opacity:!buffer?0.4:1}}>
           ⬇ Export 32-bit Float
+        </button>
+
+        <button onClick={()=>setOrigMono(null)} disabled={!buffer}
+          style={{background:"transparent",border:"1px solid #1a3a5a",borderRadius:4,
+            padding:"3px 8px",cursor:"pointer",color:"#4a6a7a",fontSize:9,fontFamily:"inherit"}}>
+          ↺ Reset
         </button>
 
         <button onClick={()=>setShowLeft(v=>!v)}
