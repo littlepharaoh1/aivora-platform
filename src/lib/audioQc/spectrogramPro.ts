@@ -13,6 +13,9 @@ export interface SpectrogramProOptions {
   gain?:          number;    // brightness boost 0-3 — default 1.2
   logFreq?:       boolean;   // logarithmic frequency — default true
   colorMap?:      "plasma"|"viridis"|"inferno"|"aivora"|"forensic";
+  windowFn?:      WindowFunction;
+  overlap?:       number;   // 0-0.95, default 0.875
+  melScale?:      boolean;
   showGrid?:      boolean;
   showLabels?:    boolean;
 }
@@ -26,6 +29,8 @@ export interface SpectrogramProData {
   sampleRate:     number;
   fftSize:        number;
   durationSec:    number;
+  windowFn:       WindowFunction;
+  overlap:        number;
 }
 
 // ── Color Maps ────────────────────────────────────────────────────────────────
@@ -107,10 +112,60 @@ function interpolateColor(
   ];
 }
 
+export type WindowFunction = "hann"|"hamming"|"blackman"|"blackman-harris"|"kaiser";
+
 function hannWindow(size: number): Float64Array {
   const w=new Float64Array(size);
   for(let i=0;i<size;i++) w[i]=0.5*(1-Math.cos(2*Math.PI*i/(size-1)));
   return w;
+}
+
+function hammingWindow(size: number): Float64Array {
+  const w=new Float64Array(size);
+  for(let i=0;i<size;i++) w[i]=0.54-0.46*Math.cos(2*Math.PI*i/(size-1));
+  return w;
+}
+
+function blackmanWindow(size: number): Float64Array {
+  const w=new Float64Array(size);
+  for(let i=0;i<size;i++)
+    w[i]=0.42-0.5*Math.cos(2*Math.PI*i/(size-1))+0.08*Math.cos(4*Math.PI*i/(size-1));
+  return w;
+}
+
+function blackmanHarrisWindow(size: number): Float64Array {
+  const w=new Float64Array(size);
+  const a=[0.35875,0.48829,0.14128,0.01168];
+  for(let i=0;i<size;i++)
+    w[i]=a[0]-a[1]*Math.cos(2*Math.PI*i/(size-1))
+            +a[2]*Math.cos(4*Math.PI*i/(size-1))
+            -a[3]*Math.cos(6*Math.PI*i/(size-1));
+  return w;
+}
+
+function kaiserWindow(size: number, beta: number=8): Float64Array {
+  const w=new Float64Array(size);
+  function I0(x: number): number {
+    let s=1,t=1;
+    for(let k=1;k<=20;k++){t*=(x/2/k)**2;s+=t;}
+    return s;
+  }
+  const I0b=I0(beta);
+  for(let i=0;i<size;i++){
+    const x=2*i/(size-1)-1;
+    w[i]=I0(beta*Math.sqrt(1-x*x))/I0b;
+  }
+  return w;
+}
+
+function makeWindow(type: WindowFunction, size: number): Float64Array {
+  switch(type){
+    case "hamming":        return hammingWindow(size);
+    case "blackman":       return blackmanWindow(size);
+    case "blackman-harris":return blackmanHarrisWindow(size);
+    case "kaiser":         return kaiserWindow(size);
+    default:               return hannWindow(size);
+  }
 }
 
 function runFFT(re: Float64Array, im: Float64Array): void {
@@ -143,13 +198,14 @@ export function computeSpectrogramPro(
   buffer:  AudioBuffer,
   options: SpectrogramProOptions = {}
 ): SpectrogramProData {
-  const fftSize = options.fftSize ?? 4096;
-  const minDb   = options.minDb  ?? -90;
-  const maxDb   = options.maxDb  ?? -10;
-  const sr      = buffer.sampleRate;
-  const hopSize = Math.floor(fftSize/8);  // 87.5% overlap = smoother
-  const numBins = fftSize/2;
-  const window  = hannWindow(fftSize);
+  const fftSize  = options.fftSize  ?? 4096;
+  const minDb    = options.minDb   ?? -90;
+  const maxDb    = options.maxDb   ?? -10;
+  const sr       = buffer.sampleRate;
+  const overlap  = options.overlap ?? 0.875;
+  const hopSize  = Math.max(1, Math.floor(fftSize*(1-overlap)));
+  const numBins  = fftSize/2;
+  const window   = makeWindow(options.windowFn ?? "hann", fftSize);
 
   // Mix to mono
   const mono=new Float32Array(buffer.length);
@@ -179,6 +235,8 @@ export function computeSpectrogramPro(
     frames,numFrames:frames.length,numBins,
     minDb,maxDb,sampleRate:sr,fftSize,
     durationSec:buffer.length/sr,
+    windowFn: options.windowFn ?? "hann",
+    overlap:  overlap,
   };
 }
 

@@ -4,7 +4,7 @@
  * Aivora Platform
  */
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { computeSpectrogramPro, drawSpectrogramPro } from "../lib/audioQc/spectrogramPro";
+import { computeSpectrogramPro, drawSpectrogramPro, WindowFunction } from "../lib/audioQc/spectrogramPro";
 import { renderWaveform } from "../lib/audioEditor/waveformRenderer";
 import { mixToMono } from "../lib/audioEditor/audioBufferUtils";
 import { exportFloat32Wav, downloadWavBlob } from "../lib/audioForensics/floatWavExporter";
@@ -91,7 +91,9 @@ function ProfessionalAudioEditorInner() {
   const [playing,    setPlaying]    = useState(false);
   const [level,      setLevel]      = useState(-60);
   const [fftSize,    setFftSize]    = useState(4096);
-  const [colorMap,   setColorMap]   = useState<"aivora"|"plasma"|"inferno">("plasma");
+  const [colorMap,   setColorMap]   = useState<"aivora"|"plasma"|"inferno"|"forensic">("plasma");
+  const [windowFn,   setWindowFn]   = useState<WindowFunction>("hann");
+  const [overlap,    setOverlap]    = useState(0.875);
   const [waveH,      setWaveH]      = useState(220);
   const [specH,      setSpecH]      = useState(200);
   const [showLeft,   setShowLeft]   = useState(true);
@@ -319,15 +321,16 @@ function ProfessionalAudioEditorInner() {
     if(!specCacheRef.current ||
        specCacheRef.current.fftSize   !== fftSize ||
        specCacheRef.current.colorMap  !== colorMap ||
-       specCacheRef.current.bufferId  !== bid) {
+       specCacheRef.current.bufferId  !== bid ||
+       (specCacheRef.current as any).windowFn !== windowFn) {
 
       const fullW = Math.max(4096, Math.floor(buffer.duration * zoom * 2));
       const offscreen = document.createElement("canvas");
       offscreen.width  = fullW;
       offscreen.height = specH;
-      const spec = computeSpectrogramPro(buffer,{fftSize,minDb:-90,maxDb:-10,gain:1.4,colorMap});
+      const spec = computeSpectrogramPro(buffer,{fftSize,minDb:-90,maxDb:-10,gain:1.4,colorMap,windowFn,overlap});
       drawSpectrogramPro(offscreen,spec,{colorMap,gain:1.4,logFreq:true,showGrid:true,showLabels:true});
-      specCacheRef.current = {canvas:offscreen, fftSize, colorMap, bufferId:bid};
+      (specCacheRef.current as any) = {canvas:offscreen, fftSize, colorMap, bufferId:bid, windowFn};
     }
 
     const offscreen = specCacheRef.current!.canvas;
@@ -384,7 +387,7 @@ function ProfessionalAudioEditorInner() {
       ctx.lineWidth=1;
       ctx.strokeRect(sx,0,ex-sx,specH);
     }
-  },[buffer,zoom,panOffset,playhead,selection,fftSize,colorMap,specH]);
+  },[buffer,zoom,panOffset,playhead,selection,fftSize,colorMap,specH,windowFn,overlap]);
 
   // ── Mouse on Waveform ────────────────────────────────────────────────────────
 
@@ -627,6 +630,18 @@ function ProfessionalAudioEditorInner() {
       <div style={{height:32,display:"flex",alignItems:"center",gap:4,
         padding:"0 8px",overflowX:"auto",overflowY:"hidden"}}>
         {/* Density modes */}
+        <span style={{fontSize:8,color:"#2a5a6a"}}>WIN</span>
+        {(["hann","hamming","blackman","blackman-harris","kaiser"] as const).map(w=>(
+          <div key={w} onClick={()=>setWindowFn(w)}
+            style={{fontSize:7,padding:"2px 5px",borderRadius:3,cursor:"pointer",
+              background:windowFn===w?"#8B5CF622":"transparent",
+              color:windowFn===w?"#8B5CF6":"#2a5a6a"}}>
+            {w}
+          </div>
+        ))}
+
+        <div style={{width:1,height:18,background:"#0a1520",margin:"0 2px"}}/>
+
         <span style={{fontSize:8,color:"#2a5a6a"}}>DSP</span>
         {([["off","●"],["energy","⚡"],["entropy","∿"],["transient","↯"]] as const).map(([mode,icon])=>(
           <div key={mode} onClick={()=>setDensityMode(mode)}
