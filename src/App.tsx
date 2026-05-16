@@ -141,14 +141,16 @@ const GROUP_ICON_COLORS: Record<string,string> = {
   manage:"#10B981",     system:"#F59E0B",
 };
 
-function NavIcon({name, active, group}: {name:string; active:boolean; group:string}) {
+function NavIcon({name, active, group, size=18}: {name:string; active:boolean; group:string; size?:number}) {
   const d = ICON_PATHS[name] ?? "M12 12h.01";
   const color = active ? (GROUP_ICON_COLORS[group] ?? "#0EA5E9") : "#4a6a7a";
+  // Split on capital M that starts new subpath
+  const parts = d.replace(/([A-Z])/g, ' $1').trim().split(/(?=M)/).filter(Boolean);
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      {d.split(" M").filter(Boolean).map((part,i)=>(
-        <path key={i} d={i===0&&!part.startsWith("M")?"M"+part:"M"+part.replace(/^M/,"")}/>
+      {parts.map((part,i)=>(
+        <path key={i} d={part.trim()}/>
       ))}
     </svg>
   );
