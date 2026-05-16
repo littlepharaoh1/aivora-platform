@@ -137,21 +137,21 @@ const ICON_PATHS: Record<string,string> = {
 };
 
 const CARD_ICONS: Record<string,string> = {
-  qc:           "◉",
-  batch:        "▦",
-  naming:       "◈",
-  enhancement:  "✦",
-  pipeline:     "⟶",
-  delivery:     "✓",
-  forensic:     "⊕",
-  audition:     "≡",
-  contributors: "⊞",
-  monitor:      "∿",
-  dsp:          "⊗",
-  store:        "◇",
-  proeditor:    "♪",
+  qc:           "🎙",
+  batch:        "📊",
+  naming:       "🏷",
+  enhancement:  "🔧",
+  pipeline:     "⚡",
+  delivery:     "✅",
+  forensic:     "🔬",
+  audition:     "🎛",
+  contributors: "👥",
+  monitor:      "📈",
+  dsp:          "⚗",
+  store:        "🛍",
+  proeditor:    "🎚",
   dashboard:    "⬡",
-  rooms:        "◎",
+  rooms:        "🎙",
 };
 
 const GROUP_ICON_COLORS: Record<string,string> = {
@@ -381,10 +381,10 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
             }}>
             <div style={{width:44,height:44,marginBottom:12,
               display:"flex",alignItems:"center",justifyContent:"center",
-              borderRadius:10,background:`${card.color}20`,
+              borderRadius:10,background:`${card.color}18`,
               border:`1px solid ${card.color}40`,
-              fontSize:20,lineHeight:1}}>
-              {CARD_ICONS[card.icon] ?? "◆"}
+              color:card.color}}>
+              {CARD_SVG[card.icon] ?? CARD_SVG.dashboard}
             </div>
             <div style={{fontSize:12,fontWeight:600,
               color:colors.text.primary,marginBottom:3}}>{card.label}</div>
