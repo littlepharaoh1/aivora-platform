@@ -156,8 +156,9 @@ export function renderWaveform(
       if (mono[i] < min) min = mono[i];
       if (mono[i] > max) max = mono[i];
     }
-    peakMax[px] = centerY - max * (WAVE_H / 2 - 4);
-    peakMin[px] = centerY - min * (WAVE_H / 2 - 4);
+    const amp = Math.min(1/Math.max(0.01, Math.max(Math.abs(max),Math.abs(min))), 4);
+    peakMax[px] = centerY - max * amp * (WAVE_H / 2 - 4);
+    peakMin[px] = centerY - min * amp * (WAVE_H / 2 - 4);
   }
 
   // Draw peak fill
@@ -193,7 +194,8 @@ export function renderWaveform(
     let sum = 0;
     for (let i = sStart; i < sEnd; i++) sum += mono[i] * mono[i];
     const rms = Math.sqrt(sum / Math.max(1, sEnd - sStart));
-    const y = centerY - rms * (WAVE_H / 2 - 4);
+    const rmsAmp = Math.min(1/Math.max(0.01,rms),4);
+    const y = centerY - rms * rmsAmp * (WAVE_H / 2 - 4);
     if (firstRms) { ctx.moveTo(px, y); firstRms = false; } else ctx.lineTo(px, y);
   }
   ctx.stroke();
@@ -209,7 +211,8 @@ export function renderWaveform(
     let sum = 0;
     for (let i = sStart; i < sEnd; i++) sum += mono[i] * mono[i];
     const rms = Math.sqrt(sum / Math.max(1, sEnd - sStart));
-    const y = centerY + rms * (WAVE_H / 2 - 4);
+    const rmsAmp2 = Math.min(1/Math.max(0.01,rms),4);
+    const y = centerY + rms * rmsAmp2 * (WAVE_H / 2 - 4);
     if (firstRms) { ctx.moveTo(px, y); firstRms = false; } else ctx.lineTo(px, y);
   }
   ctx.stroke();
