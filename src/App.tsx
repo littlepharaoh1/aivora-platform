@@ -89,24 +89,21 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
 
 const NAV_ITEMS = [
   // Production
-  { id:"dashboard",       icon:"⬡",  label:"Dashboard",          group:"production" },
-  { id:"qc",              icon:"🎙", label:"QC Workstation",      group:"production" },
-  { id:"batch",           icon:"📊", label:"Batch Analyzer",      group:"production" },
-  { id:"naming",          icon:"🏷", label:"Smart Naming",        group:"production" },
-  { id:"enhancement",     icon:"🔧", label:"Enhancement Lab",     group:"production" },
-  { id:"pipeline",        icon:"⚡", label:"Audio Pipeline",      group:"production" },
-  { id:"readiness",       icon:"✅", label:"Delivery Readiness",  group:"production" },
-  // Repair
-  { id:"forensic_repair", icon:"🔬", label:"Forensic Repair",    group:"repair"     },
-  { id:"audition",        icon:"🎛", label:"Audition Editor",    group:"repair"     },
-  // Manage
-  { id:"contributors",    icon:"👥", label:"Contributors",       group:"manage"     },
-  { id:"monitor",         icon:"📈", label:"Activity Monitor",   group:"manage"     },
-  // System
-  { id:"dsp_validation",  icon:"⚗",  label:"DSP Validation",    group:"system"     },
-  { id:"store",           icon:"🛍", label:"Store",              group:"system"     },
-  { id:"proeditor",       icon:"🎚", label:"Pro Editor",         group:"repair"     },
-  { id:"rooms",           icon:"🎙", label:"Conversation Rooms", group:"production" },
+  { id:"dashboard",       icon:"dashboard",    label:"Dashboard",          group:"production" },
+  { id:"qc",              icon:"qc",           label:"QC Workstation",      group:"production" },
+  { id:"batch",           icon:"batch",        label:"Batch Analyzer",      group:"production" },
+  { id:"naming",          icon:"naming",       label:"Smart Naming",        group:"production" },
+  { id:"enhancement",     icon:"enhancement",  label:"Enhancement Lab",     group:"production" },
+  { id:"pipeline",        icon:"pipeline",     label:"Audio Pipeline",      group:"production" },
+  { id:"readiness",       icon:"delivery",     label:"Delivery Readiness",  group:"production" },
+  { id:"forensic_repair", icon:"forensic",     label:"Forensic Repair",     group:"repair"     },
+  { id:"audition",        icon:"audition",     label:"Audition Editor",     group:"repair"     },
+  { id:"contributors",    icon:"contributors", label:"Contributors",        group:"manage"     },
+  { id:"monitor",         icon:"monitor",      label:"Activity Monitor",    group:"manage"     },
+  { id:"dsp_validation",  icon:"dsp",          label:"DSP Validation",      group:"system"     },
+  { id:"store",           icon:"store",        label:"Store",               group:"system"     },
+  { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",          group:"repair"     },
+  { id:"rooms",           icon:"rooms",        label:"Conversation Rooms",  group:"production" },
 ];
 
 const GROUP_LABELS = {
@@ -174,8 +171,11 @@ function Sidebar({ activeTab, onTabChange }:{ activeTab:Tab; onTabChange:(t:Tab)
                         ?`2px solid ${colors.accent.sky}`
                         :"2px solid transparent",
                       transition:"all 0.15s"}}>
-                    <span style={{fontSize:16,width:20,textAlign:"center",
-                      flexShrink:0,opacity:active?1:0.7}}>{item.icon}</span>
+                    <span style={{width:20,display:"flex",alignItems:"center",
+                      justifyContent:"center",flexShrink:0}}>
+                      <NavIcon name={item.icon} size={18}
+                        color={active ? GROUP_COLORS[item.group]??"#0EA5E9" : "#4a6a7a"}/>
+                    </span>
                     {expanded&&<span style={{fontSize:11,fontWeight:active?600:400,
                       whiteSpace:"nowrap",
                       color:active?colors.text.primary:colors.text.secondary}}>
@@ -258,15 +258,15 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
   const { user } = useAuth();
 
   const cards=[
-    { icon:"🎙", label:"QC Workstation",    sub:"Analyze audio quality",     tab:"qc"             as Tab, color:colors.accent.sky    },
-    { icon:"📊", label:"Batch Analyzer",    sub:"Process 200+ files",        tab:"batch"          as Tab, color:colors.accent.purple },
-    { icon:"🏷", label:"Smart Naming",      sub:"German Appen S0001–S0200",  tab:"naming"         as Tab, color:colors.accent.cyan   },
-    { icon:"🔧", label:"Enhancement Lab",   sub:"Audio repair & enhancement",tab:"enhancement"    as Tab, color:colors.accent.amber  },
-    { icon:"⚡", label:"Audio Pipeline",    sub:"End-to-end processing",     tab:"pipeline"       as Tab, color:colors.accent.green  },
-    { icon:"✅", label:"Delivery Readiness",sub:"QC score & compliance",     tab:"readiness"      as Tab, color:colors.accent.green  },
-    { icon:"🔬", label:"Forensic Repair",   sub:"Silence reconstruction",    tab:"forensic_repair"as Tab, color:colors.accent.amber  },
-    { icon:"🎛", label:"Audition Editor",   sub:"Professional workstation",  tab:"audition"       as Tab, color:colors.accent.sky    },
-    { icon:"📈", label:"Activity Monitor",  sub:"Real-time tracking",        tab:"monitor"        as Tab, color:colors.accent.purple },
+    { icon:"qc", label:"QC Workstation",    sub:"Analyze audio quality",     tab:"qc"             as Tab, color:colors.accent.sky    },
+    { icon:"batch", label:"Batch Analyzer",    sub:"Process 200+ files",        tab:"batch"          as Tab, color:colors.accent.purple },
+    { icon:"naming", label:"Smart Naming",      sub:"German Appen S0001–S0200",  tab:"naming"         as Tab, color:colors.accent.cyan   },
+    { icon:"enhancement", label:"Enhancement Lab",   sub:"Audio repair & enhancement",tab:"enhancement"    as Tab, color:colors.accent.amber  },
+    { icon:"pipeline", label:"Audio Pipeline",    sub:"End-to-end processing",     tab:"pipeline"       as Tab, color:colors.accent.green  },
+    { icon:"delivery", label:"Delivery Readiness",sub:"QC score & compliance",     tab:"readiness"      as Tab, color:colors.accent.green  },
+    { icon:"forensic", label:"Forensic Repair",   sub:"Silence reconstruction",    tab:"forensic_repair"as Tab, color:colors.accent.amber  },
+    { icon:"audition", label:"Audition Editor",   sub:"Professional workstation",  tab:"audition"       as Tab, color:colors.accent.sky    },
+    { icon:"monitor", label:"Activity Monitor",  sub:"Real-time tracking",        tab:"monitor"        as Tab, color:colors.accent.purple },
   ];
 
   return(
@@ -319,7 +319,11 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
               el.style.transform="translateY(0)";
               el.style.boxShadow="none";
             }}>
-            <div style={{fontSize:22,marginBottom:8}}>{card.icon}</div>
+            <div style={{width:44,height:44,marginBottom:12,display:"flex",
+              alignItems:"center",justifyContent:"center",borderRadius:10,
+              background:`${card.color}18`,border:`1px solid ${card.color}40`}}>
+              <NavIcon name={card.icon} size={22} color={card.color}/>
+            </div>
             <div style={{fontSize:12,fontWeight:600,
               color:colors.text.primary,marginBottom:3}}>{card.label}</div>
             <div style={{fontSize:10,color:colors.text.secondary}}>{card.sub}</div>
