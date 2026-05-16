@@ -12,7 +12,7 @@ export interface SpectrogramProOptions {
   maxDb?:         number;    // default -10
   gain?:          number;    // brightness boost 0-3 — default 1.2
   logFreq?:       boolean;   // logarithmic frequency — default true
-  colorMap?:      "plasma"|"viridis"|"inferno"|"aivora";
+  colorMap?:      "plasma"|"viridis"|"inferno"|"aivora"|"forensic";
   showGrid?:      boolean;
   showLabels?:    boolean;
 }
@@ -74,6 +74,18 @@ const COLOR_MAPS = {
     [245, 125,  21],
     [252, 193,  34],
     [252, 255, 164],
+  ] as [number,number,number][],
+
+  // Forensic HDR — maximum silence detail
+  forensic: [
+    [  0,   0,   0],   // true black
+    [  0,  20,  40],   // deep navy (noise floor)
+    [  0,  60,  80],   // dark teal (low hiss)
+    [  0, 120, 100],   // teal (room tone)
+    [ 20, 180,  80],   // green (signal)
+    [180, 220,   0],   // yellow-green
+    [255, 160,   0],   // orange (strong)
+    [255, 255, 255],   // white (peak)
   ] as [number,number,number][],
 };
 
@@ -230,8 +242,27 @@ export function drawSpectrogramPro(
         frame1[b0]*fFrac    *(1-bFrac) +
         frame1[b1]*fFrac    *bFrac;
 
-      const t=Math.pow(Math.max(0,(db-minDb)/(maxDb-minDb))*gain, 0.75);
-      const [r,g,b2]=interpolateColor(Math.min(1,t),colorMap);
+      // HDR forensic pipeline
+      const linear = Math.max(0,(db-minDb)/(maxDb-minDb));
+
+      // 1. Logarithmic brightness remapping
+      const logMapped = Math.log1p(linear * 9) / Math.log1p(9);
+
+      // 2. Adaptive gamma — boost low-level detail
+      const gamma = linear < 0.15 ? 0.4 : linear < 0.4 ? 0.6 : 0.85;
+      const gammaCorrected = Math.pow(logMapped, gamma);
+
+      // 3. Local contrast enhancement — silence regions get boosted
+      const silenceBoost = linear < 0.1 ? (0.1 - linear) * 3 : 0;
+      const enhanced = Math.min(1, gammaCorrected * gain + silenceBoost);
+
+      // 4. Psychoacoustic spectral sharpening
+      const sharpened = enhanced < 0.5
+        ? 2 * enhanced * enhanced
+        : 1 - Math.pow(-2 * enhanced + 2, 2) / 2;
+
+      const t = Math.min(1, sharpened);
+      const [r,g,b2]=interpolateColor(t,colorMap);
       const idx=(py*W+px)*4;
       pixels[idx]=r; pixels[idx+1]=g; pixels[idx+2]=b2; pixels[idx+3]=255;
     }
