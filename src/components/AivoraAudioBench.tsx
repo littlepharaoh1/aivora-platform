@@ -351,6 +351,10 @@ export default function AivoraAudioBench() {
         <div style={{fontSize:10,color:"#4a6a7a",marginTop:4}}>
           Verifier-backed • Deterministic • ITU-R BS.1770-4 • SHA-256 reproducibility
         </div>
+        <div style={{fontSize:9,color:"#1a4a6a",marginTop:6,
+          fontFamily:"monospace",letterSpacing:1}}>
+          9 TASKS · 4 DIFFICULTY LEVELS · 8 CATEGORIES · v1.0.0
+        </div>
       </div>
 
       {/* Stats */}
@@ -373,6 +377,29 @@ export default function AivoraAudioBench() {
         ))}
       </div>
 
+      {/* Category Legend */}
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+        {[
+          {cat:"silence_repair",   color:"#0EA5E9", label:"Silence"},
+          {cat:"hum_removal",      color:"#F97316", label:"Hum"},
+          {cat:"hiss_reduction",   color:"#8B5CF6", label:"Hiss"},
+          {cat:"clipping_recovery",color:"#EF4444", label:"Clipping"},
+          {cat:"stereo_repair",    color:"#10B981", label:"Stereo"},
+          {cat:"tts_qa",           color:"#F59E0B", label:"TTS QA"},
+          {cat:"asr_readiness",    color:"#22d3ee", label:"ASR"},
+          {cat:"speech_preservation",color:"#00ff88",label:"Speech"},
+        ].map(({cat,color,label})=>(
+          <div key={cat} onClick={()=>setFilter(cat)}
+            style={{display:"flex",alignItems:"center",gap:4,
+              cursor:"pointer",padding:"2px 8px",borderRadius:4,
+              background:filter===cat?`${color}20`:"transparent",
+              border:`1px solid ${filter===cat?color:"transparent"}`}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:color}}/>
+            <span style={{fontSize:8,color:filter===cat?color:"#4a6a7a"}}>{label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Export */}
       {done.length > 0 && (
         <div style={{marginBottom:14}}>
@@ -391,7 +418,9 @@ export default function AivoraAudioBench() {
       {/* Filter */}
       <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
         {["all","easy","medium","hard","expert",
-          "silence_repair","hum_removal","speech_preservation"].map(f=>(
+          "silence_repair","hum_removal","hiss_reduction",
+          "clipping_recovery","stereo_repair","tts_qa",
+          "asr_readiness","speech_preservation"].map(f=>(
           <div key={f} onClick={()=>setFilter(f)}
             style={{fontSize:8,padding:"3px 8px",borderRadius:4,cursor:"pointer",
               background:filter===f?"#0EA5E922":"transparent",
