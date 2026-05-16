@@ -60,20 +60,16 @@ export function inspectCursor(
     re[i]    = (chunk[i] ?? 0) * w;
   }
 
-  // Simple DFT for dominant bin (fast enough for inspector)
-  let maxMag = 0, dominantBin = 0;
-  const checkBins = Math.floor(N / 2);
-  for (let k = 1; k < checkBins; k++) {
-    let r = 0, im2 = 0;
-    for (let n = 0; n < N; n++) {
-      const angle = (2 * Math.PI * k * n) / N;
-      r   += re[n] * Math.cos(angle);
-      im2 += re[n] * Math.sin(angle);
-    }
-    const mag = Math.sqrt(r * r + im2 * im2);
-    if (mag > maxMag) { maxMag = mag; dominantBin = k; }
+  // Fast autocorrelation for dominant frequency
+  let dominantHz = 0;
+  let maxCorr = 0;
+  const minLag = Math.floor(sampleRate / 4000);
+  const maxLag = Math.floor(sampleRate / 50);
+  for (let lag = minLag; lag < Math.min(maxLag, N / 2); lag++) {
+    let corr = 0;
+    for (let n = 0; n < N - lag; n++) corr += re[n] * re[n + lag];
+    if (corr > maxCorr) { maxCorr = corr; dominantHz = sampleRate / lag; }
   }
-  const dominantHz = (dominantBin * sampleRate) / N;
 
   // Noise floor (bottom 10% of spectrum energy)
   const noiseFloorDb = rmsDb - 30;
