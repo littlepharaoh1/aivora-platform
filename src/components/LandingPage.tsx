@@ -615,20 +615,6 @@ export default function LandingPage({ onEnter }: Props) {
 
           {showAbout && <AboutModal onClose={()=>setShowAbout(false)}/>}
 
-          <button onClick={()=>setShowAbout(true)}
-            style={{display:"flex",alignItems:"center",gap:6,marginBottom:16,
-              background:"transparent",border:"1px solid #1a3a5a",
-              borderRadius:6,padding:"6px 14px",cursor:"pointer",color:"#4a6a7a",
-              fontSize:11,fontFamily:"inherit"}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="#0EA5E9" strokeWidth="1.5" strokeLinecap="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-            About Aivora
-          </button>
-
           <span style={{fontSize:10,color:"#2a4a5a",letterSpacing:2}}>
             AIVORA AI © 2026
           </span>
