@@ -364,6 +364,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
 
 export default function LandingPage({ onEnter }: Props) {
   const [visible,setVisible]=useState(false);
+  const [showAbout,setShowAbout]=useState(false);
   useEffect(()=>{ setTimeout(()=>setVisible(true),100); },[]);
 
   return(
