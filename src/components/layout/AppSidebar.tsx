@@ -54,12 +54,11 @@ const ICON_PATHS: Record<string, string> = {
 
 function SvgIcon({name, size=16, color="currentColor"}: {name:string; size?:number; color?:string}) {
   const d = ICON_PATHS[name] ?? ICON_PATHS.dashboard;
-  const parts = d.replace(/([A-Z])/g, " $1").trim().split(/(?=M)/).filter(Boolean);
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      {parts.map((part,i)=>(
-        <path key={i} d={part.trim()}/>
+      {d.split(" M").map((part, i) => (
+        <path key={i} d={i===0 ? part : "M"+part}/>
       ))}
     </svg>
   );
