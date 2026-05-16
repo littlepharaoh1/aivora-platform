@@ -131,6 +131,7 @@ function ProfessionalAudioEditorInner() {
       for(let i=0;i<buf.length;i++) m[i]+=d[i];
     }
     if(buf.numberOfChannels>1) for(let i=0;i<m.length;i++) m[i]/=buf.numberOfChannels;
+    bufferIdRef.current += 1;
     setBuffer(buf);
     setMono(m);
     setZoom(Math.max(10,mainRef.current?.clientWidth??800/buf.duration));
@@ -171,34 +172,53 @@ function ProfessionalAudioEditorInner() {
     });
   },[mono,zoom,panOffset,playhead,selection,waveH]);
 
-  // ── Draw Spectrogram ─────────────────────────────────────────────────────────
+  // ── Draw Spectrogram ─────────────────────────────────────────────────────
+
+  const specCacheRef = useRef<{canvas:HTMLCanvasElement;fftSize:number;colorMap:string;bufferId:number}|null>(null);
+  const bufferIdRef  = useRef(0);
 
   useEffect(()=>{
     if(!specRef.current||!buffer) return;
     const W=mainRef.current?.clientWidth??800;
     specRef.current.width  = W;
     specRef.current.height = specH;
-    const spec=computeSpectrogramPro(buffer,{fftSize,minDb:-90,maxDb:-10,gain:1.4,colorMap});
+    const ctx=specRef.current.getContext("2d");
+    if(!ctx) return;
 
-    // Draw full spectrogram
-    const offscreen=document.createElement("canvas");
-    offscreen.width=W; offscreen.height=specH;
-    drawSpectrogramPro(offscreen,spec,{colorMap,gain:1.4,logFreq:true,showGrid:true,showLabels:true});
+    // Recompute spectrogram only if buffer/fft/colormap changed
+    const bid = bufferIdRef.current;
+    if(!specCacheRef.current ||
+       specCacheRef.current.fftSize   !== fftSize ||
+       specCacheRef.current.colorMap  !== colorMap ||
+       specCacheRef.current.bufferId  !== bid) {
 
-    // Apply zoom/pan
-    const ctx=specRef.current.getContext("2d"); if(!ctx) return;
+      const fullW = Math.max(W, Math.floor(buffer.duration * 4));
+      const offscreen = document.createElement("canvas");
+      offscreen.width  = fullW;
+      offscreen.height = specH;
+      const spec = computeSpectrogramPro(buffer,{fftSize,minDb:-90,maxDb:-10,gain:1.4,colorMap});
+      drawSpectrogramPro(offscreen,spec,{colorMap,gain:1.4,logFreq:true,showGrid:true,showLabels:true});
+      specCacheRef.current = {canvas:offscreen, fftSize, colorMap, bufferId:bid};
+    }
+
+    const offscreen = specCacheRef.current!.canvas;
+    const fullW = offscreen.width;
+
+    // Crop to current viewport
+    const startFrac = panOffset / duration;
+    const visibleSec = W / zoom;
+    const endFrac   = Math.min(1, (panOffset + visibleSec) / duration);
+    const srcX = startFrac * fullW;
+    const srcW = (endFrac - startFrac) * fullW;
+
     ctx.clearRect(0,0,W,specH);
-    const startFrac=panOffset/duration;
-    const endFrac  =Math.min(1,(panOffset+W/zoom)/duration);
-    const srcX=startFrac*W;
-    const srcW=(endFrac-startFrac)*W;
-    ctx.drawImage(offscreen,srcX,0,srcW,specH,0,0,W,specH);
+    if(srcW > 0) ctx.drawImage(offscreen, srcX, 0, srcW, specH, 0, 0, W, specH);
 
     // Playhead
     const phx=(playhead-panOffset)*zoom;
     if(phx>=0&&phx<=W){
       ctx.strokeStyle="#f59e0b";
-      ctx.lineWidth=1.5;
+      ctx.lineWidth=2;
       ctx.beginPath();ctx.moveTo(phx,0);ctx.lineTo(phx,specH);ctx.stroke();
     }
 
@@ -206,9 +226,9 @@ function ProfessionalAudioEditorInner() {
     if(selection){
       const sx=(selection.start-panOffset)*zoom;
       const ex=(selection.end-panOffset)*zoom;
-      ctx.fillStyle="rgba(34,211,238,0.10)";
+      ctx.fillStyle="rgba(34,211,238,0.12)";
       ctx.fillRect(sx,0,ex-sx,specH);
-      ctx.strokeStyle="#22d3ee88";
+      ctx.strokeStyle="#22d3ee";
       ctx.lineWidth=1;
       ctx.strokeRect(sx,0,ex-sx,specH);
     }
@@ -239,11 +259,18 @@ function ProfessionalAudioEditorInner() {
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
     if(e.ctrlKey||e.metaKey){
-      const factor=e.deltaY>0?0.85:1.18;
-      setZoom(z=>Math.max(5,Math.min(5000,z*factor)));
+      // Zoom centered on cursor
+      const rect = waveRef.current?.getBoundingClientRect();
+      const cursorX = rect ? e.clientX - rect.left : 0;
+      const cursorSec = panOffset + cursorX / zoom;
+      const factor = e.deltaY > 0 ? 0.8 : 1.25;
+      const newZoom = Math.max(5, Math.min(5000, zoom * factor));
+      const newPan  = Math.max(0, cursorSec - cursorX / newZoom);
+      setZoom(newZoom);
+      setPanOffset(newPan);
     } else {
-      const delta=e.deltaY/zoom*0.3;
-      setPanOffset(p=>Math.max(0,Math.min(duration-1,p+delta)));
+      const delta = e.deltaY / zoom * 0.8;
+      setPanOffset(p=>Math.max(0,Math.min(Math.max(0,duration-1),p+delta)));
     }
   }
 
