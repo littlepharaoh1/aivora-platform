@@ -29,7 +29,7 @@ export function analyzeForensicSilence(
   sampleRate: number,
   fftSize:    number = 2048
 ): ForensicSilenceReport {
-  const hopSec    = 0.02;   // 20ms windows
+  const hopSec    = 0.05;   // 50ms windows — less sensitive
   const hopSamples = Math.floor(hopSec * sampleRate);
   const segments: SilenceSegment[] = [];
   const humBands: number[] = [];
@@ -52,7 +52,7 @@ export function analyzeForensicSilence(
     const rms   = Math.sqrt(sum / chunk.length);
     const rmsDb = rms > 1e-10 ? 20 * Math.log10(rms) : -120;
 
-    if (rmsDb > -20) continue; // skip speech regions
+    if (rmsDb > -30) continue; // skip speech regions
 
     totalSilenceSec += hopSec;
 
@@ -99,13 +99,13 @@ export function analyzeForensicSilence(
     // Purity score
     const purityScore = Math.max(0, 1 - humScore*0.4 - hissScore*0.3 - seamScore*0.3);
 
-    // Type classification
+    // Type classification — stricter thresholds
     let type: SilenceSegment["type"] = "clean";
-    if (rmsDb < -90)      type = "digital";
-    else if (humScore > 0.5) type = "hum";
-    else if (hissScore > 0.5) type = "hiss";
-    else if (seamScore > 0.4) type = "seam";
-    else if (rmsDb > -60)    type = "room";
+    if (rmsDb < -90)         type = "digital";
+    else if (humScore > 0.7) type = "hum";
+    else if (hissScore > 0.7) type = "hiss";
+    else if (seamScore > 0.6) type = "seam";
+    else if (rmsDb > -45 && rmsDb < -30) type = "room";
 
     if (type !== "clean" && type !== "digital") contaminatedSec += hopSec;
 
@@ -142,13 +142,13 @@ export function drawForensicSilenceOverlay(
   const { zoom, panOffset, height, width } = opts;
 
   const TYPE_COLORS: Record<string, string> = {
-    digital:  "rgba(34,211,238,0.25)",
-    room:     "rgba(251,191,36,0.20)",
-    hum:      "rgba(239,68,68,0.30)",
-    hiss:     "rgba(168,85,247,0.25)",
-    seam:     "rgba(255,50,50,0.40)",
-    repaired: "rgba(0,255,136,0.20)",
-    clean:    "rgba(0,255,136,0.05)",
+    digital:  "rgba(34,211,238,0.15)",
+    room:     "rgba(251,191,36,0.12)",
+    hum:      "rgba(239,68,68,0.20)",
+    hiss:     "rgba(168,85,247,0.15)",
+    seam:     "rgba(255,50,50,0.30)",
+    repaired: "rgba(0,255,136,0.15)",
+    clean:    "rgba(0,255,136,0.00)",
   };
 
   for (const seg of report.segments) {
