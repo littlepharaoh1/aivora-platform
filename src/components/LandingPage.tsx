@@ -361,13 +361,13 @@ export default function LandingPage({ onEnter }: Props) {
             justifyContent:"center"}}>
             <a href="mailto:Info@aivoraailtd.com"
               style={{display:"flex",alignItems:"center",gap:8,
-                color:"#64A0B8",fontSize:12,textDecoration:"none",
-                padding:"8px 16px",border:"1px solid #1a4a6a",borderRadius:6,
-                transition:"all 0.2s",background:"#0a1520"}}
-              onMouseEnter={e=>{e.currentTarget.style.color="#0EA5E9";e.currentTarget.style.borderColor="#0EA5E9";}}
-              onMouseLeave={e=>{e.currentTarget.style.color="#64A0B8";e.currentTarget.style.borderColor="#1a4a6a";}}>
+                color:"#4a6a7a",fontSize:11,textDecoration:"none",
+                padding:"6px 14px",border:"1px solid #1a2a3a",borderRadius:6,
+                transition:"all 0.2s"}}
+              onMouseEnter={e=>(e.currentTarget.style.color="#0EA5E9",e.currentTarget.style.borderColor="#0EA5E9")}
+              onMouseLeave={e=>(e.currentTarget.style.color="#4a6a7a",e.currentTarget.style.borderColor="#1a2a3a")}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="#0EA5E9" strokeWidth="1.5" strokeLinecap="round">
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
@@ -375,13 +375,12 @@ export default function LandingPage({ onEnter }: Props) {
             </a>
             <a href="mailto:Contact@aivoraailtd.com"
               style={{display:"flex",alignItems:"center",gap:8,
-                color:"#64A0B8",fontSize:12,textDecoration:"none",
-                padding:"8px 16px",border:"1px solid #1a4a6a",borderRadius:6,
-                background:"#0a1520"}}
-              onMouseEnter={e=>{e.currentTarget.style.color="#8B5CF6";e.currentTarget.style.borderColor="#8B5CF6";}}
-              onMouseLeave={e=>{e.currentTarget.style.color="#64A0B8";e.currentTarget.style.borderColor="#1a4a6a";}}>
+                color:"#4a6a7a",fontSize:11,textDecoration:"none",
+                padding:"6px 14px",border:"1px solid #1a2a3a",borderRadius:6}}
+              onMouseEnter={e=>(e.currentTarget.style.color="#8B5CF6",e.currentTarget.style.borderColor="#8B5CF6")}
+              onMouseLeave={e=>(e.currentTarget.style.color="#4a6a7a",e.currentTarget.style.borderColor="#1a2a3a")}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round">
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
