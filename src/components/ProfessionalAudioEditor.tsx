@@ -10,6 +10,7 @@ import { mixToMono } from "../lib/audioEditor/audioBufferUtils";
 import { exportFloat32Wav, downloadWavBlob } from "../lib/audioForensics/floatWavExporter";
 import { inspectCursor } from "../lib/audioEditor/cursorInspector";
 import { drawSampleLevel } from "../lib/audioEditor/zoomEngine";
+import { inspectForensicCursor, ForensicCursorInfo } from "../lib/audioEditor/forensicCursorInspector";
 import { analyzeSilence, drawForensicOverlay } from "../lib/audioEditor/forensicSilenceOverlay";
 import { analyzeForensicSilence, drawForensicSilenceOverlay, ForensicSilenceReport } from "../lib/audioEditor/forensicSilenceMode";
 
@@ -94,7 +95,7 @@ function ProfessionalAudioEditorInner() {
   const [specH,      setSpecH]      = useState(200);
   const [showLeft,   setShowLeft]   = useState(true);
   const [forensicMode, setForensicMode] = useState(false);
-  const [cursorInfo,   setCursorInfo]   = useState<any>(null);
+  const [cursorInfo,   setCursorInfo]   = useState<ForensicCursorInfo|null>(null);
   const [forensicData, setForensicData] = useState<any>(null);
   const [diffMode,       setDiffMode]       = useState(false);
   const [origMono,       setOrigMono]       = useState<Float32Array|null>(null);
@@ -342,11 +343,11 @@ function ProfessionalAudioEditorInner() {
     dragRef.current={active:true,startX:getSec(e),startSel:null};
   }
   function onMouseMove(e: React.MouseEvent) {
-    // Cursor inspector
+    // Forensic cursor inspector
     if(mono && buffer) {
       const sec = getSec(e);
       if(sec >= 0 && sec <= duration) {
-        const info = inspectCursor(mono, buffer.sampleRate, sec, 512);
+        const info = inspectForensicCursor(mono, buffer.sampleRate, sec);
         setCursorInfo(info);
       }
     }
