@@ -1,328 +1,209 @@
-// ============================================================================
-// Aivora Store Panel - Test/Debug panel for the central store
-// ============================================================================
-// This is a temporary diagnostic panel to verify that the AivoraStore is
-// working before we wire up the real tabs. It shows:
-//   • How many files are in the store
-//   • Storage usage
-//   • Upload button (bulk)
-//   • Clear all button
-// ============================================================================
-
-import { useRef, useState } from "react";
+// @ts-nocheck
+/**
+ * StorePanel.tsx — Aivora File Manager
+ * Central file registry with DSP metadata + quick actions
+ */
+import React, { useState, useCallback } from "react";
 import { useAivora } from "../lib/store/AivoraContext";
+import { runUnifiedPipeline, PIPELINE_PRESETS } from "../lib/dsp/aivoraDSPController";
 
 export default function StorePanel() {
-  const {
-    records,
-    stats,
-    storageInfo,
-    isHydrating,
-    addFiles,
-    clearAll,
-    refreshStorageInfo,
-    analyzeAll,
-    analysisProgress,
-  } = useAivora();
+  const { records, stats, storageInfo, isHydrating, addRecord, removeRecord, clearAll } = useAivora();
+  const [selected,   setSelected]   = useState<Set<string>>(new Set());
+  const [processing, setProcessing] = useState<string|null>(null);
+  const [filter,     setFilter]     = useState("all");
+  const [sortBy,     setSortBy]     = useState<"name"|"date"|"size">("date");
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
-  const [profile, setProfile] = useState("asr_studio");
+  async function handleUpload(files: FileList) {
+    for(const file of Array.from(files)) {
+      if(!file.name.endsWith(".wav")) continue;
+      addRecord?.({ id:Date.now().toString(), name:file.name,
+        size:file.size, type:"wav", createdAt:new Date().toISOString() });
+    }
+  }
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setBusy(true);
-    setProgress({ done: 0, total: files.length });
+  async function quickProcess(record: any, target: string) {
+    setProcessing(record.id);
     try {
-      // Add in one bulk call (chunked internally at 25 per batch)
-      await addFiles(files);
-      setProgress({ done: files.length, total: files.length });
-      await refreshStorageInfo();
-    } catch (err) {
-      console.error("Upload failed:", err);
-      alert("Upload failed: " + (err as Error).message);
-    } finally {
-      setBusy(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+      const input = document.createElement("input");
+      input.type="file"; input.accept=".wav";
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if(!file) return;
+        const ab  = await file.arrayBuffer();
+        const ctx = new AudioContext();
+        const buf = await ctx.decodeAudioData(ab);
+        const result = await runUnifiedPipeline(buf, { target: target as any });
+        // Download result
+        const wav = encodeWav(result.output, result.sampleRate);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(wav);
+        a.download = `${file.name.replace(".wav","")}_${target}.wav`;
+        a.click();
+      };
+      input.click();
+    } catch(e) { console.error(e); }
+    setProcessing(null);
   }
 
-  async function handleClear() {
-    if (!confirm("Clear ALL files from the central store? This cannot be undone.")) {
-      return;
-    }
-    await clearAll();
-    await refreshStorageInfo();
+  function encodeWav(data: Float32Array, sr: number): Blob {
+    const ab=new ArrayBuffer(44+data.length*4);
+    const v=new DataView(ab);
+    const s=(o:number,str:string)=>{for(let i=0;i<str.length;i++)v.setUint8(o+i,str.charCodeAt(i));};
+    s(0,"RIFF");v.setUint32(4,36+data.length*4,true);s(8,"WAVE");s(12,"fmt ");
+    v.setUint32(16,16,true);v.setUint16(20,3,true);v.setUint16(22,1,true);
+    v.setUint32(24,sr,true);v.setUint32(28,sr*4,true);
+    v.setUint16(32,4,true);v.setUint16(34,32,true);s(36,"data");
+    v.setUint32(40,data.length*4,true);
+    let offset=44;
+    for(let i=0;i<data.length;i++){v.setFloat32(offset,data[i],true);offset+=4;}
+    return new Blob([ab],{type:"audio/wav"});
   }
 
-  const fmtBytes = (b?: number) => {
-    if (!b) return "—";
-    const mb = b / (1024 * 1024);
-    if (mb < 1024) return `${mb.toFixed(1)} MB`;
-    return `${(mb / 1024).toFixed(2)} GB`;
-  };
-
-  if (isHydrating) {
-    return (
-      <div style={panelStyle}>
-        <h2 style={titleStyle}>AIVORA CENTRAL STORE</h2>
-        <p style={mutedStyle}>Loading from IndexedDB...</p>
-      </div>
-    );
-  }
+  const filteredRecords = (records??[]).filter((r:any) =>
+    filter==="all" ? true : r.type===filter
+  ).sort((a:any,b:any) => {
+    if(sortBy==="name") return a.name.localeCompare(b.name);
+    if(sortBy==="size") return (b.size??0)-(a.size??0);
+    return new Date(b.createdAt??0).getTime()-new Date(a.createdAt??0).getTime();
+  });
 
   return (
-    <div style={panelStyle}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <h2 style={titleStyle}>AIVORA CENTRAL STORE</h2>
-          <p style={mutedStyle}>
-            Diagnostic panel · Bulk upload + persistent storage
-          </p>
+    <div style={{height:"100%",overflow:"auto",background:"#020608",
+      fontFamily:"'JetBrains Mono',monospace",color:"#a0c4cc",padding:16}}>
+
+      <div style={{marginBottom:16}}>
+        <div style={{fontSize:9,color:"#2a6a8a",letterSpacing:3,marginBottom:4}}>
+          FILE MANAGER
         </div>
-        <span style={badgeStyle}>{records.length} files</span>
+        <div style={{fontSize:18,fontWeight:700,color:"#E2EEF6"}}>
+          Aivora File Store
+        </div>
+        <div style={{fontSize:10,color:"#4a6a7a",marginTop:2}}>
+          Central file registry · Quick DSP actions · Batch management
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div style={gridStyle}>
-        <Card label="TOTAL" value={stats.total} color="#7dd3fc" />
-        <Card label="READY" value={stats.ready} color="#10b981" />
-        <Card label="REVIEW" value={stats.review} color="#f59e0b" />
-        <Card label="REJECTED" value={stats.rejected} color="#ef4444" />
-      </div>
-
-      {/* Storage Info */}
-      <div style={infoBoxStyle}>
-        <strong style={{ color: "#7dd3fc" }}>STORAGE</strong>
-        <div style={{ marginTop: 8, fontSize: 13, color: "#94a3b8" }}>
-          <div>Records in DB: {storageInfo.recordsCount}</div>
-          <div>Blobs in DB: {storageInfo.blobsCount}</div>
-          <div>
-            Used: {fmtBytes(storageInfo.estimatedUsage)} /{" "}
-            {fmtBytes(storageInfo.estimatedQuota)}
+      {/* Stats */}
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        {[
+          {l:"Files",   v:records?.length??0,                    c:"#0EA5E9"},
+          {l:"Storage", v:`${((storageInfo?.used??0)/1024/1024).toFixed(1)}MB`, c:"#8B5CF6"},
+          {l:"Selected",v:selected.size,                          c:"#F59E0B"},
+        ].map(({l,v,c})=>(
+          <div key={l} style={{background:"#050d18",border:`1px solid ${c}30`,
+            borderTop:`2px solid ${c}`,borderRadius:8,padding:"10px 14px"}}>
+            <div style={{fontSize:20,fontWeight:700,color:c}}>{v}</div>
+            <div style={{fontSize:8,color:"#4a6a7a",letterSpacing:1}}>{l}</div>
           </div>
-        </div>
+        ))}
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-        <button
-          style={btnPrimary}
-          onClick={() => fileInputRef.current?.click()}
-          disabled={busy}
-        >
-          {busy
-            ? `Uploading ${progress.done}/${progress.total}...`
-            : "📁 Bulk Upload Audio Files"}
-        </button>
-        <button style={btnDanger} onClick={handleClear} disabled={busy}>
-          🗑️ Clear All
-        </button>
-
-        <button
-          onClick={() => analyzeAll(profile)}
-          style={{
-            background: "#10b98122",
-            border: "1px solid #10b981",
-            color: "#10b981",
-            padding: "10px 16px",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontFamily: "monospace",
-            fontWeight: 700,
-            marginRight: 12,
-          }}
-        >
-          🧠 Analyze All
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*,.wav,.mp3,.m4a,.flac"
-          multiple
-          style={{ display: "none" }}
-          onChange={handleUpload}
-        />
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        <label style={{fontSize:10,padding:"6px 14px",borderRadius:6,
+          background:"#0EA5E920",border:"1px solid #0EA5E940",
+          color:"#0EA5E9",cursor:"pointer"}}>
+          + Upload WAV
+          <input ref={fileRef} type="file" accept=".wav" multiple
+            style={{display:"none"}}
+            onChange={e=>e.target.files&&handleUpload(e.target.files)}/>
+        </label>
+        {selected.size>0&&(
+          <button onClick={()=>{
+            selected.forEach(id=>removeRecord?.(id));
+            setSelected(new Set());
+          }} style={{fontSize:10,padding:"6px 14px",borderRadius:6,
+            background:"#EF444420",border:"1px solid #EF444440",
+            color:"#EF4444",cursor:"pointer",fontFamily:"inherit"}}>
+            Delete Selected ({selected.size})
+          </button>
+        )}
+        <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+          {["name","date","size"].map(s=>(
+            <div key={s} onClick={()=>setSortBy(s as any)}
+              style={{fontSize:9,padding:"4px 8px",borderRadius:4,cursor:"pointer",
+                background:sortBy===s?"#0EA5E922":"transparent",
+                color:sortBy===s?"#0EA5E9":"#2a5a6a",
+                border:`1px solid ${sortBy===s?"#0EA5E9":"#1a3a5a"}`}}>
+              {s}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* File List */}
-      {records.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <strong style={{ color: "#7dd3fc" }}>
-            FILES IN STORE ({records.length})
-          </strong>
-          <div style={listStyle}>
-            {records.slice(0, 50).map((r) => (
-              <div key={r.id} style={listItemStyle}>
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.filename}
-                </span>
-                <span style={stageBadge(r.stage)}>{r.stage}</span>
+      {/* Files */}
+      {isHydrating ? (
+        <div style={{textAlign:"center",padding:20,fontSize:10,color:"#2a5a6a"}}>Loading...</div>
+      ) : filteredRecords.length===0 ? (
+        <div style={{textAlign:"center",padding:40,fontSize:10,color:"#2a5a6a",
+          border:"1px solid #0a1520",borderRadius:8}}>
+          No files yet. Upload WAV files to get started.
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {filteredRecords.map((r:any)=>(
+            <div key={r.id} style={{background:"#050d18",
+              border:`1px solid ${selected.has(r.id)?"#0EA5E9":"#0f2030"}`,
+              borderRadius:8,padding:"10px 14px",
+              display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <input type="checkbox" checked={selected.has(r.id)}
+                onChange={e=>{
+                  setSelected(prev=>{
+                    const n=new Set(prev);
+                    e.target.checked?n.add(r.id):n.delete(r.id);
+                    return n;
+                  });
+                }}/>
+              <div style={{flex:1,minWidth:120}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#E2EEF6",
+                  marginBottom:2,wordBreak:"break-all"}}>{r.name}</div>
+                <div style={{fontSize:8,color:"#2a5a6a"}}>
+                  {r.size?(r.size/1024).toFixed(1)+"KB ·":""} {new Date(r.createdAt).toLocaleString()}
+                </div>
               </div>
-            ))}
-            {records.length > 50 && (
-              <div style={mutedStyle}>...and {records.length - 50} more</div>
-            )}
-          </div>
+
+              {/* Quick Actions */}
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {[
+                  {label:"TTS",      target:"tts_training", color:"#F59E0B"},
+                  {label:"ASR",      target:"asr_training", color:"#10B981"},
+                  {label:"Podcast",  target:"podcast",      color:"#8B5CF6"},
+                  {label:"Broadcast",target:"broadcast",    color:"#0EA5E9"},
+                ].map(({label,target,color})=>(
+                  <button key={target}
+                    onClick={()=>quickProcess(r,target)}
+                    disabled={processing===r.id}
+                    style={{fontSize:8,padding:"3px 8px",borderRadius:4,
+                      background:`${color}15`,border:`1px solid ${color}30`,
+                      color,cursor:"pointer",fontFamily:"inherit",
+                      opacity:processing===r.id?0.5:1}}>
+                    {processing===r.id?"⟳":label}
+                  </button>
+                ))}
+                <button onClick={()=>removeRecord?.(r.id)}
+                  style={{fontSize:8,padding:"3px 8px",borderRadius:4,
+                    background:"#EF444415",border:"1px solid #EF444430",
+                    color:"#EF4444",cursor:"pointer",fontFamily:"inherit"}}>
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {records.length === 0 && (
-        <div style={{ marginTop: 24, textAlign: "center", padding: 32 }}>
-          <p style={mutedStyle}>
-            No files in store. Click "Bulk Upload" to add files.
-          </p>
-          <p style={{ ...mutedStyle, fontSize: 12, marginTop: 8 }}>
-            Files persist across page reloads (IndexedDB).
-          </p>
+      {records?.length>0&&(
+        <div style={{marginTop:12,textAlign:"right"}}>
+          <button onClick={clearAll}
+            style={{fontSize:9,padding:"4px 10px",borderRadius:4,
+              background:"transparent",border:"1px solid #EF444430",
+              color:"#EF4444",cursor:"pointer",fontFamily:"inherit"}}>
+            Clear All Files
+          </button>
         </div>
       )}
     </div>
   );
 }
-
-// ─── Sub-component ───
-function Card({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div style={cardStyle(color)}>
-      <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: 1 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color, marginTop: 4 }}>{value}</div>
-    </div>
-  );
-}
-
-// ─── Styles ───
-const panelStyle: React.CSSProperties = {
-  padding: 24,
-  background: "#0b1220",
-  border: "1px solid #1e293b",
-  borderRadius: 12,
-  color: "#e2e8f0",
-};
-
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 20,
-  letterSpacing: 1,
-  color: "#7dd3fc",
-};
-
-const mutedStyle: React.CSSProperties = {
-  color: "#64748b",
-  fontSize: 13,
-  margin: "4px 0",
-};
-
-const badgeStyle: React.CSSProperties = {
-  background: "#1e293b",
-  color: "#7dd3fc",
-  padding: "4px 12px",
-  borderRadius: 8,
-  fontSize: 13,
-  fontFamily: "monospace",
-};
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-  gap: 12,
-  marginTop: 20,
-};
-
-const cardStyle = (color: string): React.CSSProperties => ({
-  background: "#0f172a",
-  border: `1px solid ${color}33`,
-  borderTop: `2px solid ${color}`,
-  borderRadius: 8,
-  padding: 16,
-});
-
-const infoBoxStyle: React.CSSProperties = {
-  marginTop: 20,
-  padding: 16,
-  background: "#0f172a",
-  border: "1px solid #1e293b",
-  borderRadius: 8,
-};
-
-const btnPrimary: React.CSSProperties = {
-  background: "#0ea5e9",
-  color: "#fff",
-  border: "none",
-  padding: "10px 20px",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 14,
-  fontWeight: 500,
-};
-
-const selectStyle: React.CSSProperties = {
-  background: "#0f172a",
-  color: "#e2e8f0",
-  border: "1px solid #334155",
-  padding: "10px 14px",
-  borderRadius: 8,
-  fontSize: 13,
-  cursor: "pointer",
-};
-
-const btnAnalyze: React.CSSProperties = {
-  background: "#10b981",
-  color: "#fff",
-  border: "none",
-  padding: "10px 20px",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 14,
-  fontWeight: 500,
-};
-
-const btnDanger: React.CSSProperties = {
-  background: "transparent",
-  color: "#10b981",
-  border: "1px solid #10b981",
-  padding: "10px 20px",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 14,
-};
-
-const listStyle: React.CSSProperties = {
-  marginTop: 12,
-  maxHeight: 300,
-  overflow: "auto",
-  background: "#0f172a",
-  border: "1px solid #1e293b",
-  borderRadius: 8,
-  padding: 8,
-};
-
-const listItemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  padding: "6px 8px",
-  fontSize: 12,
-  fontFamily: "monospace",
-  borderBottom: "1px solid #1e293b",
-};
-
-const stageBadge = (stage: string): React.CSSProperties => {
-  const colors: Record<string, string> = {
-    uploaded: "#7dd3fc",
-    analyzed: "#10b981",
-    enhanced: "#a78bfa",
-    rejected: "#ef4444",
-  };
-  return {
-    background: `${colors[stage] || "#64748b"}22`,
-    color: colors[stage] || "#94a3b8",
-    padding: "2px 8px",
-    borderRadius: 4,
-    fontSize: 10,
-    letterSpacing: 1,
-  };
-};

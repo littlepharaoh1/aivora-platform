@@ -12,6 +12,9 @@ import {
   type ReferenceMetrics,
 } from "../lib/dsp/referenceValidation/referenceValidator";
 import { analyzeAudioQuality } from "../lib/audioQc/audioAnalyzerCore";
+import { computeFullQualityReport } from "../lib/audioEditor/audioMetrics";
+import { classifyNoise, estimateRT60 } from "../lib/audioForensics/noiseFingerprinting";
+import { PIPELINE_PRESETS } from "../lib/dsp/aivoraDSPController";
 
 export default function DspValidationDashboard() {
   const [report,   setReport]   = useState<ValidationReport | null>(null);
