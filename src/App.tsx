@@ -70,7 +70,8 @@ type Tab =
   | "store"
   | "rooms"
   | "proeditor"
-  | "audiobench";
+  | "audiobench"
+  | "documentation";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   store:          { title:"Aivora Store",             subtitle:"RESOURCES & TOOLS" },
   proeditor:      { title:"Professional Editor",       subtitle:"ADOBE-STYLE FULL SCREEN EDITOR" },
   audiobench:     { title:"Audio Bench",                subtitle:"VERIFIER-BACKED FORENSIC BENCHMARK" },
+  documentation:  { title:"Documentation",              subtitle:"PLATFORM REFERENCE & GUIDES" },
   rooms:          { title:"Conversation Rooms",       subtitle:"DUAL SPEAKER STEREO MERGE V8" },
 };
 
