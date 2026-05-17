@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useState } from "react";
 import NavIcon, { GROUP_COLORS } from "./components/ui/NavIcon";
+import LoginPage from "./components/LoginPage";
 import AivoraAudioBench from "./components/AivoraAudioBench";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
