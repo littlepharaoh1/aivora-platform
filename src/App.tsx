@@ -47,7 +47,6 @@ import AivoraAuditionWorkstation  from "./components/AivoraAuditionWorkstation";
 import ProfessionalAudioEditor     from "./components/ProfessionalAudioEditor";
 
 // Components — Manage
-import ActivityMonitor      from "./components/ActivityMonitor";
 import DspValidationDashboard from "./components/DspValidationDashboard";
 import StorePanel           from "./components/StorePanel";
 import ConversationRooms    from "./components/ConversationRooms";
@@ -431,7 +430,6 @@ function AppContent(){
           {tab==="pipeline"        && <AudioPipeline/>}
           {tab==="readiness"       && <DeliveryReadinessScore records={records} setRecords={setRecords}/>}
           {tab==="forensic_repair" && <ForensicSilenceRepair/>}
-          {tab==="monitor"         && <ActivityMonitor/>}
           {tab==="dsp_validation"  && <DspValidationDashboard/>}
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <ComingSoon title="Contributors"/>}
