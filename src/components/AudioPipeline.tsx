@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useRef } from "react";
 import { Upload, Zap, BarChart3, Download, RefreshCw, ArrowRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { runUnifiedPipeline, PIPELINE_PRESETS } from "../lib/dsp/aivoraDSPController";
 
 const PROFILES = {
   wakeword:     { label:"Wake Word",    icon:"🎙️", color:"#22d3ee", th:{ pkMin:-6,  pkMax:-1,  rmsMin:-28, rmsMax:-10, noiseMax:-60, snrMin:45, silMax:0.15 } },
