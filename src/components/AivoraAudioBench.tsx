@@ -12,6 +12,8 @@ import { gradeToColor, scoreToGrade } from "../lib/audioBench/verifierResult";
 import type { VerifierResult } from "../lib/audioBench/verifierResult";
 import type { BenchmarkTask, TaskOutput, AudioMetadata } from "../lib/audioBench/types";
 import { buildTrainingExample, exportToJsonl, buildManifest } from "../lib/audioBench/trainingExport";
+import { benchAPI } from "../lib/api/aivoraAPI";
+import { supabase } from "../lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -300,6 +302,21 @@ export default function AivoraAudioBench() {
       };
 
       const result = await verifyTaskOutput(task, output);
+
+      // Save to Supabase bench_results
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if(session) {
+          await benchAPI.saveResult({
+            taskId:  task.id,
+            userId:  session.user.id,
+            score:   result.score,
+            passed:  result.passed,
+            grade:   result.grade,
+            hash:    result.reproducibilityHash,
+          });
+        }
+      } catch {}
       setRun(task.id, { status:"done", result, duration: Date.now()-start });
       await ctx.close();
     } catch(e: any) {
