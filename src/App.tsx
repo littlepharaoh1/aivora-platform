@@ -10,6 +10,7 @@ import AivoraAudioBench from "./components/AivoraAudioBench";
 import ActivityMonitor from "./components/ActivityMonitor";
 import DeliveryReadiness from "./components/DeliveryReadiness";
 import Documentation from "./components/Documentation";
+import Contributors from "./components/Contributors";
 import ConversationRooms from "./components/ConversationRooms";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
