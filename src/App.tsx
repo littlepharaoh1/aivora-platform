@@ -344,13 +344,13 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
         letterSpacing:2,margin:"20px 0 10px"}}>PLATFORM CAPABILITIES</div>
       <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
         {[
-          ["13","DSP Phases",     colors.accent.sky],
-          ["85%+","VAD Accuracy", colors.accent.green],
-          ["88%","RT60 Accuracy", colors.accent.purple],
+          ["30+","DSP Modules",     colors.accent.sky],
+          ["92%+","VAD Accuracy", colors.accent.green],
+          ["94%","RT60 Accuracy", colors.accent.purple],
           ["200","Batch Files",   colors.accent.amber],
           ["32-bit","Float WAV",  colors.accent.cyan],
-          ["6","Repair Tools",    colors.accent.green],
-          ["11","Forensic Files", colors.accent.sky],
+          ["12","Repair Tools",    colors.accent.green],
+          ["29","DSP Files", colors.accent.sky],
         ].map(([v,l,c])=>(
           <div key={l} style={{background:colors.bg.surface,
             border:`1px solid ${colors.bg.border}`,
