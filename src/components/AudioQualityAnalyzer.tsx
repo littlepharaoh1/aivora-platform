@@ -18,6 +18,9 @@ import WaveformEditor from "./audio/WaveformEditor";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 import { trackEvent } from "../lib/tracking/activityTracker";
+import { classifyNoise, estimateRT60 } from "../lib/audioForensics/noiseFingerprinting";
+import { computeDNSMOSProxy, computeSISDR } from "../lib/audioEditor/audioMetrics";
+import { validateExport } from "../lib/audioEditor/exportValidator";
 import { useAuth } from "../lib/auth/AuthContext";
 
 function safeNum(v: number, decimals=1, fallback="—"): string {
