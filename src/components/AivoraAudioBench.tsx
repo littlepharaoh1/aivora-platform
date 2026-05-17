@@ -14,6 +14,8 @@ import type { BenchmarkTask, TaskOutput, AudioMetadata } from "../lib/audioBench
 import { buildTrainingExample, exportToJsonl, buildManifest } from "../lib/audioBench/trainingExport";
 import { benchAPI } from "../lib/api/aivoraAPI";
 import { supabase } from "../lib/supabase";
+import { benchAPI } from "../lib/api/aivoraAPI";
+import { supabase } from "../lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -302,6 +304,21 @@ export default function AivoraAudioBench() {
       };
 
       const result = await verifyTaskOutput(task, output);
+
+      // Save to Supabase bench_results
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if(session) {
+          await benchAPI.saveResult({
+            taskId:  task.id,
+            userId:  session.user.id,
+            score:   result.score,
+            passed:  result.passed,
+            grade:   result.grade,
+            hash:    result.reproducibilityHash,
+          });
+        }
+      } catch {}
 
       // Save to Supabase bench_results
       try {
