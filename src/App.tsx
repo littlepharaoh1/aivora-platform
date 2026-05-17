@@ -385,6 +385,17 @@ function ComingSoon({ title }:{ title:string }){
 function AppContent(){
   const [showLanding,setShowLanding]=useState(true);
   const [tab,setTab]=useState<Tab>("dashboard");
+
+  // Clear Supabase auth error params from URL
+  useEffect(()=>{
+    const url=new URL(window.location.href);
+    if(url.searchParams.has("error")){
+      url.searchParams.delete("error");
+      url.searchParams.delete("error_description");
+      url.searchParams.delete("error_code");
+      window.history.replaceState({},"",url.toString());
+    }
+  },[]);
   const { records, setRecords } = useAivora();
   const meta=TAB_META[tab];
 
