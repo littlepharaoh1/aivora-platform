@@ -327,7 +327,7 @@ export default function Documentation() {
 
   return (
     <div style={{ height:"100%", display:"flex", background:"#020608",
-      fontFamily:"'JetBrains Mono',monospace", color:"#a0c4cc", overflow:"hidden" }}>
+      fontFamily:"JetBrains Mono,monospace", color:"#a0c4cc", overflow:"hidden" }}>
 
       {/* Sidebar */}
       <div style={{ width:200, borderRight:"1px solid #0a1520", overflow:"auto",
