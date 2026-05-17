@@ -50,7 +50,6 @@ import ProfessionalAudioEditor     from "./components/ProfessionalAudioEditor";
 // Components — Manage
 import DspValidationDashboard from "./components/DspValidationDashboard";
 import StorePanel           from "./components/StorePanel";
-import ConversationRooms    from "./components/ConversationRooms";
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
@@ -68,7 +67,6 @@ type Tab =
   | "monitor"
   | "dsp_validation"
   | "store"
-  | "rooms"
   | "proeditor"
   | "audiobench"
   | "documentation"
@@ -94,7 +92,6 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   audiobench:     { title:"Audio Bench",                subtitle:"VERIFIER-BACKED FORENSIC BENCHMARK" },
   documentation:  { title:"Documentation",              subtitle:"PLATFORM REFERENCE & GUIDES" },
   conversations:  { title:"Conversation Rooms",          subtitle:"DUAL-TRACK PODCAST MIXER" },
-  rooms:          { title:"Conversation Rooms",       subtitle:"DUAL SPEAKER STEREO MERGE V8" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
@@ -118,7 +115,6 @@ const NAV_ITEMS = [
   { id:"audiobench",      icon:"dsp",          label:"Audio Bench",         group:"system"     },
   { id:"documentation",   icon:"info",         label:"Documentation",       group:"system"     },
   { id:"conversations",   icon:"rooms",        label:"Conv. Rooms",          group:"production" },
-  { id:"rooms",           icon:"rooms",        label:"Conversation Rooms",  group:"production" },
 ];
 
 const GROUP_LABELS = {
