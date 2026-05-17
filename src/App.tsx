@@ -9,6 +9,7 @@ import LoginPage from "./components/LoginPage";
 import AivoraAudioBench from "./components/AivoraAudioBench";
 import ActivityMonitor from "./components/ActivityMonitor";
 import DeliveryReadiness from "./components/DeliveryReadiness";
+import Documentation from "./components/Documentation";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
 
@@ -111,6 +112,7 @@ const NAV_ITEMS = [
   { id:"store",           icon:"store",        label:"Store",               group:"system"     },
   { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",          group:"repair"     },
   { id:"audiobench",      icon:"dsp",          label:"Audio Bench",         group:"system"     },
+  { id:"documentation",   icon:"info",         label:"Documentation",       group:"system"     },
   { id:"rooms",           icon:"rooms",        label:"Conversation Rooms",  group:"production" },
 ];
 
@@ -423,6 +425,7 @@ function AppContent(){
           {tab==="rooms"           && <ConversationRooms/>}
           {tab==="activitymonitor" && <ActivityMonitor/>}
           {tab==="delivery"       && <DeliveryReadiness/>}
+          {tab==="documentation"  && <Documentation/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"      && <ProfessionalAudioEditor/>}
         </div>
