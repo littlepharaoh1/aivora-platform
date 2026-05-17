@@ -7,8 +7,11 @@ interface AudioStats {
 }
 interface EnhancementSettings {
   normalize: boolean; targetPeakDb: number;
+  lufsNormalize: boolean; targetLufs: number;
   trimSilence: boolean; trimThresholdDb: number; trimPadMs: number;
   noiseGate: boolean; noiseGateThresholdDb: number; noiseGateAttackMs: number; noiseGateReleaseMs: number;
+  spectralDenoise: boolean; denoiseStrength: number;
+  multiBandComp: boolean; mbcRatio: number; mbcThresholdDb: number;
   deClick: boolean; deClickThreshold: number;
   highPassFilter: boolean; highPassFreq: number;
   lowPassFilter: boolean; lowPassFreq: number;
@@ -209,6 +212,9 @@ function Section({title,icon,children,enabled,onToggle,accent="#22d3ee"}:{title:
 
 const DEFAULT_SETTINGS: EnhancementSettings = {
   normalize:true, targetPeakDb:-3,
+  lufsNormalize:false, targetLufs:-23,
+  spectralDenoise:false, denoiseStrength:1.5,
+  multiBandComp:false, mbcRatio:3, mbcThresholdDb:-24,
   trimSilence:true, trimThresholdDb:-50, trimPadMs:50,
   noiseGate:true, noiseGateThresholdDb:-55, noiseGateAttackMs:10, noiseGateReleaseMs:100,
   deClick:true, deClickThreshold:0.3,
@@ -332,7 +338,31 @@ export default function AudioEnhancementLab() {
             <div style={{fontSize:12,color:"#a0c4cc"}}>{fileName||"Drop or click — WAV only"}</div>
           </div>
           <Section title="NORMALIZE" icon={<Volume2 size={13}/>} enabled={settings.normalize} onToggle={v=>set("normalize",v)}>
-            <Slider label="Target Peak" value={settings.targetPeakDb} min={-12} max={-1} unit=" dBFS" onChange={v=>set("targetPeakDb",v)} disabled={!settings.normalize}/>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+            <div onClick={()=>set("lufsNormalize",false)}
+              style={{flex:1,padding:"4px 8px",borderRadius:4,cursor:"pointer",
+                textAlign:"center",fontSize:9,
+                background:!settings.lufsNormalize?"#0EA5E922":"transparent",
+                color:!settings.lufsNormalize?"#0EA5E9":"#4a6a7a",
+                border:`1px solid ${!settings.lufsNormalize?"#0EA5E9":"#1a3a5a"}`}}>
+              Peak
+            </div>
+            <div onClick={()=>set("lufsNormalize",true)}
+              style={{flex:1,padding:"4px 8px",borderRadius:4,cursor:"pointer",
+                textAlign:"center",fontSize:9,
+                background:settings.lufsNormalize?"#0EA5E922":"transparent",
+                color:settings.lufsNormalize?"#0EA5E9":"#4a6a7a",
+                border:`1px solid ${settings.lufsNormalize?"#0EA5E9":"#1a3a5a"}`}}>
+              LUFS (ITU-R)
+            </div>
+          </div>
+          {settings.lufsNormalize ? (
+            <Slider label="Target LUFS" value={settings.targetLufs}
+              min={-35} max={-9} step={0.5} unit=" LUFS"
+              onChange={v=>set("targetLufs",v)}
+              disabled={!settings.normalize}/>
+          ) : null}
+          <Slider label="Target Peak" value={settings.targetPeakDb} min={-12} max={-1} unit=" dBFS" onChange={v=>set("targetPeakDb",v)} disabled={!settings.normalize}/>
           </Section>
           <Section title="SILENCE TRIM" icon={<Scissors size={13}/>} enabled={settings.trimSilence} onToggle={v=>set("trimSilence",v)}>
             <Slider label="Threshold" value={settings.trimThresholdDb} min={-70} max={-30} unit=" dBFS" onChange={v=>set("trimThresholdDb",v)} disabled={!settings.trimSilence}/>
