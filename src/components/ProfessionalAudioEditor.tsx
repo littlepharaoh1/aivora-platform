@@ -16,6 +16,11 @@ import { analyzeForensicSilence, drawForensicSilenceOverlay, ForensicSilenceRepo
 import { computeSpectralDensity, drawSpectralDensityOverlay, SpectralDensityData } from "../lib/audioEditor/spectralDensityMap";
 import { trackHarmonics, fingerPrintRoomTone, drawHarmonicOverlay, HarmonicFrame, RoomToneProfile } from "../lib/audioEditor/harmonicTracker";
 import { computeRepairComparison, drawRepairHeatmap, RepairComparisonData } from "../lib/audioEditor/repairComparison";
+import { timeline, TimelineEngine } from "../lib/audioEditor/timelineEngine";
+import { classifyNoise } from "../lib/audioForensics/noiseFingerprinting";
+import { computeDNSMOSProxy } from "../lib/audioEditor/audioMetrics";
+import { applyLookaheadLimiter } from "../lib/audioEditor/professionalDSP";
+import { workletManager } from "../lib/audioEditor/audioWorkletManager";
 import { WebGLRenderer } from "../lib/audioEditor/webglRenderer";
 
 // ── File List Item ────────────────────────────────────────────────────────────
