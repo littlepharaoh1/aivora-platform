@@ -434,7 +434,7 @@ function AppContent(){
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <ComingSoon title="Contributors"/>}
           {tab==="rooms"           && <ConversationRooms/>}
-          {tab==="activitymonitor" && <ActivityMonitor/>}
+          {tab==="monitor" && <ActivityMonitor/>}
           {tab==="readiness" && <DeliveryReadiness/>}
           {tab==="documentation"  && <Documentation/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
