@@ -1,310 +1,191 @@
 // @ts-nocheck
 /**
- * ActivityMonitor.tsx — Enterprise Admin Activity Dashboard
- * Aivora Platform — Real-time operational monitoring
+ * ActivityMonitor.tsx — Real-time Platform Activity Dashboard
+ * Pulls live data from Supabase processing_jobs + bench_results
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { useAuth } from "../lib/auth/AuthContext";
 
-const EVENT_COLORS = {
-  login_success:     "#10b981",
-  login_failed:      "#ef4444",
-  logout:            "#f59e0b",
-  file_uploaded:     "#22d3ee",
-  file_analyzed:     "#22d3ee",
-  batch_completed:   "#8b5cf6",
-  wav_exported:      "#10b981",
-  zip_exported:      "#10b981",
-  report_exported:   "#6366f1",
-  error_occurred:    "#ef4444",
-  crash_detected:    "#ef4444",
-  tab_opened:        "#4a8a9a",
-  repair_applied:    "#f59e0b",
-  naming_completed:  "#8b5cf6",
-};
-
-function timeAgo(ts: string): string {
-  const diff = Date.now() - new Date(ts).getTime();
-  const m = Math.floor(diff / 60000);
-  const h = Math.floor(diff / 3600000);
-  const d = Math.floor(diff / 86400000);
-  if (d > 0) return `${d}d ago`;
-  if (h > 0) return `${h}h ago`;
-  if (m > 0) return `${m}m ago`;
-  return "just now";
+interface Job {
+  id: string; file_name: string; status: string;
+  score: number; lufs: number; snr_db: number; created_at: string;
+}
+interface Stats {
+  total: number; passed: number; failed: number;
+  avgScore: number; avgLufs: number;
 }
 
-function StatCard({ label, value, color = "#22d3ee", sub = "" }) {
+function StatCard({ label, value, color }: { label:string; value:string|number; color:string }) {
   return (
-    <div style={{background:"#060e16",border:"1px solid #0f2a3a",
-      borderRadius:10,padding:"12px 16px",minWidth:100}}>
-      <div style={{fontSize:22,fontWeight:900,color,fontFamily:"monospace"}}>{value}</div>
-      <div style={{fontSize:9,color:"#4a8a9a",marginTop:2}}>{label}</div>
-      {sub && <div style={{fontSize:8,color:"#2a5a6a",marginTop:1}}>{sub}</div>}
+    <div style={{ background:"#050d18", border:`1px solid ${color}30`,
+      borderTop:`2px solid ${color}`, borderRadius:8, padding:"10px 14px" }}>
+      <div style={{ fontSize:20, fontWeight:700, color }}>{value}</div>
+      <div style={{ fontSize:8, color:"#4a6a7a", letterSpacing:1 }}>{label}</div>
     </div>
   );
 }
 
 export default function ActivityMonitor() {
-  const { user, isAdmin } = useAuth();
-  const [logs,       setLogs]       = useState([]);
-  const [stats,      setStats]      = useState({
-    total:0, logins:0, files:0, exports:0, errors:0, sessions:0
-  });
-  const [filter,     setFilter]     = useState({ module:"", eventType:"", user:"" });
-  const [loading,    setLoading]    = useState(true);
-  const [autoRefresh,setAutoRefresh]= useState(true);
+  const [jobs,    setJobs]    = useState<Job[]>([]);
+  const [stats,   setStats]   = useState<Stats>({ total:0,passed:0,failed:0,avgScore:0,avgLufs:0 });
+  const [loading, setLoading] = useState(true);
+  const [filter,  setFilter]  = useState<"all"|"done"|"failed">("all");
 
-  const fetchLogs = useCallback(async () => {
+  async function fetchData() {
     setLoading(true);
     try {
-      let query = supabase
-        .from("activity_logs")
+      const { data } = await supabase
+        .from("processing_jobs")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(100);
 
-      if (filter.module)    query = query.eq("module", filter.module);
-      if (filter.eventType) query = query.eq("event_type", filter.eventType);
-      if (filter.user)      query = query.ilike("user_email", `%${filter.user}%`);
+      const jobs = data ?? [];
+      setJobs(jobs);
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const logs = data || [];
-      setLogs(logs);
-
-      // Compute stats
-      const today = new Date().toDateString();
+      const passed   = jobs.filter((j:Job) => j.status === "done").length;
+      const failed   = jobs.filter((j:Job) => j.status === "failed").length;
+      const scores   = jobs.filter((j:Job) => j.score > 0).map((j:Job) => j.score);
+      const lufsArr  = jobs.filter((j:Job) => j.lufs && j.lufs > -100).map((j:Job) => j.lufs);
       setStats({
-        total:    logs.length,
-        logins:   logs.filter(l => l.event_type === "login_success").length,
-        files:    logs.filter(l => ["file_uploaded","file_analyzed"].includes(l.event_type)).length,
-        exports:  logs.filter(l => ["wav_exported","zip_exported","report_exported"].includes(l.event_type)).length,
-        errors:   logs.filter(l => ["error_occurred","crash_detected"].includes(l.event_type)).length,
-        sessions: new Set(logs.map(l => l.session_id)).size,
+        total:    jobs.length,
+        passed,   failed,
+        avgScore: scores.length  ? Math.round(scores.reduce((a:number,b:number)=>a+b)/scores.length) : 0,
+        avgLufs:  lufsArr.length ? Math.round(lufsArr.reduce((a:number,b:number)=>a+b)/lufsArr.length*10)/10 : 0,
       });
-    } catch(e) {
-      console.error("ActivityMonitor:", e);
-    }
+    } catch(e) { console.error(e); }
     setLoading(false);
-  }, [filter]);
+  }
 
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    fetchData();
+    // Realtime subscription
+    const sub = supabase
+      .channel("jobs_changes")
+      .on("postgres_changes", { event:"*", schema:"public", table:"processing_jobs" },
+        () => fetchData())
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, []);
 
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const interval = setInterval(fetchLogs, 30000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, fetchLogs]);
-
-  if (!isAdmin) return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",
-      height:"100%",fontFamily:"monospace",color:"#ef4444",fontSize:12}}>
-      ⛔ Admin access required
-    </div>
+  const filtered = jobs.filter(j =>
+    filter === "all" ? true : j.status === filter
   );
 
-  const uniqueModules   = [...new Set(logs.map(l => l.module).filter(Boolean))];
-  const uniqueEvents    = [...new Set(logs.map(l => l.event_type).filter(Boolean))];
-  const uniqueUsers     = [...new Set(logs.map(l => l.user_email).filter(Boolean))];
+  const statusColor = (s:string) =>
+    s==="done"?"#10B981":s==="failed"?"#EF4444":s==="running"?"#F59E0B":"#4a6a7a";
 
   return (
-    <div style={{background:"#040c14",minHeight:"100%",fontFamily:"monospace",color:"#a0c4cc"}}>
+    <div style={{ height:"100%", overflow:"auto", background:"#020608",
+      fontFamily:"'JetBrains Mono',monospace", color:"#a0c4cc", padding:16 }}>
 
       {/* Header */}
-      <div style={{background:"linear-gradient(135deg,#060e18,#071a18)",
-        borderBottom:"1px solid #0f2a3a",padding:"14px 18px",
-        display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"#ef444422",
-            border:"1px solid #ef444444",display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:16}}>👁</div>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:"#e0f2f8",letterSpacing:1}}>
-              ACTIVITY MONITOR
-            </div>
-            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:2}}>
-              ENTERPRISE AUDIT · ADMIN ONLY
-            </div>
-          </div>
+      <div style={{ marginBottom:16 }}>
+        <div style={{ fontSize:9, color:"#2a6a8a", letterSpacing:3, marginBottom:4 }}>
+          ACTIVITY MONITOR
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <div onClick={()=>setAutoRefresh(!autoRefresh)}
-            style={{fontSize:9,padding:"4px 10px",borderRadius:6,cursor:"pointer",
-              background:autoRefresh?"#10b98122":"#0f2a3a",
-              border:"1px solid "+(autoRefresh?"#10b98144":"#1e3a5f"),
-              color:autoRefresh?"#10b981":"#4a8a9a",fontWeight:700}}>
-            {autoRefresh?"⟳ AUTO":"⟳ OFF"}
-          </div>
-          <button onClick={fetchLogs}
-            style={{fontSize:9,padding:"4px 10px",borderRadius:6,cursor:"pointer",
-              background:"#22d3ee22",border:"1px solid #22d3ee44",
-              color:"#22d3ee",fontWeight:700}}>
-            Refresh
-          </button>
+        <div style={{ fontSize:18, fontWeight:700, color:"#E2EEF6" }}>
+          Platform Activity
+        </div>
+        <div style={{ fontSize:10, color:"#4a6a7a", marginTop:2 }}>
+          Real-time processing jobs • Supabase live updates
         </div>
       </div>
 
-      <div style={{padding:14,display:"flex",flexDirection:"column",gap:12}}>
+      {/* Stats */}
+      <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
+        <StatCard label="Total Jobs"  value={stats.total}   color="#0EA5E9"/>
+        <StatCard label="Passed"      value={stats.passed}  color="#10B981"/>
+        <StatCard label="Failed"      value={stats.failed}  color="#EF4444"/>
+        <StatCard label="Avg Score"   value={stats.avgScore>0?`${stats.avgScore}/100`:"—"} color="#F59E0B"/>
+        <StatCard label="Avg LUFS"    value={stats.avgLufs!==0?`${stats.avgLufs}`:"—"} color="#8B5CF6"/>
+        <StatCard label="Pass Rate"   value={stats.total>0?`${Math.round(stats.passed/stats.total*100)}%`:"—"} color="#22d3ee"/>
+      </div>
 
-        {/* Stats */}
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <StatCard label="Total Events"  value={stats.total}    color="#22d3ee"/>
-          <StatCard label="Logins"        value={stats.logins}   color="#10b981"/>
-          <StatCard label="Files"         value={stats.files}    color="#8b5cf6"/>
-          <StatCard label="Exports"       value={stats.exports}  color="#f59e0b"/>
-          <StatCard label="Errors"        value={stats.errors}   color="#ef4444"/>
-          <StatCard label="Sessions"      value={stats.sessions} color="#6366f1"/>
-          <StatCard label="Unique Users"  value={uniqueUsers.length} color="#22d3ee"/>
-        </div>
-
-        {/* Filters */}
-        <div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:10,padding:12}}>
-          <div style={{fontSize:9,color:"#4a8a9a",marginBottom:8,letterSpacing:1}}>FILTERS</div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <select value={filter.module}
-              onChange={e=>setFilter(f=>({...f,module:e.target.value}))}
-              style={{background:"#050d14",border:"1px solid #0f2a3a",borderRadius:6,
-                padding:"5px 8px",color:"#a0c4cc",fontSize:10,fontFamily:"monospace"}}>
-              <option value="">All Modules</option>
-              {uniqueModules.map(m=><option key={m} value={m}>{m}</option>)}
-            </select>
-            <select value={filter.eventType}
-              onChange={e=>setFilter(f=>({...f,eventType:e.target.value}))}
-              style={{background:"#050d14",border:"1px solid #0f2a3a",borderRadius:6,
-                padding:"5px 8px",color:"#a0c4cc",fontSize:10,fontFamily:"monospace"}}>
-              <option value="">All Events</option>
-              {uniqueEvents.map(e=><option key={e} value={e}>{e}</option>)}
-            </select>
-            <input placeholder="Filter by email..."
-              value={filter.user}
-              onChange={e=>setFilter(f=>({...f,user:e.target.value}))}
-              style={{background:"#050d14",border:"1px solid #0f2a3a",borderRadius:6,
-                padding:"5px 8px",color:"#a0c4cc",fontSize:10,fontFamily:"monospace",
-                minWidth:160}}/>
-            <button onClick={()=>setFilter({module:"",eventType:"",user:""})}
-              style={{background:"#0f2a3a",border:"1px solid #1e3a5f",borderRadius:6,
-                padding:"5px 10px",cursor:"pointer",color:"#94a3b8",fontSize:9}}>
-              Clear
-            </button>
+      {/* Filter */}
+      <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+        {(["all","done","failed"] as const).map(f => (
+          <div key={f} onClick={()=>setFilter(f)}
+            style={{ fontSize:9, padding:"4px 10px", borderRadius:4, cursor:"pointer",
+              background:filter===f?"#0EA5E922":"transparent",
+              color:filter===f?"#0EA5E9":"#2a5a6a",
+              border:`1px solid ${filter===f?"#0EA5E9":"#1a3a5a"}` }}>
+            {f.toUpperCase()} ({f==="all"?jobs.length:jobs.filter(j=>j.status===f).length})
           </div>
+        ))}
+        <button onClick={fetchData}
+          style={{ marginLeft:"auto", fontSize:9, padding:"4px 10px", borderRadius:4,
+            background:"transparent", border:"1px solid #1a3a5a",
+            color:"#4a6a7a", cursor:"pointer", fontFamily:"inherit" }}>
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Jobs Table */}
+      {loading ? (
+        <div style={{ fontSize:10, color:"#2a5a6a", padding:20, textAlign:"center" }}>
+          Loading...
         </div>
-
-        {/* Events Table */}
-        <div style={{background:"#060e16",border:"1px solid #0f2a3a",
-          borderRadius:12,overflow:"hidden"}}>
-          <div style={{display:"grid",
-            gridTemplateColumns:"140px 1fr 80px 100px 90px 70px",
-            padding:"8px 12px",borderBottom:"1px solid #0f2a3a",background:"#050d14"}}>
-            {["EVENT","USER","MODULE","DEVICE","OS","TIME"].map(h=>(
-              <div key={h} style={{fontSize:8,color:"#4a8a9a"}}>{h}</div>
-            ))}
-          </div>
-
-          {loading ? (
-            <div style={{padding:24,textAlign:"center",color:"#4a8a9a",fontSize:10}}>
-              Loading events...
-            </div>
-          ) : logs.length === 0 ? (
-            <div style={{padding:24,textAlign:"center",color:"#4a8a9a",fontSize:10}}>
-              No events found
-            </div>
-          ) : (
-            <div style={{maxHeight:500,overflowY:"auto"}}>
-              {logs.map((log,i)=>{
-                const ec = EVENT_COLORS[log.event_type] || "#4a8a9a";
-                return (
-                  <div key={log.id||i} style={{display:"grid",
-                    gridTemplateColumns:"140px 1fr 80px 100px 90px 70px",
-                    padding:"7px 12px",borderBottom:"1px solid #0a1a24",
-                    background:i%2===0?"#060e16":"#050d14",alignItems:"center"}}>
-                    {/* Event */}
-                    <div>
-                      <span style={{fontSize:8,color:ec,background:ec+"22",
-                        padding:"1px 5px",borderRadius:3,fontWeight:700}}>
-                        {log.event_type?.replace(/_/g," ").toUpperCase()}
-                      </span>
-                    </div>
-                    {/* User */}
-                    <div style={{fontSize:9,color:"#a0c4cc",overflow:"hidden",
-                      textOverflow:"ellipsis",whiteSpace:"nowrap",paddingRight:8}}
-                      title={log.user_email}>
-                      {log.user_email || "—"}
-                      {log.role && <span style={{fontSize:7,color:"#4a8a9a",
-                        marginLeft:4}}>({log.role})</span>}
-                    </div>
-                    {/* Module */}
-                    <div style={{fontSize:9,color:"#4a8a9a"}}>{log.module||"—"}</div>
-                    {/* Device */}
-                    <div style={{fontSize:9,color:"#4a8a9a",overflow:"hidden",
-                      textOverflow:"ellipsis",whiteSpace:"nowrap"}}
-                      title={log.device_type}>
-                      {log.device_type||"—"}
-                    </div>
-                    {/* OS */}
-                    <div style={{fontSize:9,color:"#4a8a9a",overflow:"hidden",
-                      textOverflow:"ellipsis",whiteSpace:"nowrap"}}
-                      title={log.os}>
-                      {log.os||"—"}
-                    </div>
-                    {/* Time */}
-                    <div style={{fontSize:9,color:"#2a5a6a"}}
-                      title={new Date(log.created_at).toLocaleString()}>
-                      {timeAgo(log.created_at)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      ) : filtered.length === 0 ? (
+        <div style={{ fontSize:10, color:"#2a5a6a", padding:20, textAlign:"center",
+          border:"1px solid #0a1520", borderRadius:8 }}>
+          No jobs yet. Process audio files to see activity here.
         </div>
-
-        {/* Session Timeline */}
-        {logs.length > 0 && (
-          <div style={{background:"#060e16",border:"1px solid #0f2a3a",
-            borderRadius:12,padding:14}}>
-            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:10}}>
-              TOP USERS BY ACTIVITY
-            </div>
-            {Object.entries(
-              logs.reduce((acc, l) => {
-                const k = l.user_email || "anonymous";
-                if (!acc[k]) acc[k] = { count:0, lastSeen:"", role:"" };
-                acc[k].count++;
-                if (!acc[k].lastSeen || l.created_at > acc[k].lastSeen)
-                  acc[k].lastSeen = l.created_at;
-                acc[k].role = l.role || "";
-                return acc;
-              }, {} as Record<string,{count:number,lastSeen:string,role:string}>)
-            )
-            .sort((a,b) => b[1].count - a[1].count)
-            .slice(0,5)
-            .map(([email, data], i) => (
-              <div key={email} style={{display:"flex",alignItems:"center",
-                gap:10,marginBottom:8}}>
-                <div style={{fontSize:9,color:"#4a8a9a",minWidth:16}}>{i+1}</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:10,color:"#a0c4cc"}}>{email}</div>
-                  <div style={{height:3,background:"#0f2a3a",borderRadius:2,marginTop:3}}>
-                    <div style={{height:"100%",borderRadius:2,background:"#22d3ee",
-                      width:`${Math.min(100,(data.count/logs.length)*100*3)}%`}}/>
-                  </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+          {filtered.map(job => (
+            <div key={job.id} style={{
+              background:"#050d18", border:"1px solid #0f2030",
+              borderLeft:`3px solid ${statusColor(job.status)}`,
+              borderRadius:8, padding:"10px 12px",
+              display:"flex", alignItems:"center", gap:12, flexWrap:"wrap",
+            }}>
+              <div style={{ flex:1, minWidth:120 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#E2EEF6",
+                  marginBottom:2, wordBreak:"break-all" }}>
+                  {job.file_name}
                 </div>
-                <div style={{fontSize:9,color:"#22d3ee",fontWeight:700,minWidth:30}}>
-                  {data.count}
-                </div>
-                <div style={{fontSize:8,color:"#4a8a9a",minWidth:50}}>
-                  {timeAgo(data.lastSeen)}
+                <div style={{ fontSize:8, color:"#2a5a6a" }}>
+                  {new Date(job.created_at).toLocaleString()}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                <span style={{ fontSize:8, padding:"2px 8px", borderRadius:4,
+                  background:`${statusColor(job.status)}20`,
+                  color:statusColor(job.status),
+                  border:`1px solid ${statusColor(job.status)}40` }}>
+                  {job.status.toUpperCase()}
+                </span>
+                {job.score > 0 && (
+                  <span style={{ fontSize:8, padding:"2px 8px", borderRadius:4,
+                    background:"#F59E0B20", color:"#F59E0B",
+                    border:"1px solid #F59E0B40" }}>
+                    {job.score}/100
+                  </span>
+                )}
+                {job.lufs && job.lufs > -100 && (
+                  <span style={{ fontSize:8, padding:"2px 8px", borderRadius:4,
+                    background:"#8B5CF620", color:"#8B5CF6",
+                    border:"1px solid #8B5CF640" }}>
+                    {job.lufs.toFixed(1)} LUFS
+                  </span>
+                )}
+                {job.snr_db > 0 && (
+                  <span style={{ fontSize:8, padding:"2px 8px", borderRadius:4,
+                    background:"#0EA5E920", color:"#0EA5E9",
+                    border:"1px solid #0EA5E940" }}>
+                    {job.snr_db.toFixed(1)}dB SNR
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
+      <div style={{ marginTop:16, padding:"10px 0", borderTop:"1px solid #0a1520",
+        fontSize:8, color:"#1a3a5a", letterSpacing:1 }}>
+        AIVORA ACTIVITY MONITOR · SUPABASE REALTIME · LIVE
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import NavIcon, { GROUP_COLORS } from "./components/ui/NavIcon";
 import LoginPage from "./components/LoginPage";
 import AivoraAudioBench from "./components/AivoraAudioBench";
+import ActivityMonitor from "./components/ActivityMonitor";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
 
@@ -419,6 +420,7 @@ function AppContent(){
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <ComingSoon title="Contributors"/>}
           {tab==="rooms"           && <ConversationRooms/>}
+          {tab==="activitymonitor" && <ActivityMonitor/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"      && <ProfessionalAudioEditor/>}
         </div>
