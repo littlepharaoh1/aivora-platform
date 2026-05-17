@@ -10,6 +10,7 @@ import AivoraAudioBench from "./components/AivoraAudioBench";
 import ActivityMonitor from "./components/ActivityMonitor";
 import DeliveryReadiness from "./components/DeliveryReadiness";
 import Documentation from "./components/Documentation";
+import ConversationRooms from "./components/ConversationRooms";
 import { supabase } from "./lib/supabase";
 import "./styles.css";
 
@@ -70,7 +71,8 @@ type Tab =
   | "rooms"
   | "proeditor"
   | "audiobench"
-  | "documentation";
+  | "documentation"
+  | "conversations";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -91,6 +93,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   proeditor:      { title:"Professional Editor",       subtitle:"ADOBE-STYLE FULL SCREEN EDITOR" },
   audiobench:     { title:"Audio Bench",                subtitle:"VERIFIER-BACKED FORENSIC BENCHMARK" },
   documentation:  { title:"Documentation",              subtitle:"PLATFORM REFERENCE & GUIDES" },
+  conversations:  { title:"Conversation Rooms",          subtitle:"DUAL-TRACK PODCAST MIXER" },
   rooms:          { title:"Conversation Rooms",       subtitle:"DUAL SPEAKER STEREO MERGE V8" },
 };
 
@@ -114,6 +117,7 @@ const NAV_ITEMS = [
   { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",          group:"repair"     },
   { id:"audiobench",      icon:"dsp",          label:"Audio Bench",         group:"system"     },
   { id:"documentation",   icon:"info",         label:"Documentation",       group:"system"     },
+  { id:"conversations",   icon:"rooms",        label:"Conv. Rooms",          group:"production" },
   { id:"rooms",           icon:"rooms",        label:"Conversation Rooms",  group:"production" },
 ];
 
@@ -437,6 +441,7 @@ function AppContent(){
           {tab==="monitor" && <ActivityMonitor/>}
           {tab==="readiness" && <DeliveryReadiness/>}
           {tab==="documentation"  && <Documentation/>}
+          {tab==="conversations"  && <ConversationRooms/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"      && <ProfessionalAudioEditor/>}
         </div>
