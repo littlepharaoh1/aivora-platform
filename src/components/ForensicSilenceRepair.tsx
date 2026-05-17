@@ -19,6 +19,8 @@ import type { ReferenceSilenceProfile, AdobeQAResult } from "../lib/audioForensi
 import type { GateResult } from "../lib/audioForensics/adobeGate";
 import type { BatchReworkReport, BatchReworkProgress } from "../lib/audioForensics/batchSilenceRework";
 import type { SpeechPreservationResult } from "../lib/audioForensics/speechPreservation";
+import { classifyNoise, estimateRT60 } from "../lib/audioForensics/noiseFingerprinting";
+import { computeFullQualityReport } from "../lib/audioEditor/audioMetrics";
 
 // ── Mini Components ───────────────────────────────────────────────────────────
 
