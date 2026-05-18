@@ -125,6 +125,7 @@ function mixTracks(
   segmentsA: SpeechSegment[],
   segmentsB: SpeechSegment[]
 ): { left: Float32Array; right: Float32Array; mono: Float32Array } {
+  // Smart interleaving: if segments overlap, duck the other speaker
   const len   = Math.max(trackA.length, trackB.length);
   const left  = new Float32Array(len);
   const right = new Float32Array(len);

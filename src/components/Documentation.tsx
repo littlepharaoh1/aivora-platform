@@ -24,13 +24,35 @@ Built for: TTS dataset teams, ASR researchers, audio QA engineers, AI companies.
       },
       {
         title: "Quick Start",
-        content: `1. Open Platform → Dashboard
-2. Choose your tool from Quick Access cards
-3. Drop a WAV file (48kHz, 32-bit float recommended)
-4. View analysis results and metrics
-5. Export repaired audio
+        content: `HOW TO USE AIVORA — Step by Step
 
-Supported formats: WAV (PCM16, PCM24, Float32), MP3, AAC (via browser decoder)`
+STEP 1: Upload your audio
+→ Every tool has a drag-and-drop area or "Upload WAV" button
+→ Supported: WAV (PCM16, PCM24, Float32), MP3, AAC
+→ Recommended: 48kHz, 32-bit float WAV
+
+STEP 2: Choose your tool
+→ QC Workstation     — check audio quality metrics
+→ Forensic Repair    — fix silence problems
+→ Enhancement Lab    — improve audio quality
+→ Delivery Readiness — validate before delivery
+→ Audio Bench        — benchmark & score your audio
+→ Conv. Rooms        — mix 2-speaker conversations
+
+STEP 3: Process
+→ Each tool shows results immediately after upload
+→ Adjust settings if needed
+→ Click the main action button (Run / Process / Mix)
+
+STEP 4: Export
+→ Download button appears after processing
+→ Output is always 32-bit float WAV at 48kHz
+→ Results are saved to Activity Monitor automatically
+
+TIPS:
+→ Start with Delivery Readiness to check any file
+→ Use Quality Tier selector in Forensic Repair for your use case
+→ Check Activity Monitor to track all processed files`
       },
     ]
   },
@@ -40,7 +62,20 @@ Supported formats: WAV (PCM16, PCM24, Float32), MP3, AAC (via browser decoder)`
     items: [
       {
         title: "QC Workstation",
-        content: `Professional audio quality control with 13 DSP phases.
+        content: `HOW TO USE:
+1. Click "Upload" or drag a WAV file
+2. Wait for automatic analysis (2-5 seconds)
+3. Read the metrics:
+   → LUFS: loudness level (-23 = broadcast standard)
+   → SNR: signal-to-noise ratio (higher = cleaner)
+   → True Peak: maximum peak (-1.0 dBTP = safe limit)
+   → RT60: room reverb time (lower = cleaner room)
+   → DNSMOS: AI quality score (1-5, higher = better)
+   → Noise Class: what type of noise is detected
+   → Export Safe: green = ready to deliver, red = fix needed
+
+WHAT IT DOES:
+Professional audio quality control with 30+ DSP modules.
 
 Metrics computed:
 - LUFS (ITU-R BS.1770-4 integrated, short-term, momentary)

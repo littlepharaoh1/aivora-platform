@@ -25,26 +25,32 @@ export default function StorePanel() {
 
   async function quickProcess(record: any, target: string) {
     setProcessing(record.id);
-    try {
-      const input = document.createElement("input");
-      input.type="file"; input.accept=".wav";
-      input.onchange = async (e: any) => {
-        const file = e.target.files?.[0];
-        if(!file) return;
+    // Open file picker for this record
+    const input = document.createElement("input");
+    input.type="file"; input.accept=".wav";
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if(!file) { setProcessing(null); return; }
+      try {
         const ab  = await file.arrayBuffer();
         const ctx = new AudioContext();
         const buf = await ctx.decodeAudioData(ab);
-        const result = await runUnifiedPipeline(buf, { target: target as any });
-        // Download result
+        const result = await runUnifiedPipeline(buf,
+          { target: target as any },
+          (pct, stage) => console.log(`${pct}% ${stage}`)
+        );
         const wav = encodeWav(result.output, result.sampleRate);
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(wav);
-        a.download = `${file.name.replace(".wav","")}_${target}.wav`;
+        const a   = document.createElement("a");
+        a.href    = URL.createObjectURL(wav);
+        a.download= `${file.name.replace(".wav","")}_${target}_processed.wav`;
         a.click();
-      };
-      input.click();
-    } catch(e) { console.error(e); }
-    setProcessing(null);
+        await ctx.close();
+      } catch(err: any) {
+        alert(`Processing failed: ${err.message}`);
+      }
+      setProcessing(null);
+    };
+    input.click();
   }
 
   function encodeWav(data: Float32Array, sr: number): Blob {
