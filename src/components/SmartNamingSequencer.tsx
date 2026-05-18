@@ -53,18 +53,17 @@ export default function SmartNamingSequencer() {
       // Alternative: use public folder export
       const exportUrl = `https://drive.google.com/drive/folders/${folderId}`;
 
-      // Fetch file list from public folder
-      const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType,size)&orderBy=name`,
-        { headers: { Accept: "application/json" } }
-      );
+      // Fetch file list via Aivora Drive Proxy (Google Apps Script)
+      const PROXY_URL = "https://script.google.com/macros/s/AKfycbz1MC9q3fTd1xLj_ZikQmfEMa4RAAiAWas_ORtnImo2wmM4yIGBWRBvvSwXJKTttphoQA/exec";
+      const res = await fetch(`${PROXY_URL}?folderId=${folderId}`);
 
-      if(!res.ok) throw new Error("مش قادر يوصل للـ folder — تأكد إنه Public");
+      if(!res.ok) throw new Error("مش قادر يوصل للـ folder");
 
       const data = await res.json();
+      if(data.error) throw new Error(data.error);
+
       const wavFiles = (data.files ?? []).filter(
-        (f: any) => f.name?.toLowerCase().endsWith(".wav") ||
-                    f.mimeType?.includes("audio")
+        (f: any) => f.name?.toLowerCase().endsWith(".wav")
       );
 
       if(wavFiles.length === 0) {
@@ -75,12 +74,13 @@ export default function SmartNamingSequencer() {
       // Download each WAV file
       const downloaded: File[] = [];
       for(const f of wavFiles) {
-        const downloadUrl = `https://drive.google.com/uc?export=download&id=${f.id}`;
-        const fileRes = await fetch(downloadUrl);
-        if(!fileRes.ok) continue;
-        const blob = await fileRes.blob();
-        const file = new File([blob], f.name, { type: "audio/wav" });
-        downloaded.push(file);
+        try {
+          const fileRes = await fetch(f.url ?? `https://drive.google.com/uc?export=download&id=${f.id}`);
+          if(!fileRes.ok) continue;
+          const blob = await fileRes.blob();
+          const file = new File([blob], f.name, { type: "audio/wav" });
+          downloaded.push(file);
+        } catch { continue; }
       }
 
       if(downloaded.length === 0) {
