@@ -373,6 +373,36 @@ export default function AudioEnhancementLab() {
             <Slider label="Attack ms" value={settings.noiseGateAttackMs} min={1} max={100} unit="ms" onChange={v=>set("noiseGateAttackMs",v)} disabled={!settings.noiseGate}/>
             <Slider label="Release ms" value={settings.noiseGateReleaseMs} min={10} max={500} unit="ms" onChange={v=>set("noiseGateReleaseMs",v)} disabled={!settings.noiseGate}/>
           </Section>
+          <Section title="SPECTRAL DENOISE" icon={<Activity size={13}/>}
+            accent="#8B5CF6"
+            enabled={settings.spectralDenoise}
+            onToggle={v=>set("spectralDenoise",v)}>
+            <Slider label="Strength" value={settings.denoiseStrength}
+              min={0.5} max={3} step={0.1} unit="x"
+              onChange={v=>set("denoiseStrength",v)}
+              disabled={!settings.spectralDenoise}/>
+            <div style={{fontSize:9,color:"#4a6a7a",marginTop:4,lineHeight:1.5}}>
+              Wiener filter · Estimates noise from first 200ms
+            </div>
+          </Section>
+
+          <Section title="MULTI-BAND COMP" icon={<Activity size={13}/>}
+            accent="#F59E0B"
+            enabled={settings.multiBandComp}
+            onToggle={v=>set("multiBandComp",v)}>
+            <Slider label="Ratio" value={settings.mbcRatio}
+              min={1.5} max={8} step={0.5} unit=":1"
+              onChange={v=>set("mbcRatio",v)}
+              disabled={!settings.multiBandComp}/>
+            <Slider label="Threshold" value={settings.mbcThresholdDb}
+              min={-40} max={-6} step={1} unit=" dBFS"
+              onChange={v=>set("mbcThresholdDb",v)}
+              disabled={!settings.multiBandComp}/>
+            <div style={{fontSize:9,color:"#4a6a7a",marginTop:4,lineHeight:1.5}}>
+              4 bands · 200Hz / 1kHz / 4kHz crossovers
+            </div>
+          </Section>
+
           <Section title="DE-CLICK" icon={<Zap size={13}/>} enabled={settings.deClick} onToggle={v=>set("deClick",v)}>
             <Slider label="Sensitivity" value={Math.round(settings.deClickThreshold*100)} min={10} max={80} unit="%" onChange={v=>set("deClickThreshold",v/100)} disabled={!settings.deClick}/>
           </Section>
