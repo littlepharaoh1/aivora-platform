@@ -429,14 +429,15 @@ function AppContent(){
           {tab==="naming"          && <SmartNamingSequencer/>}
           {tab==="enhancement"     && <AudioEnhancementLab/>}
           {tab==="pipeline"        && <AudioPipeline/>}
-          {tab==="readiness"       && <DeliveryReadinessScore records={records} setRecords={setRecords}/>}
-          {tab==="forensic_repair" && <ForensicSilenceRepair/>}
+          {tab==="readiness_old" && <DeliveryReadinessScore/>}
+                    {tab==="forensic_repair" && <ForensicSilenceRepair/>}
           {tab==="dsp_validation"  && <DspValidationDashboard/>}
           {tab==="store"           && <StorePanel/>}
-          {tab==="contributors"    && <ComingSoon title="Contributors"/>}
+          {tab==="contributors"    && <Contributors/>}
+          {tab==="readiness"       && <DeliveryReadiness/>}
           {tab==="rooms"           && <ConversationRooms/>}
           {tab==="monitor" && <ActivityMonitor/>}
-          {tab==="readiness" && <DeliveryReadiness/>}
+          {tab==="readiness_old" && <DeliveryReadinessScore/>}
           {tab==="documentation"  && <Documentation/>}
           {tab==="conversations"  && <ConversationRooms/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
