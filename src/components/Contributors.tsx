@@ -43,7 +43,10 @@ export default function Contributors() {
 
   useEffect(() => {
     fetchProfiles();
-    supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user));
+    // Use getSession instead of getUser to avoid redirect
+    supabase.auth.getSession().then(({ data }) => {
+      setCurrentUser(data.session?.user ?? null);
+    });
 
     const sub = supabase
       .channel("profiles_changes")
@@ -56,12 +59,12 @@ export default function Contributors() {
   async function fetchProfiles() {
     setLoading(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .order("created_at", { ascending:false });
-      setProfiles(data ?? []);
-    } catch(e) { console.error(e); }
+      if(!error) setProfiles(data ?? []);
+    } catch(e) { console.warn("Profiles fetch:", e); }
     setLoading(false);
   }
 
