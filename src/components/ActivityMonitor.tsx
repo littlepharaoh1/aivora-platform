@@ -34,11 +34,22 @@ export default function ActivityMonitor() {
   async function fetchData() {
     setLoading(true);
     try {
-      const { data } = await supabase
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+
+      let query = supabase
         .from("processing_jobs")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
+
+      // Non-owners see only their own jobs
+      if(session?.user?.email !== "zikaaaa460@gmail.com" &&
+         session?.user?.email !== "aivoraailtduk@gmail.com") {
+        query = query.eq("user_id", session?.user?.id ?? "none");
+      }
+
+      const { data } = await query;
 
       const jobs = data ?? [];
       setJobs(jobs);
