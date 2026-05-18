@@ -35,7 +35,7 @@ export interface GateResult {
 
 // ── Quality Tiers ─────────────────────────────────────────────────────────────
 // Tier 1: Broadcast/TTS — strictest (EBU R128 + iZotope standards)
-// Tier 2: ASR/Dataset   — standard (Appen/Scale AI standards)
+// Tier 2: ASR/Dataset   — standard (Industry dataset standards)
 // Tier 3: Podcast/Gen   — relaxed (general production standards)
 
 export type QualityTier = "broadcast" | "dataset" | "general";
@@ -64,7 +64,7 @@ export const QUALITY_TIERS: Record<QualityTier, {
   },
   dataset: {
     label:                 "ASR / Dataset",
-    description:           "Standard — Appen/Scale AI standards. For ASR training, voice datasets, annotation projects.",
+    description:           "Standard — Industry dataset standards. For ASR training, voice datasets, annotation projects.",
     color:                 "#F59E0B",
     silenceRealismMin:     0.75,
     speechPreservationMin: 0.93,

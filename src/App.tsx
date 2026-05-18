@@ -79,7 +79,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   dashboard:      { title:"Dashboard",               subtitle:"AIVORA PLATFORM OVERVIEW" },
   qc:             { title:"QC Workstation",           subtitle:"AUDIO QUALITY CONTROL" },
   batch:          { title:"Batch Analyzer",           subtitle:"MULTI-FILE QC PROCESSING" },
-  naming:         { title:"Smart Naming",             subtitle:"GERMAN APPEN SEQUENCER S0001–S0200" },
+  naming:         { title:"Smart Naming",             subtitle:"SMART SEQUENCER S0001–S0200" },
   enhancement:    { title:"Enhancement Lab",          subtitle:"AUDIO REPAIR & ENHANCEMENT" },
   pipeline:       { title:"Audio Pipeline",           subtitle:"END-TO-END PROCESSING" },
   readiness:      { title:"Delivery Readiness",       subtitle:"QC SCORE & COMPLIANCE" },
@@ -272,7 +272,7 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
   const cards=[
     { icon:"qc", label:"QC Workstation",    sub:"Analyze audio quality",     tab:"qc"             as Tab, color:colors.accent.sky    },
     { icon:"batch", label:"Batch Analyzer",    sub:"Process 200+ files",        tab:"batch"          as Tab, color:colors.accent.purple },
-    { icon:"naming", label:"Smart Naming",      sub:"German Appen S0001–S0200",  tab:"naming"         as Tab, color:colors.accent.cyan   },
+    { icon:"naming", label:"Smart Naming",      sub:"Smart Seq S0001–S0200",  tab:"naming"         as Tab, color:colors.accent.cyan   },
     { icon:"enhancement", label:"Enhancement Lab",   sub:"Audio repair & enhancement",tab:"enhancement"    as Tab, color:colors.accent.amber  },
     { icon:"pipeline", label:"Audio Pipeline",    sub:"End-to-end processing",     tab:"pipeline"       as Tab, color:colors.accent.green  },
     { icon:"delivery", label:"Delivery Readiness",sub:"QC score & compliance",     tab:"readiness"      as Tab, color:colors.accent.green  },

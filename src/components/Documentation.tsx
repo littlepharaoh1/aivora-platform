@@ -316,7 +316,7 @@ EBU R128 — Broadcast loudness
 - True Peak: ≤ -1.0 dBTP
 - Loudness Range (LRA)
 
-Appen QA Standards:
+Delivery QA Standards:
 - Silence RMS: -65 to -42 dB
 - SNR: ≥ 15 dB
 - Speech preservation: > 98%
@@ -335,7 +335,7 @@ Output format:
 - Sample rate preserved (or 48kHz normalized)
 - Channels preserved
 
-Naming convention (Appen):
+Naming convention (Standard):
 - Sequential: S0001.wav → S0200.wav
 - With task: S0001_T01.wav
 - Speaker: SPK01_0001.wav`

@@ -6,7 +6,7 @@
 import type { BenchmarkTask, TaskThresholds, TaskCategory, TaskDifficulty } from "./types";
 
 // ── Default thresholds per category ───────────────────────────────────────────
-// Based on: EBU R128, ITU-R BS.1770-4, Appen QA standards
+// Based on: EBU R128, ITU-R BS.1770-4, Industry QA standards
 
 export const DEFAULT_THRESHOLDS: Record<TaskCategory, TaskThresholds> = {
   silence_repair: {

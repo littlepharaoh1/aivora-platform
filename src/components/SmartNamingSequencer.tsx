@@ -89,13 +89,13 @@ export default function SmartNamingSequencer() {
             SMART NAMING SEQUENCER
           </div>
           <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:2}}>
-            GERMAN WAKE WORD · APPEN OFFICIAL SEQUENCE LOGIC
+            SMART NAMING · OFFICIAL SEQUENCE LOGIC
           </div>
         </div>
         {isReady && <div style={{marginLeft:"auto",padding:"4px 14px",borderRadius:20,
           background:"#10b98122",border:"1px solid #10b98144",
           color:"#10b981",fontSize:10,fontWeight:700,letterSpacing:2}}>
-          ✓ APPEN READY
+          ✓ DELIVERY READY
         </div>}
       </div>
 
@@ -265,7 +265,7 @@ export default function SmartNamingSequencer() {
           alignItems:"center",justifyContent:"center",gap:16,padding:60,opacity:0.4}}>
           <div style={{fontSize:40}}>🎙</div>
           <div style={{fontSize:13,color:"#2a5a6a",textAlign:"center"}}>
-            Upload WAV files to auto-generate Appen-ready names
+            Upload WAV files to auto-generate delivery-ready names
           </div>
         </div>}
 

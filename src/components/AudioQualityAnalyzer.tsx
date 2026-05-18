@@ -519,11 +519,11 @@ export default function AudioQualityAnalyzer() {
             />
           </div>}
 
-          {/* Appen Delivery Score */}
+          {/* Delivery Readiness Score */}
           {appenResult&&<div style={{background:"#060e16",border:"1px solid "+(appenResult.verdict==="READY"?"#10b98144":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b44":"#ef444444"),borderRadius:12,padding:14}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,fontWeight:700}}>APPEN DELIVERY SCORE</span>
+                <span style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,fontWeight:700}}>DELIVERY READINESS SCORE</span>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:20,fontWeight:900,fontFamily:"monospace",

@@ -237,7 +237,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
                 icon:"🏷",
                 title:"Smart Naming",
                 desc:"Automatic file sequencing and naming in any format (S0001–S0200, speaker codes, task IDs). Zero manual renaming errors.",
-                who:"Appen-format · Custom delivery formats"
+                who:"Standard format · Custom delivery formats"
               },
               {
                 icon:"📊",
@@ -570,7 +570,7 @@ export default function LandingPage({ onEnter }: Props) {
             desc="Process 200 files simultaneously with progress tracking and cancellation support."/>
           <FeatureCard icon="🏷" color="#0EA5E9"
             title="Smart Naming"
-            desc="German Appen sequencer S0001–S0200 with automatic task and speed detection."/>
+            desc="Smart sequential naming S0001–S0200 with automatic task and speed detection."/>
           <FeatureCard icon="⚡" color="#8B5CF6"
             title="Audio Pipeline"
             desc="End-to-end processing from upload to delivery-ready export in 32-bit float WAV."/>
