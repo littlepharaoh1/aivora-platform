@@ -206,6 +206,40 @@ export default function SmartNamingSequencer() {
               </div>
             </div>
 
+            {/* Google Drive */}
+            <div style={{background:"#050d18",border:"1px solid #0f2030",
+              borderRadius:10,padding:14,marginBottom:12}}>
+              <div style={{fontSize:9,color:"#2a6a8a",letterSpacing:2,marginBottom:8}}>
+                GOOGLE DRIVE LINK
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <input
+                  value={driveLink}
+                  onChange={e=>setDriveLink(e.target.value)}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  style={{flex:1,background:"#030810",border:"1px solid #1a3a5a",
+                    borderRadius:6,padding:"8px 12px",color:"#E2EEF6",
+                    fontSize:10,fontFamily:"inherit",outline:"none"}}/>
+                <button onClick={handleDriveLink} disabled={driveLoading}
+                  style={{padding:"8px 16px",borderRadius:6,border:"none",
+                    background:driveLoading?"#1a3a5a":"linear-gradient(135deg,#0EA5E9,#8B5CF6)",
+                    color:"#fff",fontSize:10,fontWeight:700,
+                    cursor:driveLoading?"not-allowed":"pointer",
+                    fontFamily:"inherit",whiteSpace:"nowrap"}}>
+                  {driveLoading?"⟳ جاري...":"⬇ تحميل"}
+                </button>
+              </div>
+              {driveError && (
+                <div style={{marginTop:8,fontSize:9,color:"#EF4444",
+                  padding:"4px 8px",background:"#EF444415",borderRadius:4}}>
+                  ✗ {driveError}
+                </div>
+              )}
+              <div style={{marginTop:6,fontSize:8,color:"#2a5a6a"}}>
+                الـ folder لازم يكون Public — Anyone with the link can view
+              </div>
+            </div>
+
             {/* Upload */}
             <label style={{display:"flex",alignItems:"center",gap:6,
               background:"#22d3ee22",border:"2px dashed #22d3ee44",
