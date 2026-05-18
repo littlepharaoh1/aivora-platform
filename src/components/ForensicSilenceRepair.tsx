@@ -10,7 +10,7 @@ import { buildReferenceSilenceProfile, validateReferenceProfile } from "../lib/a
 import { reconstructSilenceWithReference } from "../lib/audioForensics/silenceReconstructor";
 import { simulateAdobeQA } from "../lib/audioForensics/adobeQaSimulator";
 import { verifySpeechPreservation } from "../lib/audioForensics/speechPreservation";
-import { runAdobeGate, summarizeBatchGate } from "../lib/audioForensics/adobeGate";
+import { runAdobeGate, summarizeBatchGate, QUALITY_TIERS, QualityTier } from "../lib/audioForensics/adobeGate";
 import { runBatchSilenceRework, createCancellationToken } from "../lib/audioForensics/batchSilenceRework";
 import { exportBatchZip, downloadBlob } from "../lib/audioForensics/batchExport";
 import { exportFloat32Wav, downloadWavBlob, formatInfoToString } from "../lib/audioForensics/floatWavExporter";
@@ -81,6 +81,7 @@ export default function ForensicSilenceRepair(){
   const [qaResult,setQaResult]=useState<AdobeQAResult|null>(null);
   const [speechResult,setSpeechResult]=useState<SpeechPreservationResult|null>(null);
   const [gateResult,setGateResult]=useState<GateResult|null>(null);
+  const [qualityTier,setQualityTier]=useState<QualityTier>("dataset");
   const [profileWarnings,setProfileWarnings]=useState<string[]>([]);
 
   // Batch state
@@ -142,7 +143,7 @@ export default function ForensicSilenceRepair(){
       totalRepairedMs:reconstruction.totalRepairedMs,
     });
     const sp=verifySpeechPreservation(mainBuffer,reconstruction.buffer);
-    const gate=runAdobeGate(qa,sp,analyzeSilenceForensics(reconstruction.buffer));
+    const gate=runAdobeGate(qa,sp,analyzeSilenceForensics(reconstruction.buffer),qualityTier);
     setQaResult(qa); setSpeechResult(sp); setGateResult(gate);
     setLoading("");
   }

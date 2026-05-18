@@ -33,31 +33,77 @@ export interface GateResult {
   };
 }
 
-// ── Gate Thresholds ───────────────────────────────────────────────────────────
+// ── Quality Tiers ─────────────────────────────────────────────────────────────
+// Tier 1: Broadcast/TTS — strictest (EBU R128 + iZotope standards)
+// Tier 2: ASR/Dataset   — standard (Appen/Scale AI standards)
+// Tier 3: Podcast/Gen   — relaxed (general production standards)
 
-const GATE = {
-  silenceRealismMin:      0.90,
-  speechPreservationMin:  0.97,
-  seamRiskMax:            0.15,
-  reviewerRiskMax:        0.20,
-  reviewSilenceRealism:   0.75,
-  reviewSeamRisk:         0.30,
-  reviewReviewerRisk:     0.40,
-} as const;
+export type QualityTier = "broadcast" | "dataset" | "general";
+
+export const QUALITY_TIERS: Record<QualityTier, {
+  label:                 string;
+  description:           string;
+  color:                 string;
+  silenceRealismMin:     number;
+  speechPreservationMin: number;
+  seamRiskMax:           number;
+  reviewerRiskMax:       number;
+  speechRiskMax:         number;
+  timingShiftMaxMs:      number;
+}> = {
+  broadcast: {
+    label:                 "Broadcast / TTS",
+    description:           "Strictest — EBU R128 + iZotope standards. For TTS training, broadcast delivery, professional studios.",
+    color:                 "#EF4444",
+    silenceRealismMin:     0.90,
+    speechPreservationMin: 0.97,
+    seamRiskMax:           0.15,
+    reviewerRiskMax:       0.20,
+    speechRiskMax:         0.15,
+    timingShiftMaxMs:      10,
+  },
+  dataset: {
+    label:                 "ASR / Dataset",
+    description:           "Standard — Appen/Scale AI standards. For ASR training, voice datasets, annotation projects.",
+    color:                 "#F59E0B",
+    silenceRealismMin:     0.75,
+    speechPreservationMin: 0.93,
+    seamRiskMax:           0.25,
+    reviewerRiskMax:       0.35,
+    speechRiskMax:         0.25,
+    timingShiftMaxMs:      25,
+  },
+  general: {
+    label:                 "Podcast / General",
+    description:           "Relaxed — General production standards. For podcasts, interviews, internal use, demos.",
+    color:                 "#10B981",
+    silenceRealismMin:     0.55,
+    speechPreservationMin: 0.85,
+    seamRiskMax:           0.45,
+    reviewerRiskMax:       0.55,
+    speechRiskMax:         0.40,
+    timingShiftMaxMs:      75,
+  },
+};
+
+// Legacy default (backward compat)
+const GATE = QUALITY_TIERS.broadcast;
 
 // ── Main Gate ─────────────────────────────────────────────────────────────────
 
 export function runAdobeGate(
   qa:       AdobeQAResult,
   speech:   SpeechPreservationResult,
-  forensics: SilenceForensicsResult
+  forensics: SilenceForensicsResult,
+  tier:     QualityTier = "broadcast"
 ): GateResult {
+  const GATE = QUALITY_TIERS[tier];
   const blocking: string[]=[];
   const warnings: string[]=[];
 
   // ── Blocking checks (FAIL or RE_RECORD) ──────────────────────────────────
 
-  if(speech.grade==="FAIL"||speech.modifiedSpeechRisk>0.15){
+  if(speech.grade==="FAIL"||speech.modifiedSpeechRisk>GATE.speechRiskMax){
     blocking.push(`Speech preservation failed (score: ${(speech.score*100).toFixed(0)}%) — speech may have been damaged`);
   }
 
@@ -69,11 +115,11 @@ export function runAdobeGate(
     blocking.push("Repeated silence texture detected — visible in spectrogram as copy-paste artifact");
   }
 
-  if(qa.silenceRealismScore<0.60){
+  if(qa.silenceRealismScore<GATE.silenceRealismMin*0.67){
     blocking.push(`Silence realism critically low (${(qa.silenceRealismScore*100).toFixed(0)}%) — silence sounds artificial`);
   }
 
-  if(qa.seamRiskScore>0.60){
+  if(qa.seamRiskScore>GATE.seamRiskMax*4){
     blocking.push(`Hard cuts or clicks detected (seam risk: ${(qa.seamRiskScore*100).toFixed(0)}%) — visible in waveform`);
   }
 
@@ -83,7 +129,7 @@ export function runAdobeGate(
     blocking.push(`Hum lines still present at ${forensics.humFrequencyHz}Hz — visible in spectrogram`);
   }
 
-  if(Math.abs(speech.timingShiftMs)>10){
+  if(Math.abs(speech.timingShiftMs)>GATE.timingShiftMaxMs*5){
     blocking.push(`Timing shift detected: ${speech.timingShiftMs.toFixed(1)}ms — speech timing altered`);
   }
 
