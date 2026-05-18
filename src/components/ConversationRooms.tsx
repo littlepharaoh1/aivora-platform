@@ -125,65 +125,68 @@ function mixTracks(
   segmentsA: SpeechSegment[],
   segmentsB: SpeechSegment[]
 ): { left: Float32Array; right: Float32Array; mono: Float32Array } {
-  // Smart interleaving: if segments overlap, duck the other speaker
-  const len   = Math.max(trackA.length, trackB.length);
-  const left  = new Float32Array(len);
-  const right = new Float32Array(len);
-  const fadeLen = Math.floor(opts.crossfadeMs/1000*sr);
-
-  // Natural silence RMS level
+  const fadeLen    = Math.floor(opts.crossfadeMs/1000*sr);
   const silenceRms = Math.pow(10, opts.silenceDb/20);
+  const gapSamples = Math.floor(0.15*sr);
 
-  // Build activity maps
-  const activeA = new Uint8Array(len);
-  const activeB = new Uint8Array(len);
-  for(const seg of segmentsA) {
-    const s=Math.floor(seg.startSec*sr), e=Math.min(Math.floor(seg.endSec*sr),len);
-    for(let i=s;i<e;i++) activeA[i]=1;
+  // Sort all segments by start time for true interleaving
+  const allSegs = [
+    ...segmentsA.map(s=>({...s, speaker:"A" as const})),
+    ...segmentsB.map(s=>({...s, speaker:"B" as const})),
+  ].sort((a,b)=>a.startSec-b.startSec);
+
+  interface PlacedSeg {
+    speaker:"A"|"B"; srcStart:number; srcEnd:number;
+    dstStart:number; dstEnd:number;
   }
-  for(const seg of segmentsB) {
-    const s=Math.floor(seg.startSec*sr), e=Math.min(Math.floor(seg.endSec*sr),len);
-    for(let i=s;i<e;i++) activeB[i]=1;
+  const placed: PlacedSeg[] = [];
+  let cursor = 0;
+
+  for(const seg of allSegs) {
+    const srcStart=Math.floor(seg.startSec*sr);
+    const srcEnd  =Math.floor(seg.endSec*sr);
+    const segLen  =srcEnd-srcStart;
+    if(segLen<=0) continue;
+    if(placed.length>0) cursor+=gapSamples;
+    placed.push({ speaker:seg.speaker, srcStart, srcEnd,
+      dstStart:cursor, dstEnd:cursor+segLen });
+    cursor+=segLen;
   }
 
-  // Stereo width: A slightly left, B slightly right
-  const wA = opts.stereoWidth;
-  const wB = opts.stereoWidth;
+  const outLen=Math.max(cursor+sr,1);
+  const left  =new Float32Array(outLen);
+  const right =new Float32Array(outLen);
 
-  for(let i=0;i<len;i++) {
-    const sA = i<trackA.length ? trackA[i] : 0;
-    const sB = i<trackB.length ? trackB[i] : 0;
+  // Fill with natural room tone
+  for(let i=0;i<outLen;i++){
+    const n=(Math.random()*2-1)*silenceRms*0.4;
+    left[i]=n; right[i]=n;
+  }
 
-    // Add natural room tone to silence
-    const noise = (Math.random()*2-1) * silenceRms * 0.3;
-
-    const sigA = activeA[i] ? sA : noise;
-    const sigB = activeB[i] ? sB : noise;
-
-    // Crossfade at boundaries
-    let fadeA=1, fadeB=1;
-    // Check fade in/out
-    for(const seg of segmentsA) {
-      const s=Math.floor(seg.startSec*sr);
-      const e=Math.floor(seg.endSec*sr);
-      if(i>=s&&i<s+fadeLen) fadeA=0.5*(1-Math.cos(Math.PI*(i-s)/fadeLen));
-      if(i>=e-fadeLen&&i<e) fadeA=0.5*(1+Math.cos(Math.PI*(i-(e-fadeLen))/fadeLen));
+  // Place each segment
+  for(const seg of placed){
+    const src=seg.speaker==="A"?trackA:trackB;
+    const wL =seg.speaker==="A"?1+opts.stereoWidth*0.4:1-opts.stereoWidth*0.4;
+    const wR =seg.speaker==="A"?1-opts.stereoWidth*0.4:1+opts.stereoWidth*0.4;
+    const segLen=seg.dstEnd-seg.dstStart;
+    for(let i=0;i<segLen;i++){
+      const srcIdx=seg.srcStart+i;
+      if(srcIdx>=src.length) break;
+      const sample=src[srcIdx];
+      let fade=1;
+      if(i<fadeLen&&fadeLen>0) fade=0.5*(1-Math.cos(Math.PI*i/fadeLen));
+      else if(i>segLen-fadeLen&&fadeLen>0)
+        fade=0.5*(1+Math.cos(Math.PI*(i-(segLen-fadeLen))/fadeLen));
+      const dstIdx=seg.dstStart+i;
+      if(dstIdx>=outLen) break;
+      left[dstIdx] =Math.max(-1,Math.min(1,left[dstIdx] +sample*fade*wL));
+      right[dstIdx]=Math.max(-1,Math.min(1,right[dstIdx]+sample*fade*wR));
     }
-    for(const seg of segmentsB) {
-      const s=Math.floor(seg.startSec*sr);
-      const e=Math.floor(seg.endSec*sr);
-      if(i>=s&&i<s+fadeLen) fadeB=0.5*(1-Math.cos(Math.PI*(i-s)/fadeLen));
-      if(i>=e-fadeLen&&i<e) fadeB=0.5*(1+Math.cos(Math.PI*(i-(e-fadeLen))/fadeLen));
-    }
-
-    // Stereo mix: A panned slightly left, B slightly right
-    left[i]  = Math.max(-1,Math.min(1, sigA*fadeA*(1+wA*0.3) + sigB*fadeB*(1-wB*0.3)));
-    right[i] = Math.max(-1,Math.min(1, sigA*fadeA*(1-wA*0.3) + sigB*fadeB*(1+wB*0.3)));
   }
 
-  // Mono sum
-  const mono = new Float32Array(len);
-  for(let i=0;i<len;i++) mono[i]=Math.max(-1,Math.min(1,(left[i]+right[i])/2));
+  const mono=new Float32Array(outLen);
+  for(let i=0;i<outLen;i++)
+    mono[i]=Math.max(-1,Math.min(1,(left[i]+right[i])/2));
 
   return { left, right, mono };
 }
