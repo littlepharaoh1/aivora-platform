@@ -435,7 +435,7 @@ function AppContent(){
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <Contributors/>}
           {tab==="readiness"       && <DeliveryReadiness/>}
-          {tab==="rooms"           && <ConversationRooms/>}
+          {tab==="conversations"   && <ConversationRooms/>}
           {tab==="monitor" && <ActivityMonitor/>}
           {tab==="readiness_old" && <DeliveryReadinessScore/>}
           {tab==="documentation"  && <Documentation/>}
