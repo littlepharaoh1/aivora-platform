@@ -29,6 +29,72 @@ export default function SmartNamingSequencer() {
   const [exporting,   setExporting]   = useState(false);
   const [exported,    setExported]    = useState(false);
   const inputRef = useRef(null);
+  const [driveLink,    setDriveLink]    = useState("");
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveError,   setDriveError]   = useState("");
+
+  async function handleDriveLink() {
+    if(!driveLink.trim()) return;
+    setDriveLoading(true); setDriveError("");
+    try {
+      // Extract folder ID from Drive link
+      const folderMatch = driveLink.match(/folders\/([a-zA-Z0-9_-]+)/);
+      const fileMatch   = driveLink.match(/id=([a-zA-Z0-9_-]+)/);
+      const folderId    = folderMatch?.[1] ?? fileMatch?.[1];
+
+      if(!folderId) {
+        setDriveError("رابط غير صحيح — تأكد إنه Google Drive folder link");
+        setDriveLoading(false); return;
+      }
+
+      // Fetch folder contents via Google Drive API (public folders)
+      const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='audio/wav'&key=AIzaSyD-placeholder&fields=files(id,name,mimeType)`;
+
+      // Alternative: use public folder export
+      const exportUrl = `https://drive.google.com/drive/folders/${folderId}`;
+
+      // Fetch file list from public folder
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType,size)&orderBy=name`,
+        { headers: { Accept: "application/json" } }
+      );
+
+      if(!res.ok) throw new Error("مش قادر يوصل للـ folder — تأكد إنه Public");
+
+      const data = await res.json();
+      const wavFiles = (data.files ?? []).filter(
+        (f: any) => f.name?.toLowerCase().endsWith(".wav") ||
+                    f.mimeType?.includes("audio")
+      );
+
+      if(wavFiles.length === 0) {
+        setDriveError("مفيش ملفات WAV في الـ folder");
+        setDriveLoading(false); return;
+      }
+
+      // Download each WAV file
+      const downloaded: File[] = [];
+      for(const f of wavFiles) {
+        const downloadUrl = `https://drive.google.com/uc?export=download&id=${f.id}`;
+        const fileRes = await fetch(downloadUrl);
+        if(!fileRes.ok) continue;
+        const blob = await fileRes.blob();
+        const file = new File([blob], f.name, { type: "audio/wav" });
+        downloaded.push(file);
+      }
+
+      if(downloaded.length === 0) {
+        setDriveError("مش قادر يحمل الملفات — تأكد إن الـ folder Public");
+        setDriveLoading(false); return;
+      }
+
+      handleFiles(downloaded as any);
+      setDriveError("");
+    } catch(e: any) {
+      setDriveError(e.message ?? "خطأ في تحميل الملفات");
+    }
+    setDriveLoading(false);
+  }
 
   function handleFiles(incoming: FileList | null) {
     if (!incoming) return;
