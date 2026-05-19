@@ -170,7 +170,7 @@ async function dspEnhance(
   route:    EnhancementRoute,
   stages:   string[]
 ): Promise<Float32Array> {
-  let current = new Float32Array(data);
+  let current = new Float32Array(data.buffer as ArrayBuffer, data.byteOffset, data.length);
 
   if(route === "dsp_full" || analysis.hasReverb) {
     const derev = applyAdaptiveDereverb(current, sr, {
@@ -178,7 +178,7 @@ async function dspEnhance(
       dryWet:  0.7,
       strength: 0.6,
     });
-    current = derev.output;
+    current = new Float32Array(derev.output.buffer as ArrayBuffer, derev.output.byteOffset, derev.output.length);
     stages.push(`Dereverb (RT60=${analysis.rt60Ms}ms)`);
   }
 
@@ -189,7 +189,7 @@ async function dspEnhance(
       temporalSmooth: 0.75,
       floorDb:       -70,
     });
-    current = new Float32Array(wiener.output);
+    current = new Float32Array(wiener.output.buffer as ArrayBuffer, wiener.output.byteOffset, wiener.output.length);
     stages.push(`Wiener (SNR +${wiener.snrImprovement.toFixed(1)}dB)`);
   }
 
@@ -236,7 +236,7 @@ export class SpeechEnhanceAgent {
     const inputQuality = analysis.qualityScore;
     const route        = selectRoute(analysis, options);
 
-    let current = new Float32Array(data);
+    let current = new Float32Array(data.buffer as ArrayBuffer, data.byteOffset, data.length);
 
     if(route === "passthrough") {
       return {
@@ -258,7 +258,7 @@ export class SpeechEnhanceAgent {
     if(route === "neural_denoise" || route === "neural_hybrid") {
       const neural = await neuralEnhance(current, sr).catch(() => null);
       if(neural) {
-        current = neural;
+        current = new Float32Array(neural.buffer as ArrayBuffer, neural.byteOffset, neural.length);
         stages.push("Neural enhancement");
       } else {
         // Neural unavailable — fall back to DSP
@@ -276,7 +276,7 @@ export class SpeechEnhanceAgent {
 
     // Mastering limiter
     const limited = applyMasteringLimiter(current, sr, { thresholdDb:-1.0 });
-    current = limited.output;
+    current = new Float32Array(limited.output.buffer as ArrayBuffer, limited.output.byteOffset, limited.output.length);
     if(limited.maxGainReductionDb > 0.1)
       stages.push(`Limiter (${limited.maxGainReductionDb.toFixed(1)}dB GR)`);
 
