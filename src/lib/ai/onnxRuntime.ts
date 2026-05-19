@@ -179,8 +179,8 @@ export class ONNXRuntimeOrchestrator {
 
     try {
       // Dynamic import — graceful if not installed
-      const ortMod = await (import as (s: string) => Promise<unknown>)
-        ("onnxruntime-web").catch(() => null);
+      const ortMod = await import(/* @vite-ignore */ "onnxruntime-web" as string)
+        .catch(() => null);
 
       if(!ortMod) {
         this.available = false;
