@@ -64,7 +64,7 @@ export default function ActivityMonitor() {
         avgScore: scores.length  ? Math.round(scores.reduce((a:number,b:number)=>a+b)/scores.length) : 0,
         avgLufs:  lufsArr.length ? Math.round(lufsArr.reduce((a:number,b:number)=>a+b)/lufsArr.length*10)/10 : 0,
       });
-    } catch(e) { console.error(e); }
+    } catch(e) {  }
     setLoading(false);
   }
 

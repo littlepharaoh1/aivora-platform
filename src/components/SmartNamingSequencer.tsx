@@ -132,7 +132,7 @@ export default function SmartNamingSequencer() {
       const blob = await buildZip(zipFiles);
       downloadZip(blob, `${locale}_${speakerId}_S${String(startIndex).padStart(4,"0")}_batch.zip`);
       setExported(true);
-    } catch(e) { console.error(e); }
+    } catch(e) {  }
     setExporting(false);
   }
 

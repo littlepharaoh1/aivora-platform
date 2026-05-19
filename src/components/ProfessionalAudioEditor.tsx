@@ -221,7 +221,7 @@ function ProfessionalAudioEditorInner() {
     setPlayhead(0);
     setSelection(null);
     } catch(err) {
-      console.error("loadFile error:", err);
+      
     }
   }
 

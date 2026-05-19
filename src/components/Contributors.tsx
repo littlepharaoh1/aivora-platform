@@ -64,7 +64,7 @@ export default function Contributors() {
         .select("*")
         .order("created_at", { ascending:false });
       if(!error) setProfiles(data ?? []);
-    } catch(e) { console.warn("Profiles fetch:", e); }
+    } catch(e) {  }
     setLoading(false);
   }
 

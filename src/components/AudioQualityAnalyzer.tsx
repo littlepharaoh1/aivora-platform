@@ -202,7 +202,7 @@ export default function AudioQualityAnalyzer() {
       setSpectrogramData(spec);
       const gaps=detectDigitalGaps(buf);
       setDigitalGaps(gaps);
-    }catch(e){console.error(e);}
+    }catch(e){}
     setLoading(false);
   }
 
@@ -212,7 +212,7 @@ export default function AudioQualityAnalyzer() {
     try{
       const result=restoreNaturalSilence(rep._buf);
       setRestored(result);
-    }catch(e){console.error(e);}
+    }catch(e){}
     setRestoring(false);
   }
 
@@ -285,7 +285,7 @@ export default function AudioQualityAnalyzer() {
           metadata:  { operations: result.operations, fileName: rep?.name },
         });
       }
-    }catch(e){console.error(e);}
+    }catch(e){}
     setRepairing(false);
   }
 

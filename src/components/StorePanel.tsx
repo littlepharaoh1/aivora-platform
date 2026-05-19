@@ -36,7 +36,7 @@ export default function StorePanel() {
         const buf = await ctx.decodeAudioData(ab);
         const result = await runUnifiedPipeline(buf,
           { target: target as any },
-          (pct, stage) => console.log(`${pct}% ${stage}`)
+          (pct, stage) => 
         );
         const wav = encodeWav(result.output, result.sampleRate);
         const a   = document.createElement("a");

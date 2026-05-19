@@ -251,7 +251,7 @@ export default function DeliveryReadinessScore({
           : r
       ));
     } catch (e) {
-      console.error("Analysis failed:", e);
+      
     } finally {
       setAnalyzing(false);
     }
@@ -303,7 +303,7 @@ export default function DeliveryReadinessScore({
         
         setRecords(prev => [...prev, record]);
       } catch (err) {
-        console.error("Failed to process", file.name, err);
+        
       }
     }
     
