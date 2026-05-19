@@ -252,8 +252,7 @@ export default function AudioQualityAnalyzer() {
       ["Reviewer",   d.reviewer],
       ["Date",       d.date],
     ];
-    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("
-");
+    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
     const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
     const a=document.createElement("a");
     a.href=URL.createObjectURL(blob);
