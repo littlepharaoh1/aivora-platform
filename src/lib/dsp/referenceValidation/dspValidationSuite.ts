@@ -197,8 +197,7 @@ export class DSPValidationSuite {
       }
       lines.push("");
     }
-    return lines.join("
-");
+    return lines.join("\n");
   }
 }
 
