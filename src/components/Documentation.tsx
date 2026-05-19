@@ -2,7 +2,7 @@
 /**
  * Documentation.tsx — Aivora Platform Documentation
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const DOCS = [
   {
@@ -300,6 +300,16 @@ AudioWorklet:
     ]
   },
   {
+    section: "WHATS NEW",
+    color: "#22d3ee",
+    items: [
+      {
+        title: "Latest Updates",
+        content: changelog || "Loading changelog...",
+      }
+    ]
+  },
+  {
     section: "STANDARDS",
     color: "#F59E0B",
     items: [
@@ -345,6 +355,14 @@ Naming convention (Standard):
 ];
 
 export default function Documentation() {
+  const [changelog, setChangelog] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/CHANGELOG.md")
+      .then(r => r.text())
+      .then(t => setChangelog(t))
+      .catch(() => {});
+  }, []);
   const [activeSection, setActiveSection] = useState("GETTING STARTED");
   const [activeItem,    setActiveItem]    = useState(0);
   const [search,        setSearch]        = useState("");
