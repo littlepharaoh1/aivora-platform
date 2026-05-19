@@ -290,8 +290,7 @@ export class StorageOrchestrator {
     this.cache.delete(id);
     await this.idb.delete(id);
     this.registry.delete(id);
-    await supabase.from("processing_jobs")
-      .delete().eq("id",`storage_${id}`).then(()=>{}).catch(()=>{});
+    try { await supabase.from("processing_jobs").delete().eq("id",`storage_${id}`); } catch {}
     return true;
   }
 
