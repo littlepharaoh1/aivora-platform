@@ -20,9 +20,9 @@
 
 import { runIntegrityCheck }       from "../dsp/observability/audioIntegrity";
 import { detectSyntheticSpeech }   from "../audioForensics/syntheticSpeechDetector";
-import { detectAIArtifacts }       from "./aiArtifactDetector";
+import { detectAIArtifacts }       from "../ai/aiArtifactDetector";
 import { measureLUFS }             from "../audioEditor/masteringLimiter";
-import { vadEngine }               from "./vadEngine";
+import { vadEngine }               from "../ai/vadEngine";
 import { supabase }                from "../supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
