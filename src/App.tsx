@@ -10,6 +10,7 @@ import AivoraAudioBench from "./components/AivoraAudioBench";
 import ActivityMonitor from "./components/ActivityMonitor";
 import DeliveryReadiness from "./components/DeliveryReadiness";
 import Documentation from "./components/Documentation";
+import ObservabilityDashboard from "./components/ObservabilityDashboard";
 import Contributors from "./components/Contributors";
 import ConversationRooms from "./components/ConversationRooms";
 import { supabase } from "./lib/supabase";
@@ -71,7 +72,8 @@ type Tab =
   | "proeditor"
   | "audiobench"
   | "documentation"
-  | "conversations";
+  | "conversations"
+  | "observability";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +95,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   audiobench:     { title:"Audio Bench",                subtitle:"VERIFIER-BACKED FORENSIC BENCHMARK" },
   documentation:  { title:"Documentation",              subtitle:"PLATFORM REFERENCE & GUIDES" },
   conversations:  { title:"Conversation Rooms",          subtitle:"DUAL-TRACK PODCAST MIXER" },
+  observability:  { title:"Observability",               subtitle:"DSP RUNTIME TELEMETRY" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
@@ -115,6 +118,7 @@ const NAV_ITEMS = [
   { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",          group:"repair"     },
   { id:"audiobench",      icon:"dsp",          label:"Audio Bench",         group:"system"     },
   { id:"documentation",   icon:"info",         label:"Documentation",       group:"system"     },
+  { id:"observability",   icon:"dsp",          label:"Observability",       group:"system"     },
   { id:"conversations",   icon:"rooms",        label:"Conv. Rooms",          group:"production" },
 ];
 
@@ -446,6 +450,7 @@ function AppContent(){
           {tab==="monitor" && <ActivityMonitor/>}
           {tab==="readiness_old" && <DeliveryReadinessScore/>}
           {tab==="documentation"  && <Documentation/>}
+          {tab==="observability"  && <ObservabilityDashboard/>}
           {tab==="conversations"  && <ConversationRooms/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"      && <ProfessionalAudioEditor/>}
