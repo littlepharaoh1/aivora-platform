@@ -216,6 +216,76 @@ function detectBandwidthArtifact(spectrum: Float64Array, sr: number): number {
   return 0;
 }
 
+// ── Spectral Clone Detection ─────────────────────────────────────────────────
+// Copy-paste synthesis creates repeating spectral patterns
+
+function detectSpectralClone(
+  data: Float32Array,
+  sr:   number
+): number {
+  const blockLen = Math.floor(0.5 * sr); // 500ms blocks
+  if(data.length < blockLen * 3) return 0;
+
+  const blocks: Float64Array[] = [];
+  for(let s=0;s+blockLen<=data.length;s+=blockLen){
+    const re=new Float64Array(blockLen), im=new Float64Array(blockLen);
+    for(let i=0;i<blockLen;i++) re[i]=data[s+i];
+    fft(re,im);
+    const mag=new Float64Array(blockLen/2);
+    for(let k=0;k<blockLen/2;k++) mag[k]=Math.sqrt(re[k]**2+im[k]**2);
+    // Normalize
+    const max=mag.reduce((m,v)=>Math.max(m,v),0);
+    if(max>0) for(let k=0;k<mag.length;k++) mag[k]/=max;
+    blocks.push(mag);
+  }
+
+  if(blocks.length<3) return 0;
+
+  // Cross-correlation between non-adjacent blocks
+  let maxSim=0;
+  for(let i=0;i<blocks.length;i++){
+    for(let j=i+2;j<blocks.length;j++){
+      let dot=0,nA=0,nB=0;
+      for(let k=0;k<blocks[i].length;k++){
+        dot+=blocks[i][k]*blocks[j][k];
+        nA+=blocks[i][k]**2; nB+=blocks[j][k]**2;
+      }
+      const sim=Math.sqrt(nA*nB)>0?dot/Math.sqrt(nA*nB):0;
+      if(sim>maxSim) maxSim=sim;
+    }
+  }
+
+  // High similarity between distant blocks = clone
+  return maxSim > 0.95 ? (maxSim-0.95)/0.05 : 0;
+}
+
+// ── Over-Suppression Detection ────────────────────────────────────────────────
+// Neural denoisers sometimes over-suppress, creating musical noise
+
+function detectOverSuppression(
+  data: Float32Array,
+  sr:   number
+): number {
+  const frameLen=Math.floor(0.02*sr);
+  let   musicalNoise=0, frames=0;
+  let   prevEnergy=0;
+
+  for(let s=0;s+frameLen<=data.length;s+=frameLen){
+    let e=0;
+    for(let i=s;i<s+frameLen;i++) e+=data[i]**2;
+    e/=frameLen;
+
+    if(frames>0&&prevEnergy>1e-8){
+      // Rapid energy fluctuation = musical noise
+      const ratio=Math.abs(Math.log10(e/(prevEnergy+1e-15)));
+      if(ratio>1.5) musicalNoise++;
+    }
+    prevEnergy=e; frames++;
+  }
+
+  return frames>0?Math.min(1,musicalNoise/frames*5):0;
+}
+
 // ── Main Detector ─────────────────────────────────────────────────────────────
 
 export function detectAIArtifacts(
@@ -305,6 +375,29 @@ export function detectAIArtifacts(
         artifactCounts.set("bandwidth_artifact", (artifactCounts.get("bandwidth_artifact")??0)+1);
       }
     }
+  }
+
+  // Full-signal clone + over-suppression detection
+  const cloneP = detectSpectralClone(data, sr);
+  if(cloneP > 0.3){
+    artifacts.push({
+      timestampSec: 0, type:"spectral_clone",
+      probability:  cloneP,
+      severity:     cloneP>0.7?"high":"medium",
+      description:  `Spectral clone pattern detected (copy-paste synthesis, score=${(cloneP*100).toFixed(0)}%)`,
+    });
+    artifactCounts.set("spectral_clone", Math.round(cloneP*10));
+  }
+
+  const overP = detectOverSuppression(data, sr);
+  if(overP > 0.3){
+    artifacts.push({
+      timestampSec: 0, type:"over_suppressed",
+      probability:  overP,
+      severity:     overP>0.6?"high":"medium",
+      description:  `Over-suppression artifacts (musical noise, score=${(overP*100).toFixed(0)}%)`,
+    });
+    artifactCounts.set("over_suppressed", Math.round(overP*10));
   }
 
   // Overall score: penalty per artifact type
