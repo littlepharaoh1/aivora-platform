@@ -222,6 +222,93 @@ export default function AudioQualityAnalyzer() {
     setLoading(false);
   }
 
+  function buildReviewData() {
+    return {
+      fileName:   rep?.name ?? "unknown",
+      score:      appenResult?.score ?? 0,
+      lufs:       rep?.qc?.metrics?.lufs ?? 0,
+      snr:        rep?.qc?.metrics?.snrDb ?? 0,
+      truePeak:   rep?.qc?.metrics?.truePeak ?? 0,
+      noiseClass: rep?.qc?.metrics?.noiseClass ?? "",
+      status:     reviewStatus ?? "review",
+      note:       reviewNote,
+      reviewer:   reviewerName,
+      date:       new Date().toISOString().split("T")[0],
+    };
+  }
+
+  function downloadExcel() {
+    const d = buildReviewData();
+    const rows = [
+      ["Field","Value"],
+      ["File Name",  d.fileName],
+      ["Score",      d.score+"/100"],
+      ["LUFS",       d.lufs.toFixed(1)+" LUFS"],
+      ["SNR",        d.snr.toFixed(1)+" dB"],
+      ["True Peak",  d.truePeak.toFixed(2)+" dBTP"],
+      ["Noise Class",d.noiseClass],
+      ["Status",     d.status.toUpperCase()],
+      ["Note",       d.note],
+      ["Reviewer",   d.reviewer],
+      ["Date",       d.date],
+    ];
+    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("
+");
+    const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`QC_Review_${d.fileName.replace(".wav","")}_${d.date}.csv`;
+    a.click();
+  }
+
+  function downloadJSON() {
+    const d=buildReviewData();
+    const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`QC_Review_${d.fileName.replace(".wav","")}_${d.date}.json`;
+    a.click();
+  }
+
+  function downloadJSONL() {
+    const d=buildReviewData();
+    const line=JSON.stringify({
+      messages:[
+        {role:"system",    content:"You are an audio QA reviewer."},
+        {role:"user",      content:`Review: ${d.fileName}, Score:${d.score}/100, LUFS:${d.lufs.toFixed(1)}, SNR:${d.snr.toFixed(1)}dB, Noise:${d.noiseClass}`},
+        {role:"assistant", content:`Status:${d.status.toUpperCase()}. Note:${d.note||"No notes"}.`},
+      ],
+      reward: d.status==="approved"?1.0:d.status==="review"?0.5:0.0,
+      metadata: d,
+    });
+    const blob=new Blob([line+"
+"],{type:"application/jsonl"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`QC_Review_${d.fileName.replace(".wav","")}_${d.date}.jsonl`;
+    a.click();
+  }
+
+  async function saveReview() {
+    const d=buildReviewData();
+    try {
+      const {data:{session}}=await supabase.auth.getSession();
+      if(session){
+        await supabase.from("processing_jobs").insert([{
+          user_id:  session.user.id,
+          file_name: d.fileName,
+          status:   d.status,
+          score:    d.score,
+          lufs:     d.lufs,
+          snr_db:   d.snr,
+          completed_at: new Date().toISOString(),
+        }]);
+        setReviewSaved(true);
+        setTimeout(()=>setReviewSaved(false),3000);
+      }
+    } catch {}
+  }
+
   async function doRestore() {
     if(!rep?._buf)return;
     setRestoring(true);
