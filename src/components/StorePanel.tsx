@@ -165,7 +165,7 @@ export default function StorePanel() {
                 <div style={{fontSize:11,fontWeight:700,color:"#E2EEF6",
                   marginBottom:2,wordBreak:"break-all"}}>{r.name}</div>
                 <div style={{fontSize:8,color:"#2a5a6a"}}>
-                  {r.size?(r.size/1024).toFixed(1)+"KB ·":""} {new Date(r.createdAt).toLocaleString()}
+                  {r.size?(r.size/1024).toFixed(1)+"KB ·":""} {r.createdAt?new Date(r.createdAt).toLocaleString():""}
                 </div>
               </div>
 
