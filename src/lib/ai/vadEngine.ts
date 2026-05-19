@@ -70,9 +70,40 @@ export interface VADFrame {
 
 // ── DSP Feature Extraction ────────────────────────────────────────────────────
 
+// ── FFT for spectral features ────────────────────────────────────────────────
+
+function fftVAD(re: Float64Array, im: Float64Array): void {
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){
+    let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;
+    if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]];}
+  }
+  for(let len=2;len<=n;len<<=1){
+    const ang=-2*Math.PI/len,wR=Math.cos(ang),wI=Math.sin(ang);
+    for(let i=0;i<n;i+=len){
+      let cR=1,cI=0;
+      for(let j=0;j<len>>1;j++){
+        const uR=re[i+j],uI=im[i+j];
+        const vR=re[i+j+len/2]*cR-im[i+j+len/2]*cI;
+        const vI=re[i+j+len/2]*cI+im[i+j+len/2]*cR;
+        re[i+j]=uR+vR;im[i+j]=uI+vI;
+        re[i+j+len/2]=uR-vR;im[i+j+len/2]=uI-vI;
+        const nR=cR*wR-cI*wI;cI=cR*wI+cI*wR;cR=nR;
+      }
+    }
+  }
+}
+
+// ── Advanced Frame Feature Extraction ─────────────────────────────────────────
+// Features: energy, ZCR, SFM, spectral centroid, spectral flux,
+//           sub-band energies (low/mid/high), periodicity
+
 function computeFrameFeatures(
-  frame: Float32Array
-): { energy: number; zcr: number; sfm: number } {
+  frame:     Float32Array,
+  sr:        number = 16000,
+  prevMag?:  Float64Array
+): { energy: number; zcr: number; sfm: number; centroid: number;
+     flux: number; lowE: number; midE: number; highE: number; periodicity: number } {
   const n = frame.length;
   let   ms = 0, zcr = 0;
 
@@ -80,23 +111,74 @@ function computeFrameFeatures(
   for(let i = 1; i < n; i++)
     if((frame[i] >= 0) !== (frame[i-1] >= 0)) zcr++;
 
-  // Spectral Flatness Measure via simplified geometric/arithmetic mean ratio
-  const step    = Math.max(1, Math.floor(n / 64));
-  let   geoSum  = 0, arSum = 0, count = 0;
-  for(let i = 0; i < n; i += step) {
-    const v = Math.abs(frame[i]) + 1e-10;
-    geoSum += Math.log(v);
-    arSum  += v;
-    count++;
+  // Windowed FFT for spectral features
+  const fftN  = Math.min(512, n);
+  const re    = new Float64Array(fftN);
+  const im    = new Float64Array(fftN);
+  for(let i=0;i<fftN;i++)
+    re[i]=frame[i<n?i:0]*0.5*(1-Math.cos(2*Math.PI*i/(fftN-1)));
+  fftVAD(re, im);
+
+  const mag   = new Float64Array(fftN/2);
+  let   sumM  = 0;
+  for(let k=0;k<fftN/2;k++){ mag[k]=Math.sqrt(re[k]**2+im[k]**2); sumM+=mag[k]; }
+
+  // Spectral centroid
+  let centroid=0;
+  if(sumM>1e-10)
+    for(let k=0;k<fftN/2;k++) centroid+=k*mag[k]/sumM;
+  centroid=centroid/(fftN/2); // normalize 0-1
+
+  // Spectral flatness (geometric/arithmetic mean of spectrum)
+  let geoSum=0, arSum=0;
+  for(let k=1;k<fftN/2;k++){
+    geoSum+=Math.log(mag[k]+1e-10); arSum+=mag[k];
   }
-  const sfm = count > 0
-    ? Math.exp(geoSum / count) / (arSum / count)
+  const sfm=arSum>1e-10
+    ? Math.exp(geoSum/(fftN/2-1))/((arSum/(fftN/2-1))+1e-10)
     : 0;
 
+  // Spectral flux (vs previous frame)
+  let flux=0;
+  if(prevMag){
+    for(let k=0;k<Math.min(fftN/2,prevMag.length);k++){
+      const diff=mag[k]-prevMag[k]; flux+=diff>0?diff*diff:0;
+    }
+    flux=Math.sqrt(flux/(fftN/2));
+  }
+
+  // Sub-band energies
+  const lowEnd  = Math.floor(fftN/2*300/(sr/2));   // <300Hz
+  const midEnd  = Math.floor(fftN/2*3400/(sr/2));  // 300-3400Hz (speech band)
+  let   lowE=0, midE=0, highE=0;
+  for(let k=0;k<fftN/2;k++){
+    if(k<lowEnd)         lowE+=mag[k]**2;
+    else if(k<midEnd)    midE+=mag[k]**2;
+    else                 highE+=mag[k]**2;
+  }
+  const totE=lowE+midE+highE+1e-10;
+  lowE/=totE; midE/=totE; highE/=totE;
+
+  // Periodicity via normalized autocorrelation peak
+  let acfPeak=0;
+  const tauMin=Math.floor(sr/500), tauMax=Math.floor(sr/60);
+  if(tauMax<n){
+    let r0=0; for(let i=0;i<n;i++) r0+=frame[i]**2;
+    for(let tau=tauMin;tau<=Math.min(tauMax,n-1);tau++){
+      let r=0; for(let i=0;i<n-tau;i++) r+=frame[i]*frame[i+tau];
+      const norm=r/(r0+1e-15);
+      if(norm>acfPeak) acfPeak=norm;
+    }
+  }
+
   return {
-    energy: ms / n,
-    zcr:    zcr / n,
-    sfm:    Math.max(0, Math.min(1, sfm)),
+    energy:      ms/n,
+    zcr:         zcr/n,
+    sfm:         Math.max(0,Math.min(1,sfm)),
+    centroid,
+    flux:        Math.min(1,flux),
+    lowE, midE, highE,
+    periodicity: Math.max(0,Math.min(1,acfPeak)),
   };
 }
 
@@ -121,29 +203,43 @@ function dspVAD(
 
   for(let s = 0; s + frameLen <= data.length; s += hopLen) {
     const frame    = data.slice(s, s + frameLen);
-    const { energy, zcr, sfm } = computeFrameFeatures(frame);
+    const feat = computeFrameFeatures(frame as Float32Array, sr);
 
-    // Update noise floor (slow attack, fast release)
-    energyHistory.push(energy);
-    if(energyHistory.length > 20) energyHistory.shift();
+    // Update adaptive noise floor (10th percentile of energy history)
+    energyHistory.push(feat.energy);
+    if(energyHistory.length > 30) energyHistory.shift();
     const sortedE = [...energyHistory].sort((a,b)=>a-b);
     noiseFloor    = sortedE[Math.floor(sortedE.length * 0.1)] + ENERGY_FLOOR;
 
-    // SNR-based energy confidence
-    const snrLinear    = energy / (noiseFloor + 1e-15);
-    const energyConf   = Math.min(1, Math.log10(snrLinear + 1) / 2);
+    // 1. SNR confidence (primary)
+    const snrLinear  = feat.energy / (noiseFloor + 1e-15);
+    const energyConf = Math.min(1, Math.log10(Math.max(1,snrLinear)) / 2.5);
 
-    // ZCR confidence: speech has moderate ZCR
-    const zcrConf      = zcr > 0.05 && zcr < 0.35 ? 1.0 : 0.3;
+    // 2. ZCR confidence: speech ZCR typically 0.05-0.35
+    const zcrConf = feat.zcr > 0.03 && feat.zcr < 0.40 ? 1.0 : 0.2;
 
-    // SFM confidence: low SFM = harmonic = speech
-    const sfmConf      = sfm < SFM_VOICED_MAX ? 1.0 : 0.2;
+    // 3. SFM confidence: low SFM = harmonic = speech
+    const sfmConf = feat.sfm < SFM_VOICED_MAX ? 1.0 : 0.15;
 
-    // Combined confidence
-    const confidence   = energyConf * 0.6 + zcrConf * 0.2 + sfmConf * 0.2;
-    const isSpeech     = confidence >= threshold;
+    // 4. Spectral band confidence: speech energy concentrated in 300-3400Hz
+    const bandConf = feat.midE > 0.4 ? 1.0 : feat.midE > 0.25 ? 0.6 : 0.2;
 
-    frames.push({ isSpeech, confidence, energy, zcr });
+    // 5. Periodicity confidence: voiced speech is periodic
+    const periodicityConf = feat.periodicity > 0.3 ? Math.min(1,feat.periodicity*2) : 0.3;
+
+    // 6. Spectral flux: speech has dynamic spectral changes
+    const fluxConf = feat.flux > 0.01 ? 1.0 : 0.5;
+
+    // Weighted combination (tuned for speech detection)
+    const confidence = energyConf   * 0.35 +
+                       sfmConf      * 0.20 +
+                       bandConf     * 0.20 +
+                       periodicityConf * 0.12 +
+                       zcrConf      * 0.08 +
+                       fluxConf     * 0.05;
+
+    const isSpeech = confidence >= threshold;
+    frames.push({ isSpeech, confidence, energy:feat.energy, zcr:feat.zcr });
   }
 
   // Apply hangover
