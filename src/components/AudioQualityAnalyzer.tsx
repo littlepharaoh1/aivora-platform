@@ -536,7 +536,7 @@ export default function AudioQualityAnalyzer() {
           </div>}
 
           {/* Human Review Panel */}
-      {analysis && (
+      {rep {analysis &&{analysis && (
         <div style={{background:"#050d18",border:"1px solid #0f2030",
           borderRadius:12,padding:16,marginTop:12}}>
 
