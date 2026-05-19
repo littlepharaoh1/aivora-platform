@@ -263,8 +263,7 @@ export class DeterministicReplayEngine {
   exportJSONL(): string {
     return this.getAllRecords()
       .map(r => JSON.stringify(r))
-      .join("
-");
+      .join("\n");
   }
 
   /**
