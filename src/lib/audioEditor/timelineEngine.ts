@@ -451,6 +451,86 @@ export class TimelineEngine {
     return result;
   }
 
+  // ── Crash Recovery ──────────────────────────────────────────────────────────
+
+  /**
+   * Serialize timeline state to JSON string.
+   * Safe for localStorage / Supabase persistence.
+   */
+  serialize(): string {
+    try {
+      return JSON.stringify({
+        version:   1,
+        state:     this.state,
+        editCount: this.editCount,
+        timestamp: Date.now(),
+      });
+    } catch {
+      return "{}";
+    }
+  }
+
+  /**
+   * Restore timeline state from serialized JSON.
+   * Validates schema before applying.
+   */
+  restore(serialized: string): boolean {
+    try {
+      const parsed = JSON.parse(serialized);
+      if(!parsed?.state?.tracks || !Array.isArray(parsed.state.tracks)) return false;
+      if(typeof parsed.version !== "number") return false;
+
+      // Rebuild node from restored state
+      const { generateId: _g, ...rest } = {} as Record<string, unknown>;
+      void _g; void rest;
+      const id = Math.random().toString(36).slice(2,10);
+      const node = {
+        id,
+        operation: { type: "ADD_TRACK" as const, track: parsed.state.tracks[0] ?? {
+          id: "t1", name:"Track 1", muted:false, solo:false, gain:1, clips:[],
+        }},
+        state:     parsed.state as TimelineState,
+        timestamp: Date.now(),
+        parentId:  null,
+      };
+      this.nodes.set(id, node);
+      this.headId     = id;
+      this.redoStack  = [];
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Validate state integrity — detect corruption.
+   */
+  validate(): { valid: boolean; issues: string[] } {
+    const issues: string[] = [];
+    const state = this.state;
+
+    if(!state) { issues.push("State is null"); return { valid:false, issues }; }
+    if(!Array.isArray(state.tracks)) issues.push("tracks is not array");
+    if(typeof state.sampleRate !== "number" || state.sampleRate <= 0)
+      issues.push(`Invalid sampleRate: ${state.sampleRate}`);
+
+    for(const track of state.tracks ?? []) {
+      if(!track.id) issues.push("Track missing id");
+      if(!Array.isArray(track.clips)) issues.push(`Track ${track.id}: clips not array`);
+
+      for(const clip of track.clips ?? []) {
+        if(clip.startSample >= clip.endSample)
+          issues.push(`Clip ${clip.id}: startSample >= endSample`);
+        if(clip.gain < 0 || clip.gain > 10)
+          issues.push(`Clip ${clip.id}: gain out of range`);
+        if(!this.sources.has(clip.sourceId))
+          issues.push(`Clip ${clip.id}: source ${clip.sourceId} not registered`);
+      }
+    }
+
+    return { valid: issues.length === 0, issues };
+  }
+
   // ── History ─────────────────────────────────────────────────────────────────
 
   getHistory(): { id: EditId; type: string; timestamp: number }[] {
