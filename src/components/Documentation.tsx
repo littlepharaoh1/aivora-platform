@@ -305,7 +305,7 @@ AudioWorklet:
     items: [
       {
         title: "Latest Updates",
-        content: changelog || "Loading changelog...",
+        content: "CHANGELOG",
       }
     ]
   },
@@ -355,13 +355,13 @@ Naming convention (Standard):
 ];
 
 export default function Documentation() {
-  const [changelog, setChangelog] = useState<string>("");
+  const [changelog, setChangelog] = useState<string>("Loading...");
 
   useEffect(() => {
     fetch("/CHANGELOG.md")
       .then(r => r.text())
       .then(t => setChangelog(t))
-      .catch(() => {});
+      .catch(() => setChangelog("Documentation available soon."));
   }, []);
   const [activeSection, setActiveSection] = useState("GETTING STARTED");
   const [activeItem,    setActiveItem]    = useState(0);
@@ -435,7 +435,7 @@ export default function Documentation() {
               whiteSpace:"pre-wrap",
               background:"#050d18", border:"1px solid #0f2030",
               borderRadius:8, padding:20 }}>
-              {currentItem.content}
+              {currentItem.content === "CHANGELOG" ? changelog : currentItem.content}
             </div>
           </>
         ) : (
