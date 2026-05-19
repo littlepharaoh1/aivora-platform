@@ -284,8 +284,7 @@ export class BenchmarkCorpusRunner {
     return result.results.map(r => JSON.stringify({
       ...r,
       timestamp: result.timestamp,
-    })).join("
-");
+    })).join("\n");
   }
 }
 
