@@ -675,7 +675,7 @@ export default function AudioQualityAnalyzer() {
               {new Date().toLocaleDateString()}
             </div>
             <button onClick={saveReview}
-              style={{padding:"6px 14px",borderRadius:6,border:"none",
+              style={{padding:"6px 14px",borderRadius:6,
                 background:reviewSaved?"#10B98120":"#0EA5E920",
                 color:reviewSaved?"#10B981":"#0EA5E9",
                 fontSize:10,fontWeight:700,cursor:"pointer",
