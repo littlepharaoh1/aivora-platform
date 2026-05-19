@@ -255,30 +255,128 @@ function analyzeTransientNaturalness(data: Float32Array, sr: number): number {
   return Math.min(1, cv/0.5);
 }
 
-// ── Glottal Irregularity ──────────────────────────────────────────────────────
-// Real voices have micro-variations in glottal pulses (jitter/shimmer)
+// ── Glottal Irregularity (Jitter + Shimmer) ──────────────────────────────────
+// Real voices have micro-variations in glottal pulses
+// Jitter: cycle-to-cycle F0 variation
+// Shimmer: cycle-to-cycle amplitude variation
 
 function analyzeGlottalIrregularity(data: Float32Array, sr: number): number {
   const frameLen=Math.floor(FRAME_MS*sr/1000);
-  const f0s:number[]=[];
+  const hopLen  =Math.floor(frameLen/2);
+  const f0s:     number[]=[];
+  const amps:    number[]=[];
 
-  for(let s=0;s+frameLen<=data.length;s+=Math.floor(frameLen/2)){
-    const f0=estimateF0(data.slice(s,s+frameLen) as Float32Array,sr);
-    if(f0>60&&f0<500) f0s.push(f0);
+  for(let s=0;s+frameLen<=data.length;s+=hopLen){
+    const frame=data.slice(s,s+frameLen) as Float32Array;
+    const f0=estimateF0(frame,sr);
+    if(f0>60&&f0<500){
+      f0s.push(f0);
+      // RMS amplitude of frame
+      let ms=0; for(let i=0;i<frameLen;i++) ms+=frame[i]**2;
+      amps.push(Math.sqrt(ms/frameLen));
+    }
   }
 
   if(f0s.length<5) return 0.5;
 
-  // Jitter: frame-to-frame F0 variation
-  let jitter=0;
-  for(let i=1;i<f0s.length;i++)
-    jitter+=Math.abs(f0s[i]-f0s[i-1])/(f0s[i-1]+1e-10);
-  jitter/=(f0s.length-1);
+  // Jitter (RAP — relative average perturbation, 3-point)
+  let jitterSum=0;
+  for(let i=1;i<f0s.length-1;i++){
+    const avg=(f0s[i-1]+f0s[i]+f0s[i+1])/3;
+    jitterSum+=Math.abs(f0s[i]-avg)/(avg+1e-10);
+  }
+  const jitter=jitterSum/Math.max(1,f0s.length-2);
 
-  // High jitter = natural human voice
-  // Low jitter = synthetic
-  return Math.min(1,jitter/0.05);
+  // Shimmer (amplitude perturbation quotient)
+  let shimmerSum=0;
+  for(let i=1;i<amps.length;i++)
+    shimmerSum+=Math.abs(amps[i]-amps[i-1])/(amps[i-1]+1e-10);
+  const shimmer=shimmerSum/Math.max(1,amps.length-1);
+
+  // Natural voice: jitter ~0.5-2%, shimmer ~2-5%
+  // TTS: jitter <0.1%, shimmer <0.5%
+  const jitterScore  = Math.min(1, jitter/0.015);
+  const shimmerScore = Math.min(1, shimmer/0.03);
+
+  // Combined irregularity score (high=natural, low=synthetic)
+  return (jitterScore*0.6 + shimmerScore*0.4);
 }
+
+// ── MFCC Delta Regularity ────────────────────────────────────────────────────
+// TTS produces unnaturally smooth MFCC trajectories
+
+function analyzeMFCCRegularity(data: Float32Array, sr: number): number {
+  const frameLen=Math.floor(FRAME_MS*sr/1000);
+  const hopLen  =Math.floor(HOP_MS*sr/1000);
+  const nMFCC   =13;
+  const mfccFrames: Float32Array[]=[];
+
+  // Mel filterbank (simplified, 26 filters)
+  const nFFT=512;
+  const nFilters=26;
+  const fLow=80, fHigh=Math.min(8000,sr/2);
+  const melLow=2595*Math.log10(1+fLow/700);
+  const melHigh=2595*Math.log10(1+fHigh/700);
+
+  // Mel filter centers
+  const melPoints=new Float32Array(nFilters+2);
+  for(let i=0;i<nFilters+2;i++)
+    melPoints[i]=700*(Math.pow(10,(melLow+i*(melHigh-melLow)/(nFilters+1))/2595)-1);
+  const binPoints=melPoints.map(f=>Math.floor(f/sr*nFFT));
+
+  for(let s=0;s+frameLen<=data.length;s+=hopLen){
+    const re=new Float64Array(nFFT), im=new Float64Array(nFFT);
+    for(let i=0;i<Math.min(frameLen,nFFT);i++)
+      re[i]=data[s+i]*0.54-0.46*Math.cos(2*Math.PI*i/(frameLen-1)); // Hamming
+    fft(re,im);
+
+    const mag=new Float64Array(nFFT/2);
+    for(let k=0;k<nFFT/2;k++) mag[k]=re[k]**2+im[k]**2;
+
+    // Apply mel filters
+    const filterEnergies=new Float32Array(nFilters);
+    for(let m=1;m<=nFilters;m++){
+      const f1=binPoints[m-1], f2=binPoints[m], f3=binPoints[m+1];
+      for(let k=f1;k<f2&&k<mag.length;k++)
+        filterEnergies[m-1]+=mag[k]*(k-f1)/(f2-f1+1e-10);
+      for(let k=f2;k<f3&&k<mag.length;k++)
+        filterEnergies[m-1]+=mag[k]*(f3-k)/(f3-f2+1e-10);
+      filterEnergies[m-1]=Math.log(filterEnergies[m-1]+1e-10);
+    }
+
+    // DCT for MFCC
+    const mfcc=new Float32Array(nMFCC);
+    for(let n=0;n<nMFCC;n++){
+      let sum=0;
+      for(let m=0;m<nFilters;m++)
+        sum+=filterEnergies[m]*Math.cos(Math.PI*n*(m+0.5)/nFilters);
+      mfcc[n]=sum;
+    }
+    mfccFrames.push(mfcc);
+  }
+
+  if(mfccFrames.length<10) return 0.5;
+
+  // Compute MFCC delta regularity (coefficient of variation of delta MFCCs)
+  const deltas: number[]=[];
+  for(let t=1;t<mfccFrames.length;t++){
+    let d=0;
+    for(let n=0;n<nMFCC;n++)
+      d+=(mfccFrames[t][n]-mfccFrames[t-1][n])**2;
+    deltas.push(Math.sqrt(d));
+  }
+
+  const mean=deltas.reduce((a,b)=>a+b)/deltas.length;
+  const std=Math.sqrt(deltas.reduce((s,v)=>s+(v-mean)**2,0)/deltas.length);
+  const cv=std/(mean+1e-10);
+
+  // Low CV = unnaturally smooth trajectory = synthetic
+  // High CV = natural variation = human
+  return Math.min(1, cv/0.5);
+}
+
+// ── FFT helper (already defined above) ───────────────────────────────────────
+// Re-export for MFCC use
 
 // ── Main Detector ─────────────────────────────────────────────────────────────
 
@@ -295,14 +393,18 @@ export function detectSyntheticSpeech(
     transientNaturalness: analyzeTransientNaturalness(data, sr),
   };
 
-  // Weighted synthetic score
+  // MFCC regularity analysis (additional evidence)
+  const mfccNaturalness = analyzeMFCCRegularity(data, sr);
+
+  // Weighted synthetic score (7 features)
   const syntheticScore =
-    features.f0RegularityScore    * 0.25 +
+    features.f0RegularityScore       * 0.22 +
     (1-features.glottalIrregularity) * 0.20 +
-    features.spectralSmoothness   * 0.20 +
-    features.pauseRegularity      * 0.15 +
-    (1-features.phaseChaos)       * 0.10 +
-    (1-features.transientNaturalness) * 0.10;
+    features.spectralSmoothness      * 0.18 +
+    features.pauseRegularity         * 0.13 +
+    (1-features.phaseChaos)          * 0.10 +
+    (1-features.transientNaturalness)* 0.10 +
+    (1-mfccNaturalness)              * 0.07;
 
   const confidence   = Math.min(1, Math.abs(syntheticScore - 0.5) * 2);
   const isSynthetic  = syntheticScore > 0.55;
