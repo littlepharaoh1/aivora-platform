@@ -164,8 +164,8 @@ export default function AudioQualityAnalyzer() {
         setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
         const spec=computeSpectrogramPro(buf,{fftSize:4096,minDb:-90,maxDb:-10,gain:1.3,colorMap:"aivora"});
         setSpectrogramData(spec);
-        const gaps=detectDigitalGaps(buf);
-        setDigitalGaps(gaps);
+        const digitalGapsList=detectDigitalGaps(buf);
+        setDigitalGaps(digitalGapsList);
       }).catch(console.error);
     }
   },[currentFile]);
@@ -216,8 +216,8 @@ export default function AudioQualityAnalyzer() {
       }
       const spec=computeSpectrogramPro(buf,{fftSize:4096,minDb:-90,maxDb:-10,gain:1.3,colorMap:"aivora"});
       setSpectrogramData(spec);
-      const gaps=detectDigitalGaps(buf);
-      setDigitalGaps(gaps);
+      const digitalGapsList=detectDigitalGaps(buf);
+      setDigitalGaps(digitalGapsList);
     }catch(e){}
     setLoading(false);
   }
