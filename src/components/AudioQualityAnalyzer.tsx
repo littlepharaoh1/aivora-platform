@@ -281,8 +281,7 @@ export default function AudioQualityAnalyzer() {
       reward: d.status==="approved"?1.0:d.status==="review"?0.5:0.0,
       metadata: d,
     });
-    const blob=new Blob([line+"
-"],{type:"application/jsonl"});
+    const blob=new Blob([line+"\n"],{type:"application/jsonl"});
     const a=document.createElement("a");
     a.href=URL.createObjectURL(blob);
     a.download=`QC_Review_${d.fileName.replace(".wav","")}_${d.date}.jsonl`;
