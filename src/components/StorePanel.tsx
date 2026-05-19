@@ -8,7 +8,7 @@ import { useAivora } from "../lib/store/AivoraContext";
 import { runUnifiedPipeline, PIPELINE_PRESETS } from "../lib/dsp/aivoraDSPController";
 
 export default function StorePanel() {
-  const { records, stats, storageInfo, isHydrating, addRecord, removeRecord, clearAll } = useAivora();
+  const { records, stats, storageInfo, isHydrating, addFile, removeRecord, clearAll } = useAivora();
   const [selected,   setSelected]   = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState<string|null>(null);
   const [filter,     setFilter]     = useState("all");
@@ -16,10 +16,9 @@ export default function StorePanel() {
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   async function handleUpload(files: FileList) {
-    for(const file of Array.from(files)) {
-      if(!file.name.endsWith(".wav")) continue;
-      addRecord?.({ id:Date.now().toString(), name:file.name,
-        size:file.size, type:"wav", createdAt:new Date().toISOString() });
+    const wavs = Array.from(files).filter(f => f.name.toLowerCase().endsWith(".wav"));
+    for(const file of wavs) {
+      await addFile?.(file);
     }
   }
 
