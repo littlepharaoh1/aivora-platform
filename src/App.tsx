@@ -388,8 +388,15 @@ function AppContent(){
   const [showLanding,setShowLanding]=useState(true);
   const [tab,setTab]=useState<Tab>("dashboard");
 
-  // Clear Supabase auth error params from URL
+  // Clear Supabase auth params from URL
   useEffect(()=>{
+    // Clear hash tokens (access_token, refresh_token)
+    if(window.location.hash.includes("access_token") ||
+       window.location.hash.includes("refresh_token")) {
+      window.history.replaceState({},"",window.location.pathname);
+      return;
+    }
+    // Clear search error params
     const url=new URL(window.location.href);
     if(url.searchParams.has("error")){
       url.searchParams.delete("error");
