@@ -68,7 +68,7 @@ export interface ReplayStats {
 async function hashFloat32(data: Float32Array): Promise<string> {
   try {
     // Use SubtleCrypto for forensic-grade hashing
-    const bytes  = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    const bytes  = new Uint8Array(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength);
     const digest = await crypto.subtle.digest("SHA-256", bytes);
     const hex    = Array.from(new Uint8Array(digest))
       .map(b => b.toString(16).padStart(2,"0"))
