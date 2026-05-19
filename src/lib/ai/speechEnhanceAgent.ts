@@ -267,11 +267,13 @@ export class SpeechEnhanceAgent {
     }
 
     // DSP stages
-    current = await dspEnhance(current, sr, analysis, route, stages);
+    const dspOut = await dspEnhance(current, sr, analysis, route, stages);
+    current = new Float32Array(dspOut.buffer as ArrayBuffer, dspOut.byteOffset, dspOut.length);
 
     // LUFS normalization
     const targetLufs = options.targetLufs ?? -23;
-    current = normalizeLUFS(current, sr, targetLufs);
+    const lufsOut = normalizeLUFS(current, sr, targetLufs);
+    current = new Float32Array(lufsOut.buffer as ArrayBuffer, lufsOut.byteOffset, lufsOut.length);
     stages.push(`LUFS → ${targetLufs}`);
 
     // Mastering limiter
@@ -286,7 +288,7 @@ export class SpeechEnhanceAgent {
     const qualityDelta   = outputQuality - inputQuality;
 
     if(options.validateOutput !== false && qualityDelta < -10) {
-      current     = data;
+      current     = new Float32Array(data.buffer as ArrayBuffer, data.byteOffset, data.length);
       rolledBack  = true;
       stages.push("ROLLBACK: output degraded");
     }
