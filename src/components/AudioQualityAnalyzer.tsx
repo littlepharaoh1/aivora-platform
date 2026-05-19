@@ -17,6 +17,7 @@ import { detectReverb } from "../lib/audioQc/reverbDetector";
 import WaveformEditor from "./audio/WaveformEditor";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
+import { supabase } from "../lib/supabase";
 import { trackEvent } from "../lib/tracking/activityTracker";
 import { jobsAPI } from "../lib/api/aivoraAPI";
 import { supabase } from "../lib/supabase";
@@ -134,6 +135,17 @@ export default function AudioQualityAnalyzer() {
   const [beforeAfter,setBeforeAfter]=useState(null);
   const [repairResult,setRepairResult]=useState(null);
   const [appenResult,setAppenResult]=useState(null);
+  const [reviewStatus, setReviewStatus] = useState<"approved"|"review"|"rejected"|null>(null);
+  const [reviewNote,   setReviewNote]   = useState("");
+  const [reviewSaved,  setReviewSaved]  = useState(false);
+  const [reviewerName, setReviewerName] = useState("");
+
+  // Get reviewer name from session
+  React.useEffect(()=>{
+    supabase.auth.getSession().then(({data})=>{
+      setReviewerName(data.session?.user?.email?.split("@")[0] ?? "Reviewer");
+    });
+  },[]);
   const [vadResult,setVadResult]=useState(null);
   const [reverbResult,setReverbResult]=useState(null);
   const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false,noiseReduction:false,noiseStrength:0.7,dynamicCompression:false,speechEQ:false});
@@ -519,7 +531,96 @@ export default function AudioQualityAnalyzer() {
             />
           </div>}
 
-          {/* Delivery Readiness Score */}
+          {/* Human Review Panel */}
+      {analysis && (
+        <div style={{background:"#050d18",border:"1px solid #0f2030",
+          borderRadius:12,padding:16,marginTop:12}}>
+
+          <div style={{fontSize:9,color:"#2a6a8a",letterSpacing:2,marginBottom:12}}>
+            HUMAN REVIEW
+          </div>
+
+          {/* Status Buttons */}
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            {([
+              {key:"approved", label:"✓ Approved", color:"#10B981"},
+              {key:"review",   label:"⚠ Review",   color:"#F59E0B"},
+              {key:"rejected", label:"✗ Rejected",  color:"#EF4444"},
+            ] as const).map(({key,label,color})=>(
+              <div key={key} onClick={()=>setReviewStatus(key)}
+                style={{flex:1,textAlign:"center",padding:"10px 0",
+                  borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:11,
+                  background:reviewStatus===key?`${color}25`:"#030810",
+                  color:reviewStatus===key?color:"#4a6a7a",
+                  border:`2px solid ${reviewStatus===key?color:"#1a3a5a"}`,
+                  transition:"all 0.15s"}}>
+                {label}
+              </div>
+            ))}
+          </div>
+
+          {/* Note */}
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:9,color:"#4a6a7a",letterSpacing:1,marginBottom:6}}>
+              NOTE
+            </div>
+            <textarea
+              value={reviewNote}
+              onChange={e=>setReviewNote(e.target.value)}
+              placeholder="Add review notes..."
+              rows={3}
+              style={{width:"100%",boxSizing:"border-box",
+                background:"#030810",border:"1px solid #1a3a5a",
+                borderRadius:6,padding:"8px 12px",
+                color:"#E2EEF6",fontSize:11,
+                fontFamily:"inherit",outline:"none",resize:"vertical"}}/>
+          </div>
+
+          {/* Reviewer + Save */}
+          <div style={{display:"flex",alignItems:"center",
+            gap:8,marginBottom:12,flexWrap:"wrap"}}>
+            <div style={{fontSize:9,color:"#4a6a7a"}}>
+              Reviewer: <span style={{color:"#0EA5E9"}}>{reviewerName}</span>
+            </div>
+            <div style={{fontSize:9,color:"#4a6a7a",marginLeft:"auto"}}>
+              {new Date().toLocaleDateString()}
+            </div>
+            <button onClick={saveReview}
+              style={{padding:"6px 14px",borderRadius:6,border:"none",
+                background:reviewSaved?"#10B98120":"#0EA5E920",
+                color:reviewSaved?"#10B981":"#0EA5E9",
+                fontSize:10,fontWeight:700,cursor:"pointer",
+                fontFamily:"inherit",
+                border:`1px solid ${reviewSaved?"#10B98140":"#0EA5E940"}`}}>
+              {reviewSaved?"✓ Saved":"Save to DB"}
+            </button>
+          </div>
+
+          {/* Export Buttons */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <div style={{fontSize:8,color:"#4a6a7a",
+              width:"100%",marginBottom:4,letterSpacing:1}}>
+              EXPORT REVIEW
+            </div>
+            {[
+              {label:"Excel/CSV", fn:downloadExcel, color:"#10B981"},
+              {label:"JSON",      fn:downloadJSON,  color:"#0EA5E9"},
+              {label:"JSONL",     fn:downloadJSONL, color:"#8B5CF6"},
+            ].map(({label,fn,color})=>(
+              <button key={label} onClick={fn}
+                style={{flex:1,padding:"8px 0",borderRadius:6,
+                  background:`${color}15`,
+                  border:`1px solid ${color}30`,
+                  color,fontSize:10,fontWeight:700,
+                  cursor:"pointer",fontFamily:"inherit"}}>
+                ⬇ {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Readiness Score */}
           {appenResult&&<div style={{background:"#060e16",border:"1px solid "+(appenResult.verdict==="READY"?"#10b98144":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b44":"#ef444444"),borderRadius:12,padding:14}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
