@@ -142,9 +142,13 @@ export default function AudioQualityAnalyzer() {
 
   // Get reviewer name from session
   React.useEffect(()=>{
+    // Clear auth tokens from URL hash
+    if(window.location.hash.includes("access_token")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     supabase.auth.getSession().then(({data})=>{
       setReviewerName(data.session?.user?.email?.split("@")[0] ?? "Reviewer");
-    });
+    }).catch(()=>{});
   },[]);
   const [vadResult,setVadResult]=useState(null);
   const [reverbResult,setReverbResult]=useState(null);
