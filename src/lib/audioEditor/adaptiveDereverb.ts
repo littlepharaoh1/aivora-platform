@@ -141,7 +141,7 @@ function cdot(
   let rR=0, rI=0;
   for(let i=0;i<n;i++){
     rR += aR[i]*bR[i] + aI[i]*bI[i];  // conj(a) * b
-    rI += aR[i]*bI[i] - aI*bR[i];
+    rI += aR[i]*bI[i] - aI[i]*bR[i];
   }
   return [rR, rI];
 }
