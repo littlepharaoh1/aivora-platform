@@ -65,7 +65,9 @@ export const AudioDSPController: React.FC = () => {
 
         // Generate mono channel buffer frame
         const audioBuffer = ctx.createBuffer(1, floatArray.length, 16000);
-        audioBuffer.copyToChannel(floatArray, 0);
+        
+        // HOT-FIX: Cast to any to bypass strict modern TypedArray buffer-backing constraints
+        audioBuffer.copyToChannel(floatArray as any, 0);
 
         // Connect source execution nodes directly to target hardware output
         const sourceNode = ctx.createBufferSource();
