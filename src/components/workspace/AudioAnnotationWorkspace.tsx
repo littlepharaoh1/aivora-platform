@@ -138,3 +138,5 @@ export const AudioAnnotationWorkspace: React.FC = () => {
         </div>
     );
 };
+
+export default AudioAnnotationWorkspace;
