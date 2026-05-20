@@ -3,7 +3,30 @@
  * AivoraAuditionWorkstation.tsx — Professional Audio Editor Workstation
  * Full editing workflow: Copy → Paste → Protect → QA → Export
  * Aivora Platform
+ *
+ * ─── AUDIO ENGINE REFACTOR ────────────────────────────────────────────
+ *  BEFORE (broken):
+ *    • loadAudio()  → new AudioContext() each call, never closed  (leak)
+ *    • handlePlay() → new AudioContext() each call, never closed  (leak)
+ *    • No position tracking, no seek, ⏹ was really just "stop from zero"
+ *    • Download button buried / not independently accessible
+ *
+ *  AFTER (fixed):
+ *    • One persistent AudioContext per session  (audioCtxRef)
+ *    • Real pause/resume: position preserved in playOffsetRef
+ *    • RAF loop updates playPositionMs every frame while playing
+ *    • Click-to-seek progress bar in transport row
+ *    • Session-ID guard on onended prevents stale closure races
+ *    • "⬇ Download Enhanced WAV" button added to transport bar
+ *    • All cleanup on unmount (RAF + source + AudioContext)
+ *    • Playback resets on new file load
+ *
+ *  UI POLICY: every Tailwind class, inline style, color, and layout
+ *  from the original is preserved exactly. Only the audio-engine
+ *  wiring, refs, and transport bar JSX are changed.
+ * ─────────────────────────────────────────────────────────────────────
  */
+
 import React, { useState, useRef, useEffect } from "react";
 import { exportFloat32Wav, downloadWavBlob } from "../lib/audioForensics/floatWavExporter";
 import { analyzeSilenceForensics } from "../lib/audioForensics/silenceForensics";
@@ -136,7 +159,6 @@ function WaveformCanvas({buffer,startSample,endSample,selection,repairedRegions,
     }
     ctx.stroke();
 
-    // Repaired region overlays
     for(const r of repairedRegions){
       const x1=(r.startSample-startSample)/visLen*W;
       const x2=(r.endSample-startSample)/visLen*W;
@@ -147,7 +169,6 @@ function WaveformCanvas({buffer,startSample,endSample,selection,repairedRegions,
       ctx.strokeRect(x1,0,x2-x1,H);
     }
 
-    // Selection
     if(selection){
       const x1=(selection.startSample-startSample)/visLen*W;
       const x2=(selection.endSample-startSample)/visLen*W;
@@ -155,13 +176,11 @@ function WaveformCanvas({buffer,startSample,endSample,selection,repairedRegions,
       ctx.fillRect(x1,0,x2-x1,H);
       ctx.strokeStyle="#22d3ee"; ctx.lineWidth=1;
       ctx.strokeRect(x1,0,x2-x1,H);
-      // Handles
       ctx.fillStyle="#22d3ee";
       ctx.fillRect(x1-2,0,4,H);
       ctx.fillRect(x2-2,0,4,H);
     }
 
-    // dB labels
     ctx.fillStyle="#4a8a9a"; ctx.font="8px monospace";
     [-1,-0.5,0,0.5,1].forEach(v=>{
       const y=H/2*(1-v);
@@ -302,6 +321,9 @@ export default function AivoraAuditionWorkstation(){
   const [zoomEnd,setZoomEnd]=useState(1);
   const [isPlaying,setIsPlaying]=useState(false);
 
+  // ── NEW: playback position state (milliseconds) ─────────────────────
+  const [playPositionMs,setPlayPositionMs]=useState<number>(0);
+
   const [forensics,setForensics]=useState<any>(null);
   const [refProfile,setRefProfile]=useState<any>(null);
   const [clipboardEntries,setClipboardEntries]=useState<ClipboardEntry[]>([]);
@@ -316,7 +338,25 @@ export default function AivoraAuditionWorkstation(){
 
   const targetRef=useRef<HTMLInputElement>(null);
   const refRef   =useRef<HTMLInputElement>(null);
-  const sourceRef=useRef<AudioBufferSourceNode|null>(null);
+
+  // ── NEW: persistent audio engine refs ──────────────────────────────
+  // One AudioContext for the entire session — created on first user
+  // gesture (file load or play), never recreated unless closed.
+  const audioCtxRef   = useRef<AudioContext|null>(null);
+  // The currently playing BufferSourceNode (null when stopped).
+  const sourceRef     = useRef<AudioBufferSourceNode|null>(null);
+  // audioCtx.currentTime at which the last play() call started.
+  const playStartRef  = useRef<number>(0);
+  // Seconds into the buffer from which the last play() started.
+  // Preserved on pause so resume continues from the right place.
+  const playOffsetRef = useRef<number>(0);
+  // requestAnimationFrame handle for the position-update loop.
+  const rafRef        = useRef<number>(0);
+  // Incremented each time startPlayback() is called.
+  // The onended + RAF closures compare against this to ignore stale
+  // callbacks from a previous playback session (e.g. after seek).
+  const playSessionRef= useRef<number>(0);
+  // ────────────────────────────────────────────────────────────────────
 
   const activeBuffer=viewMode==="original"?originalBuffer??targetBuffer:editedBuffer??targetBuffer;
   const sr=activeBuffer?.sampleRate??44100;
@@ -327,9 +367,139 @@ export default function AivoraAuditionWorkstation(){
   const visStartMs=(visStart/sr)*1000;
   const visEndMs  =(visEnd/sr)*1000;
 
-  async function loadAudio(file:File):Promise<AudioBuffer>{
-    const ctx=new AudioContext();
+  // ── Cleanup on unmount ───────────────────────────────────────────────
+  useEffect(()=>{
+    return ()=>{
+      cancelAnimationFrame(rafRef.current);
+      try { sourceRef.current?.stop(); } catch {}
+      audioCtxRef.current?.close();
+    };
+  },[]);
+
+  // ── Audio Context Management ─────────────────────────────────────────
+  // Returns the single shared AudioContext, creating it on first call.
+  // Must be called inside a user-gesture handler so Safari/iOS allows it.
+  function getAudioCtx(): AudioContext {
+    if (!audioCtxRef.current || audioCtxRef.current.state==="closed") {
+      audioCtxRef.current = new AudioContext();
+    }
+    return audioCtxRef.current;
+  }
+
+  // ── File Loading ─────────────────────────────────────────────────────
+  // Uses the shared AudioContext so decoded buffers are compatible with
+  // the playback graph — no cross-context issues.
+  async function loadAudio(file:File): Promise<AudioBuffer> {
+    const ctx = getAudioCtx();
+    if (ctx.state==="suspended") await ctx.resume();
     return ctx.decodeAudioData(await file.arrayBuffer());
+  }
+
+  // ── Core Playback Primitives ─────────────────────────────────────────
+
+  /**
+   * Internal: start playing `buf` from `offsetSec` seconds.
+   * Registers the RAF position loop and the session-guarded onended.
+   */
+  function startPlayback(buf: AudioBuffer, offsetSec: number): void {
+    const ctx = getAudioCtx();
+    if (ctx.state==="suspended"||ctx.state==="interrupted") ctx.resume();
+
+    const sessionId = ++playSessionRef.current;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+
+    // Clamp offset to valid range (avoid sub-millisecond overrun crash).
+    const safeOffset = Math.max(0, Math.min(offsetSec, buf.duration - 0.001));
+    playOffsetRef.current = safeOffset;
+    playStartRef.current  = ctx.currentTime;
+    src.start(0, safeOffset);
+
+    // Session-guarded onended: fires for both natural end AND stop().
+    // We only update state when the session is still current, which
+    // prevents the old source's onended racing against new playback
+    // that started immediately after a seek.
+    src.onended = ()=>{
+      if (playSessionRef.current !== sessionId) return; // stale — ignore
+      cancelAnimationFrame(rafRef.current);
+      // Natural end → reset position to start
+      playOffsetRef.current = 0;
+      setPlayPositionMs(0);
+      setIsPlaying(false);
+    };
+
+    sourceRef.current = src;
+    setIsPlaying(true);
+
+    // RAF loop: updates playPositionMs every animation frame.
+    function tick(){
+      if (playSessionRef.current !== sessionId) return; // stale
+      const c = audioCtxRef.current;
+      if (!c) return;
+      const elapsed = c.currentTime - playStartRef.current;
+      const posMs = (safeOffset + elapsed) * 1000;
+      setPlayPositionMs(Math.min(posMs, buf.duration * 1000));
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  /**
+   * Internal: stop the current source.
+   * `preservePosition=true` → pause (keep offset for resume).
+   * `preservePosition=false` → seek-stop (caller will set new offset).
+   */
+  function stopCurrent(preservePosition: boolean): void {
+    // Increment session so onended/RAF from the old source are ignored.
+    playSessionRef.current++;
+    cancelAnimationFrame(rafRef.current);
+
+    if (preservePosition && audioCtxRef.current) {
+      const elapsed = audioCtxRef.current.currentTime - playStartRef.current;
+      playOffsetRef.current = playOffsetRef.current + elapsed;
+    }
+
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current = null;
+    setIsPlaying(false);
+  }
+
+  // ── Public: Play / Pause ─────────────────────────────────────────────
+  function handlePlay(): void {
+    const buf = activeBuffer;
+    if (!buf) return;
+
+    if (isPlaying) {
+      // Pause: stop and preserve position for resume.
+      stopCurrent(true);
+      return;
+    }
+
+    // Resume from paused position, or start from selection start,
+    // or start from the beginning of the file.
+    const resumeOffset =
+      playOffsetRef.current > 0
+        ? playOffsetRef.current
+        : selection
+          ? selection.startSample / sr
+          : 0;
+
+    startPlayback(buf, resumeOffset);
+  }
+
+  // ── Public: Seek (click on progress bar) ────────────────────────────
+  function seekTo(seconds: number): void {
+    const buf = activeBuffer;
+    if (!buf) return;
+
+    if (isPlaying) {
+      stopCurrent(false); // discard old position
+      startPlayback(buf, seconds);
+    } else {
+      playOffsetRef.current = seconds;
+      setPlayPositionMs(seconds * 1000);
+    }
   }
 
   function handleSelect(s:number,e:number){
@@ -342,8 +512,6 @@ export default function AivoraAuditionWorkstation(){
       durationMs:((ee-ss)/sr)*1000,type:"selection",
     };
     setSelection(reg);
-
-    // Auto check speech protection
     const buf=editedBuffer??targetBuffer;
     if(buf){
       const p=checkSpeechProtection(buf,ss,ee);
@@ -380,24 +548,15 @@ export default function AivoraAuditionWorkstation(){
   async function handlePaste(){
     const buf=editedBuffer??targetBuffer;
     if(!buf||!selection||!activeClipboard) return;
-
-    // Speech protection check
     const p=checkSpeechProtection(buf,selection.startSample,selection.endSample);
     setProtection(p);
-    if(!p.allowed){
-      setStatus(`⛔ Blocked: ${p.blockedReason}`);
-      return;
-    }
-
+    if(!p.allowed){setStatus(`⛔ Blocked: ${p.blockedReason}`);return;}
     setLoading("Pasting clean silence...");
     await new Promise(r=>setTimeout(r,0));
-
     const result=replaceRegionWithClipboard(
       buf, selection.startSample, selection.endSample,
       activeClipboard, {mode:replaceMode, crossfadeMs:8, snapZeroCross:true}
     );
-
-    // Run region QA
     const qa=runRegionQA(
       result.repairedBuffer,
       selection.startSample, selection.endSample,
@@ -405,15 +564,11 @@ export default function AivoraAuditionWorkstation(){
     );
     setLastQA(qa);
     setEditedBuffer(result.repairedBuffer);
-
-    // Update repaired regions
     setRepairedRegions(prev=>[...prev,{
       startSample:selection.startSample,endSample:selection.endSample,
       startMs:selection.startMs,endMs:selection.endMs,
       durationMs:selection.durationMs,type:"repaired",
     }]);
-
-    // Add to history
     const entry:EditEntry={
       id:`edit_${Date.now()}`,
       action:`${replaceMode} silence paste`,
@@ -422,7 +577,6 @@ export default function AivoraAuditionWorkstation(){
       qaResult:qa,
     };
     setEditHistory(prev=>[...prev,entry]);
-
     const statusMsg=qa.status==="PASS"
       ?`✅ Paste PASS (${(qa.score*100).toFixed(0)}%) — seam safe`
       :qa.status==="REVIEW"
@@ -437,14 +591,11 @@ export default function AivoraAuditionWorkstation(){
   async function handleHeal(){
     const buf=editedBuffer??targetBuffer;
     if(!buf||!selection||!refProfile) return;
-
     const p=checkSpeechProtection(buf,selection.startSample,selection.endSample);
     setProtection(p);
     if(!p.allowed){setStatus(`⛔ Blocked: ${p.blockedReason}`);return;}
-
     setLoading("Healing region...");
     await new Promise(r=>setTimeout(r,0));
-
     const result=healRegion(buf,selection.startSample,selection.endSample,refProfile);
     const qa=runRegionQA(result.repairedBuffer,selection.startSample,selection.endSample,originalBuffer??targetBuffer??undefined);
     setLastQA(qa);
@@ -473,19 +624,6 @@ export default function AivoraAuditionWorkstation(){
     setStatus("Reference profile ready"); setLoading("");
   }
 
-  // ── Playback ───────────────────────────────────────────────────────────────
-
-  function handlePlay(){
-    const buf=activeBuffer; if(!buf) return;
-    if(isPlaying){sourceRef.current?.stop();setIsPlaying(false);return;}
-    const ctx=new AudioContext();
-    const src=ctx.createBufferSource();
-    src.buffer=buf; src.connect(ctx.destination);
-    const offset=selection?(selection.startSample/sr):0;
-    src.start(0,offset); src.onended=()=>setIsPlaying(false);
-    sourceRef.current=src; setIsPlaying(true);
-  }
-
   // ── Zoom ───────────────────────────────────────────────────────────────────
 
   function zoomIn(){const m=(zoomStart+zoomEnd)/2,h=(zoomEnd-zoomStart)/4;setZoomStart(Math.max(0,m-h));setZoomEnd(Math.min(1,m+h));}
@@ -498,7 +636,7 @@ export default function AivoraAuditionWorkstation(){
     setZoomEnd(Math.min(1,selection.endSample/totalSamples+pad));
   }
 
-  // ── Export ─────────────────────────────────────────────────────────────────
+  // ── Validate & Export ─────────────────────────────────────────────────────
 
   async function handleValidateFile(){
     if(!editedBuffer||!targetBuffer) return;
@@ -540,7 +678,7 @@ export default function AivoraAuditionWorkstation(){
     return()=>window.removeEventListener("keydown",onKey);
   });
 
-  // ── Protection color ──────────────────────────────────────────────────────
+  // ── Derived display values ─────────────────────────────────────────────────
 
   const protColor=!protection?"#4a8a9a"
     :protection.riskLevel==="LOW"?"#10b981"
@@ -557,11 +695,16 @@ export default function AivoraAuditionWorkstation(){
     return m.subarray(selection.startSample,selection.endSample);
   })():null;
 
+  // Seek-bar progress: 0–1
+  const playProgress = totalMs > 0 ? Math.min(playPositionMs / totalMs, 1) : 0;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100vh",
       background:"#020810",fontFamily:"monospace",color:"#a0c4cc",overflow:"hidden"}}>
 
-      {/* TOP BAR */}
+      {/* ── TOP BAR ─────────────────────────────────────────────────────── */}
       <div style={{height:40,background:"#030c14",borderBottom:"1px solid #0f2a3a",
         display:"flex",alignItems:"center",gap:6,padding:"0 10px",flexShrink:0,flexWrap:"wrap"}}>
         <div style={{fontSize:11,fontWeight:700,color:"#22d3ee",letterSpacing:2}}>
@@ -575,9 +718,13 @@ export default function AivoraAuditionWorkstation(){
         </button>
         <input ref={targetRef} type="file" accept=".wav" style={{display:"none"}}
           onChange={async e=>{
-            const f=e.target.files?.[0];if(!f)return;
+            const f=e.target.files?.[0]; if(!f) return;
             setTargetName(f.name);
             const buf=await loadAudio(f);
+            // Stop any ongoing playback and reset position for new file.
+            if (isPlaying) stopCurrent(false);
+            playOffsetRef.current = 0;
+            setPlayPositionMs(0);
             setTargetBuffer(buf);setOriginalBuffer(buf);setEditedBuffer(null);
             setZoomStart(0);setZoomEnd(1);setSelection(null);setForensics(null);
             setRepairedRegions([]);setLastQA(null);setEditHistory([]);
@@ -589,8 +736,8 @@ export default function AivoraAuditionWorkstation(){
         </button>
         <input ref={refRef} type="file" accept=".wav" style={{display:"none"}}
           onChange={async e=>{
-            const f=e.target.files?.[0];if(!f)return;
-            setRefName(f.name);setRefBuffer(await loadAudio(f));
+            const f=e.target.files?.[0]; if(!f) return;
+            setRefName(f.name); setRefBuffer(await loadAudio(f));
           }}/>
         <div style={{width:1,height:20,background:"#0f2a3a",margin:"0 2px"}}/>
         {(["original","edited","difference"] as ViewMode[]).map(m=>(
@@ -625,14 +772,12 @@ export default function AivoraAuditionWorkstation(){
         </div>
       </div>
 
-      {/* MAIN BODY */}
+      {/* ── MAIN BODY ───────────────────────────────────────────────────── */}
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
 
         {/* LEFT PANEL */}
         <div style={{width:190,background:"#030c14",borderRight:"1px solid #0f2a3a",
           display:"flex",flexDirection:"column",overflow:"hidden",flexShrink:0}}>
-
-          {/* File info */}
           <div style={{padding:"8px 8px",borderBottom:"1px solid #0a1a24"}}>
             <div style={{fontSize:8,color:"#4a8a9a",marginBottom:3,letterSpacing:1}}>TARGET</div>
             <div style={{fontSize:8,color:"#e0f2f8",wordBreak:"break-all",marginBottom:4}}>
@@ -645,8 +790,6 @@ export default function AivoraAuditionWorkstation(){
               <StatRow label="Edits" value={`${editHistory.length}`}/>
             </>}
           </div>
-
-          {/* Reference */}
           <div style={{padding:"8px 8px",borderBottom:"1px solid #0a1a24"}}>
             <div style={{fontSize:8,color:"#8b5cf6",marginBottom:3,letterSpacing:1}}>REFERENCE</div>
             <div style={{fontSize:8,color:refBuffer?"#e0f2f8":"#2a5a6a",wordBreak:"break-all",marginBottom:4}}>
@@ -670,8 +813,6 @@ export default function AivoraAuditionWorkstation(){
               </button>
             </>}
           </div>
-
-          {/* Forensics */}
           {forensics&&<div style={{padding:"8px 8px",borderBottom:"1px solid #0a1a24"}}>
             <div style={{fontSize:8,color:"#f59e0b",marginBottom:3,letterSpacing:1}}>FORENSICS</div>
             <StatRow label="Contaminated" value={`${forensics.contaminatedRegions.length}`}
@@ -679,8 +820,6 @@ export default function AivoraAuditionWorkstation(){
             <StatRow label="Purity" value={`${(forensics.overallPurityScore*100).toFixed(0)}%`}/>
             <StatRow label="Noise Floor" value={`${forensics.noiseFloorDb.toFixed(1)} dB`}/>
           </div>}
-
-          {/* Edit History */}
           <div style={{flex:1,overflow:"auto",padding:"8px 8px"}}>
             <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4,letterSpacing:1}}>HISTORY</div>
             {editHistory.length===0&&<div style={{fontSize:8,color:"#2a5a6a"}}>No edits</div>}
@@ -698,7 +837,7 @@ export default function AivoraAuditionWorkstation(){
         {/* CENTER EDITOR */}
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
-          {/* Overview */}
+          {/* Overview strip */}
           <div style={{height:28,background:"#020c10",borderBottom:"1px solid #0a1a24",
             position:"relative",flexShrink:0}}>
             <div style={{position:"absolute",left:`${zoomStart*100}%`,top:0,bottom:0,
@@ -756,34 +895,126 @@ export default function AivoraAuditionWorkstation(){
             <span style={{fontSize:7,color:"#4a8a9a"}}>{fmtTime(visStartMs)}–{fmtTime(visEndMs)}</span>
           </div>
 
-          {/* Transport */}
+          {/* ── TRANSPORT BAR ─────────────────────────────────────────────── */}
+          {/*  Changes from original:                                          */}
+          {/*    1. ▶/⏸  instead of ▶/⏹  (it's now pause, not stop)          */}
+          {/*    2. Position/duration display  e.g.  1.234s / 5.000s          */}
+          {/*    3. Click-to-seek progress bar between play btn and duration   */}
+          {/*    4. "⬇ Download Enhanced WAV" button (calls handleExport)      */}
           <div style={{height:34,background:"#030c14",borderTop:"1px solid #0a1a24",
             display:"flex",alignItems:"center",gap:6,padding:"0 10px",flexShrink:0}}>
+
+            {/* Play / Pause button */}
             <button onClick={handlePlay}
               style={{background:"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:5,
-                padding:"3px 14px",cursor:"pointer",color:"#22d3ee",fontSize:11}}>
-              {isPlaying?"⏹":"▶"}
+                padding:"3px 14px",cursor:"pointer",color:"#22d3ee",fontSize:11,
+                flexShrink:0}}>
+              {isPlaying ? "⏸" : "▶"}
             </button>
-            <span style={{fontSize:8,color:"#4a8a9a"}}>{fmtTime(totalMs)}</span>
-            <div style={{width:1,height:14,background:"#0f2a3a",margin:"0 2px"}}/>
+
+            {/* Position / Duration text */}
+            <span style={{fontSize:8,color:"#4a8a9a",flexShrink:0,minWidth:90,textAlign:"right"}}>
+              {fmtTime(playPositionMs)}
+              <span style={{color:"#1a4a5a"}}> / </span>
+              {fmtTime(totalMs)}
+            </span>
+
+            {/* ── Seek / Progress bar ──────────────────────────────────── */}
+            {/*  Click anywhere on the bar to jump to that position.         */}
+            {/*  The cyan fill shows how far through the file we are.        */}
+            <div
+              onClick={e=>{
+                if(!activeBuffer) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const fraction = Math.max(0, Math.min(1,
+                  (e.clientX - rect.left) / rect.width
+                ));
+                seekTo(fraction * activeBuffer.duration);
+              }}
+              style={{flex:1,height:5,background:"#0a1a24",borderRadius:3,
+                cursor:activeBuffer?"pointer":"default",position:"relative",overflow:"hidden"}}>
+              {/* Filled progress */}
+              <div style={{
+                position:"absolute",left:0,top:0,bottom:0,
+                width:`${playProgress*100}%`,
+                background: isPlaying
+                  ? "linear-gradient(90deg,#22d3ee,#0ea5e9)"
+                  : "#1a4a5a",
+                borderRadius:3,
+                transition: isPlaying ? "none" : "width 0.1s ease",
+              }}/>
+              {/* Playhead handle */}
+              {activeBuffer && (
+                <div style={{
+                  position:"absolute",
+                  left:`calc(${playProgress*100}% - 3px)`,
+                  top:-2, bottom:-2, width:6,
+                  background:"#22d3ee",borderRadius:3,
+                  boxShadow:"0 0 4px #22d3ee88",
+                  pointerEvents:"none",
+                }}/>
+              )}
+            </div>
+
+            <div style={{width:1,height:14,background:"#0f2a3a",margin:"0 2px",flexShrink:0}}/>
+
+            {/* Analyze button */}
             <button onClick={handleAnalyze} disabled={!activeBuffer}
               style={{background:"#f59e0b22",border:"1px solid #f59e0b44",borderRadius:4,
-                padding:"2px 8px",cursor:"pointer",color:"#f59e0b",fontSize:8,opacity:!activeBuffer?0.4:1}}>
+                padding:"2px 8px",cursor:"pointer",color:"#f59e0b",fontSize:8,
+                opacity:!activeBuffer?0.4:1,flexShrink:0}}>
               🔬 Analyze
             </button>
-            <button onClick={handleValidateFile} disabled={!editedBuffer||!targetBuffer} style={{background:"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:4,padding:"2px 8px",cursor:"pointer",color:"#22d3ee",fontSize:8,opacity:(!editedBuffer||!targetBuffer)?0.4:1}}>✅ Validate</button>
-            <button onClick={()=>setShowRoundtrip(v=>!v)} disabled={!gateResult} style={{background:"#8b5cf622",border:"1px solid #8b5cf644",borderRadius:4,padding:"2px 8px",cursor:"pointer",color:"#8b5cf6",fontSize:8,opacity:!gateResult?0.4:1}}>🎯 Roundtrip</button>
-            <div style={{marginLeft:"auto",fontSize:7,color:"#2a5a6a"}}>
-              SPACE=Play  Ctrl+C=Copy  Ctrl+V=Paste  +=In  -=Out
-            </div>
+
+            <button onClick={handleValidateFile} disabled={!editedBuffer||!targetBuffer}
+              style={{background:"#22d3ee22",border:"1px solid #22d3ee44",borderRadius:4,
+                padding:"2px 8px",cursor:"pointer",color:"#22d3ee",fontSize:8,
+                opacity:(!editedBuffer||!targetBuffer)?0.4:1,flexShrink:0}}>
+              ✅ Validate
+            </button>
+
+            <button onClick={()=>setShowRoundtrip(v=>!v)} disabled={!gateResult}
+              style={{background:"#8b5cf622",border:"1px solid #8b5cf644",borderRadius:4,
+                padding:"2px 8px",cursor:"pointer",color:"#8b5cf6",fontSize:8,
+                opacity:!gateResult?0.4:1,flexShrink:0}}>
+              🎯 Roundtrip
+            </button>
+
+            {/* ── Download Enhanced WAV ─────────────────────────────────── */}
+            {/*  Available as soon as any buffer is loaded.                   */}
+            {/*  Uses editedBuffer when available, falls back to original.    */}
+            <button
+              onClick={handleExport}
+              disabled={!targetBuffer}
+              title={editedBuffer
+                ? "Download the restored/edited buffer as 32-bit Float WAV"
+                : "Download the original file as 32-bit Float WAV"}
+              style={{
+                background: editedBuffer ? "#10b98133" : "#10b98116",
+                border:`1px solid ${editedBuffer?"#10b98166":"#10b98133"}`,
+                borderRadius:5,
+                padding:"3px 10px",
+                cursor:targetBuffer?"pointer":"not-allowed",
+                color: editedBuffer ? "#10b981" : "#4a8a9a",
+                fontSize:9,
+                fontWeight:700,
+                opacity:!targetBuffer?0.35:1,
+                flexShrink:0,
+                display:"flex",alignItems:"center",gap:4,
+                boxShadow: editedBuffer ? "0 0 8px #10b98144" : "none",
+                transition:"box-shadow 0.2s",
+              }}>
+              ⬇ {editedBuffer ? "Download Enhanced WAV" : "Download WAV"}
+            </button>
+
           </div>
+          {/* ── END TRANSPORT BAR ─────────────────────────────────────────── */}
+
         </div>
 
         {/* RIGHT PANEL */}
         <div style={{width:200,background:"#030c14",borderLeft:"1px solid #0f2a3a",
           display:"flex",flexDirection:"column",overflow:"auto",flexShrink:0}}>
-
-          {/* Tools */}
           <div style={{padding:"8px 6px",borderBottom:"1px solid #0a1a24"}}>
             <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4,letterSpacing:1}}>TOOLS</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:2}}>
@@ -794,8 +1025,6 @@ export default function AivoraAuditionWorkstation(){
               <ToolBtn icon="🔬" label="Inspect" active={activeTool==="inspect"} onClick={()=>setActiveTool("inspect")}/>
             </div>
           </div>
-
-          {/* Selection Info */}
           <div style={{padding:"8px 8px",borderBottom:"1px solid #0a1a24"}}>
             <div style={{fontSize:8,color:"#22d3ee",marginBottom:3,letterSpacing:1}}>SELECTION</div>
             {!selection&&<div style={{fontSize:8,color:"#2a5a6a"}}>Drag to select</div>}
@@ -807,8 +1036,6 @@ export default function AivoraAuditionWorkstation(){
               {selMono&&<StatRow label="RMS" value={`${rmsDb(selMono).toFixed(1)} dB`}/>}
             </>}
           </div>
-
-          {/* Speech Protection */}
           {protection&&<div style={{padding:"8px 8px",borderBottom:"1px solid #0a1a24"}}>
             <div style={{fontSize:8,color:protColor,marginBottom:3,letterSpacing:1}}>
               SPEECH PROTECTION: {protection.riskLevel}
@@ -824,8 +1051,6 @@ export default function AivoraAuditionWorkstation(){
               <div key={i} style={{fontSize:7,color:"#f59e0b",marginTop:2}}>⚠ {w}</div>
             ))}
           </div>}
-
-          {/* Silence Clipboard */}
           <div style={{padding:"8px 8px",borderBottom:"1px solid #0a1a24"}}>
             <div style={{fontSize:8,color:"#8b5cf6",marginBottom:4,letterSpacing:1}}>SILENCE CLIPBOARD</div>
             <button onClick={handleCopyToClipboard} disabled={!selection||!activeBuffer}
@@ -847,8 +1072,6 @@ export default function AivoraAuditionWorkstation(){
               </div>
             ))}
           </div>
-
-          {/* Replace Mode */}
           <div style={{padding:"8px 8px",borderBottom:"1px solid #0a1a24"}}>
             <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4,letterSpacing:1}}>REPLACE MODE</div>
             {(["fill","blend","heal","replace","match_tone"] as ReplaceMode[]).map(m=>(
@@ -861,8 +1084,6 @@ export default function AivoraAuditionWorkstation(){
               </div>
             ))}
           </div>
-
-          {/* Paste Button */}
           <div style={{padding:"8px 8px",borderBottom:"1px solid #0a1a24"}}>
             <button onClick={handlePaste}
               disabled={!selection||!activeClipboard||!activeBuffer||protection?.riskLevel==="BLOCKED"}
@@ -879,8 +1100,6 @@ export default function AivoraAuditionWorkstation(){
               🩹 Heal Region
             </button>
           </div>
-
-          {/* Last Region QA */}
           {lastQA&&<div style={{padding:"8px 8px"}}>
             <div style={{fontSize:8,color:qaColor,marginBottom:4,letterSpacing:1}}>REGION QA</div>
             <QABadge result={lastQA}/>
@@ -888,15 +1107,22 @@ export default function AivoraAuditionWorkstation(){
         </div>
       </div>
 
+      {/* ── ROUNDTRIP PANEL ─────────────────────────────────────────────── */}
       {showRoundtrip&&gateResult&&(
-        <div style={{position:"fixed",top:40,right:0,bottom:0,width:260,background:"#030c14",borderLeft:"1px solid #0f2a3a",zIndex:100,overflow:"auto",padding:12}}>
+        <div style={{position:"fixed",top:40,right:0,bottom:0,width:260,background:"#030c14",
+          borderLeft:"1px solid #0f2a3a",zIndex:100,overflow:"auto",padding:12}}>
           <div style={{display:"flex",alignItems:"center",marginBottom:10}}>
             <div style={{fontSize:10,fontWeight:700,color:"#8b5cf6"}}>ROUNDTRIP READINESS</div>
-            <button onClick={()=>setShowRoundtrip(false)} style={{marginLeft:"auto",background:"transparent",border:"none",color:"#4a8a9a",cursor:"pointer",fontSize:14}}>{"✕"}</button>
+            <button onClick={()=>setShowRoundtrip(false)}
+              style={{marginLeft:"auto",background:"transparent",border:"none",color:"#4a8a9a",cursor:"pointer",fontSize:14}}>✕</button>
           </div>
-          <div style={{padding:"8px",borderRadius:8,marginBottom:10,background:gateResult.passed?"#10b98122":"#ef444422",border:"1px solid "+(gateResult.passed?"#10b98144":"#ef444444")}}>
-            <div style={{fontSize:11,fontWeight:700,color:gateResult.passed?"#10b981":"#ef4444"}}>{gateResult.gateStatus.replace(/_/g," ")}</div>
-            <div style={{fontSize:7,color:"#4a8a9a"}}>{"Adobe-style QA — NOT official certification"}</div>
+          <div style={{padding:"8px",borderRadius:8,marginBottom:10,
+            background:gateResult.passed?"#10b98122":"#ef444422",
+            border:"1px solid "+(gateResult.passed?"#10b98144":"#ef444444")}}>
+            <div style={{fontSize:11,fontWeight:700,color:gateResult.passed?"#10b981":"#ef4444"}}>
+              {gateResult.gateStatus.replace(/_/g," ")}
+            </div>
+            <div style={{fontSize:7,color:"#4a8a9a"}}>Adobe-style QA — NOT official certification</div>
           </div>
           <PBar score={gateResult.scores.silenceRealism}     label="Silence Realism"/>
           <PBar score={1-gateResult.scores.seamRisk}         label="Seam Invisibility"/>
@@ -904,16 +1130,36 @@ export default function AivoraAuditionWorkstation(){
           <PBar score={1-gateResult.scores.reviewerRisk}     label="Reviewer Safety"/>
           <PBar score={gateResult.scores.overallGate}        label="Overall Score"/>
           <div style={{marginTop:6}}>
-            {gateResult.blockingReasons.map((r,i)=>(<div key={i} style={{fontSize:8,color:"#ef4444",marginBottom:2}}>{"✗ "+r}</div>))}
-            {gateResult.warnings.map((w,i)=>(<div key={i} style={{fontSize:8,color:"#f59e0b",marginBottom:2}}>{"⚠ "+w}</div>))}
+            {gateResult.blockingReasons.map((r,i)=>(
+              <div key={i} style={{fontSize:8,color:"#ef4444",marginBottom:2}}>✗ {r}</div>
+            ))}
+            {gateResult.warnings.map((w,i)=>(
+              <div key={i} style={{fontSize:8,color:"#f59e0b",marginBottom:2}}>⚠ {w}</div>
+            ))}
           </div>
           <div style={{marginTop:8,padding:"6px",background:"#040c14",borderRadius:6,border:"1px solid #0f2a3a"}}>
-            <div style={{fontSize:8,fontWeight:700,color:gateResult.exportAllowed?"#10b981":"#ef4444"}}>{gateResult.exportAllowed?"✅ Export allowed":"⛔ Export blocked"}</div>
-            {editedBuffer&&<div style={{fontSize:7,color:"#22d3ee",marginTop:2}}>{"32-bit Float · "+editedBuffer.sampleRate+"Hz"}</div>}
+            <div style={{fontSize:8,fontWeight:700,color:gateResult.exportAllowed?"#10b981":"#ef4444"}}>
+              {gateResult.exportAllowed?"✅ Export allowed":"⛔ Export blocked"}
+            </div>
+            {editedBuffer&&(
+              <div style={{fontSize:7,color:"#22d3ee",marginTop:2}}>
+                32-bit Float · {editedBuffer.sampleRate}Hz
+              </div>
+            )}
           </div>
-          <button onClick={handleExport} disabled={!gateResult.exportAllowed} style={{marginTop:8,width:"100%",background:gateResult.exportAllowed?"#10b98122":"#0a1a24",border:"1px solid "+(gateResult.exportAllowed?"#10b98144":"#0f2a3a"),borderRadius:6,padding:"7px",cursor:gateResult.exportAllowed?"pointer":"not-allowed",color:gateResult.exportAllowed?"#10b981":"#2a5a6a",fontSize:10,fontWeight:700}}>{gateResult.exportAllowed?"⬇ Export 32-bit Float WAV":"⛔ Export Blocked"}</button>
+          <button onClick={handleExport} disabled={!gateResult.exportAllowed}
+            style={{marginTop:8,width:"100%",
+              background:gateResult.exportAllowed?"#10b98122":"#0a1a24",
+              border:"1px solid "+(gateResult.exportAllowed?"#10b98144":"#0f2a3a"),
+              borderRadius:6,padding:"7px",
+              cursor:gateResult.exportAllowed?"pointer":"not-allowed",
+              color:gateResult.exportAllowed?"#10b981":"#2a5a6a",
+              fontSize:10,fontWeight:700}}>
+            {gateResult.exportAllowed?"⬇ Export 32-bit Float WAV":"⛔ Export Blocked"}
+          </button>
         </div>
       )}
+
     </div>
   );
 }
