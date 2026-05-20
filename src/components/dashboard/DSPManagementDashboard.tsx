@@ -69,3 +69,5 @@ export const DSPManagementDashboard: React.FC = () => {
         </div>
     );
 };
+
+export default DSPManagementDashboard;
