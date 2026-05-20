@@ -143,7 +143,7 @@ export class GPURuntime {
   }
 
   writeBuffer(buf:GPUBuffer, data:Float32Array): void {
-    this.dev?.queue.writeBuffer(buf,0,data);
+    this.dev?.queue.writeBuffer(buf,0,data.buffer as ArrayBuffer,data.byteOffset,data.byteLength);
   }
 
   get device():       GPUDevice|null       { return this.dev; }
