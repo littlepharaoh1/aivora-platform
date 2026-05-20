@@ -20,9 +20,6 @@ import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 import { supabase } from "../lib/supabase";
 import { trackEvent } from "../lib/tracking/activityTracker";
 import { jobsAPI } from "../lib/api/aivoraAPI";
-import { supabase } from "../lib/supabase";
-import { jobsAPI } from "../lib/api/aivoraAPI";
-import { supabase } from "../lib/supabase";
 import { classifyNoise, estimateRT60 } from "../lib/audioForensics/noiseFingerprinting";
 import { computeDNSMOSProxy, computeSISDR } from "../lib/audioEditor/audioMetrics";
 import { validateExport } from "../lib/audioEditor/exportValidator";
@@ -48,15 +45,11 @@ async function analyze(buf, name, pk) {
   const analysis = await analyzeAudioBuffer(buf);
   const scored   = scoreAnalysis(analysis, pk);
   const compliance = validateStudioCompliance(analysis, profileMap[pk] || "asr_studio");
-
-  // Run new QC engine in parallel
   const mono = buf.getChannelData(0);
   const qcResult = await analyzeAudioQuality(mono, buf.sampleRate, pk);
-
   const edges = { silRatio: analysis.silence.silenceRatio, leadMs: analysis.silence.leadingMs, trailMs: analysis.silence.trailingMs };
   const hum   = { detected: analysis.noise.type==="hum_50"||analysis.noise.type==="hum_60", freq: analysis.noise.humFreq||0, strength: analysis.noise.humStrength||0 };
   const voice = { pct: Math.round(analysis.vad.voiceRatio*100), present: analysis.vad.voiceRatio>0.1 };
-
   return {
     name, pk, plabel:p.label, picon:p.icon, pcolor:p.color,
     total:scored.total, grade:scored.grade, verdict:scored.verdict, checks:scored.checks,
@@ -64,7 +57,6 @@ async function analyze(buf, name, pk) {
     pkDb:analysis.peakDb, rDb:analysis.rmsDb, nDb:analysis.noise.floorDb,
     snr:analysis.snrDb, clip:analysis.clipping.hardClips, dur:analysis.duration, sr:analysis.sampleRate,
     analysis, env:analysis.environment, silence:analysis.silence, lufs:analysis.lufs, compliance,
-    // New QC engine results
     qc: qcResult,
     _buf: buf,
     time: new Date().toLocaleTimeString()
@@ -110,7 +102,7 @@ function MetricCard({label,value,sub,color="#a0c4cc"}) {
   return <div style={{background:"#050d14",border:"1px solid #0f2a3a",borderRadius:8,padding:"8px 10px",minWidth:80}}>
     <div style={{fontSize:8,color:"#4a8a9a",marginBottom:2}}>{label}</div>
     <div style={{fontSize:12,color:color,fontWeight:700,fontFamily:"monospace"}}>{value}</div>
-    {sub&&<div style={{fontSize:9,color:"#2a5a6a",marginTop:1}}>{sub}</div>}
+    {sub&&<div style={{fontSize:9,color:"#2a6a8a",marginTop:1}}>{sub}</div>}
   </div>;
 }
 
@@ -140,9 +132,10 @@ export default function AudioQualityAnalyzer() {
   const [reviewSaved,  setReviewSaved]  = useState(false);
   const [reviewerName, setReviewerName] = useState("");
 
-  // Get reviewer name from session
+  // ── NEW: holds the restored AudioBuffer for download ─────────────────
+  const [restoredBuffer, setRestoredBuffer] = useState<AudioBuffer|null>(null);
+
   React.useEffect(()=>{
-    // Clear auth tokens from URL hash
     if(window.location.hash.includes("access_token")) {
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -150,12 +143,12 @@ export default function AudioQualityAnalyzer() {
       setReviewerName(data.session?.user?.email?.split("@")[0] ?? "Reviewer");
     }).catch(()=>{});
   },[]);
+
   const [vadResult,setVadResult]=useState(null);
   const [reverbResult,setReverbResult]=useState(null);
   const [repairOpts,setRepairOpts]=useState({humRemoval:false,humFrequency:50,loudnessNormalize:false,trimSilence:false,shortenInternalSilence:false,noiseReduction:false,noiseStrength:0.7,dynamicCompression:false,speechEQ:false});
   const [spectrogramData,setSpectrogramData]=useState(null);
 
-  // Auto-analyze when global file changes from another section
   React.useEffect(()=>{
     if(currentFile&&!loading){
       const ctx=new AudioContext();
@@ -169,13 +162,14 @@ export default function AudioQualityAnalyzer() {
       }).catch(console.error);
     }
   },[currentFile]);
+
   const [digitalGaps,setDigitalGaps]=useState([]);
   const canvasRef=useRef(null);
   const prof=PROFILES[pk];
 
   async function go(file) {
     if(!file.name.toLowerCase().endsWith(".wav"))return;
-    setLoading(true);setRep(null);setRestored(null);
+    setLoading(true);setRep(null);setRestored(null);setRestoredBuffer(null);
     try{
       const ab=await file.arrayBuffer();
       const ctx=new AudioContext();
@@ -183,7 +177,6 @@ export default function AudioQualityAnalyzer() {
       const r=await analyze(buf,file.name,pk);
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
       setAudioFile(file,pk);
-      // Advanced VAD + Reverb
       const advVad = analyzeAdvancedVAD(buf, pk);
       setVadResult(advVad);
       const reverb = detectReverb(buf);
@@ -307,14 +300,71 @@ export default function AudioQualityAnalyzer() {
     } catch {}
   }
 
+  // ── FIXED: doRestore now updates spectrogram + gaps + enables download ──
+  //
+  // BEFORE: called restoreNaturalSilence(), saved result text, did nothing else.
+  //         Spectrogram and gap markers never refreshed → red lines stayed.
+  //
+  // AFTER:  1. Runs restoration as before.
+  //         2. Extracts the repaired AudioBuffer from the result
+  //            (tries .repairedBuffer → .restoredBuffer → .buffer → in-place buf).
+  //         3. Updates rep._buf so WaveformEditor plays the clean audio.
+  //         4. Re-computes spectrogram  → red lines disappear.
+  //         5. Re-scans digital gaps    → gap count drops to 0 (or fewer).
+  //         6. Stores buffer in restoredBuffer state → Download button lights up.
   async function doRestore() {
-    if(!rep?._buf)return;
+    if (!rep?._buf) return;
     setRestoring(true);
-    try{
-      const result=restoreNaturalSilence(rep._buf);
+    try {
+      const result = restoreNaturalSilence(rep._buf);
       setRestored(result);
-    }catch(e){}
+
+      if (result.changed) {
+        // Pick whichever field the library returns for the processed buffer.
+        // Falls back to the original buffer if restoration was in-place.
+        const newBuf: AudioBuffer =
+          result.repairedBuffer ??
+          result.restoredBuffer ??
+          result.buffer         ??
+          rep._buf;
+
+        // 1. Update rep so WaveformEditor plays the clean version
+        setRep(prev => prev ? { ...prev, _buf: newBuf } : prev);
+
+        // 2. Store for the download button
+        setRestoredBuffer(newBuf);
+
+        // 3. Re-render spectrogram — red silence lines will vanish
+        const spec = computeSpectrogramPro(newBuf, {
+          fftSize: 4096, minDb: -90, maxDb: -10, gain: 1.3, colorMap: "aivora",
+        });
+        setSpectrogramData(spec);
+
+        // 4. Re-scan gaps — count should drop significantly
+        const newGaps = detectDigitalGaps(newBuf);
+        setDigitalGaps(newGaps);
+      }
+    } catch(e) {
+      console.error("doRestore error:", e);
+    }
     setRestoring(false);
+  }
+
+  // ── NEW: download the restored buffer as a named WAV file ─────────────
+  function doDownloadRestored() {
+    const buf = restoredBuffer;
+    if (!buf || !rep) return;
+    const baseName = rep.name.replace(/\.wav$/i, "");
+    const wav = exportToWav(buf, `${baseName}_restored`);
+    downloadWav(wav);
+    trackEvent({
+      eventType: "wav_exported",
+      module:    "silence_restoration",
+      userId:    qcUser?.uid,
+      userEmail: qcUser?.email,
+      userRole:  qcUser?.role,
+      metadata:  { fileName: wav.filename, segmentsRestored: restored?.segmentsRestored },
+    });
   }
 
   function doGenerateReport() {
@@ -367,7 +417,6 @@ export default function AudioQualityAnalyzer() {
         profile:pk,
       },rep.name);
       setRepairResult(result);
-      // Re-run QC on repaired buffer for before/after comparison
       if(result.changed && result.repairedBuffer){
         const mono2 = result.repairedBuffer.getChannelData(0);
         const qcAfter = await analyzeAudioQuality(mono2, result.repairedBuffer.sampleRate, pk);
@@ -447,7 +496,7 @@ export default function AudioQualityAnalyzer() {
         <div style={{fontSize:9,color:"#4a8a9a"}}>HISTORY</div>
         {hist.map((r,i)=>{
           const c=r.verdict==="READY"?"#10b981":r.verdict==="REVIEW"?"#f59e0b":"#ef4444";
-          return <div key={i} onClick={()=>{setRep(r);setRestored(null);}} style={{background:"#060e16",border:"1px solid "+c+"33",borderRadius:7,padding:"8px 10px",cursor:"pointer"}}>
+          return <div key={i} onClick={()=>{setRep(r);setRestored(null);setRestoredBuffer(null);}} style={{background:"#060e16",border:"1px solid "+c+"33",borderRadius:7,padding:"8px 10px",cursor:"pointer"}}>
             <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:9,color:c}}>{PROFILES[r.pk]?.icon} {r.grade}</span><span style={{fontSize:9,color:"#4a8a9a"}}>{r.total}/100</span></div>
             <div style={{fontSize:10,color:"#a0c4cc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</div>
             <div style={{height:2,background:"#0f2a3a",borderRadius:2,marginTop:4}}><div style={{height:"100%",width:r.total+"%",background:c,borderRadius:2}}/></div>
@@ -465,14 +514,14 @@ export default function AudioQualityAnalyzer() {
             <Ring score={rep.total} grade={rep.grade} verdict={rep.verdict}/>
             <div style={{flex:1}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-              <div style={{fontSize:12,color:"#e0f2f8",fontWeight:700}}>{rep.name}</div>
-              <button onClick={doGenerateReport}
-                style={{display:"flex",alignItems:"center",gap:5,background:"#0f172a",
-                  border:"1px solid #1e3a5f",borderRadius:6,padding:"4px 10px",
-                  cursor:"pointer",color:"#94a3b8",fontSize:9,fontWeight:700}}>
-                <FileText size={10}/>QC REPORT
-              </button>
-            </div>
+                <div style={{fontSize:12,color:"#e0f2f8",fontWeight:700}}>{rep.name}</div>
+                <button onClick={doGenerateReport}
+                  style={{display:"flex",alignItems:"center",gap:5,background:"#0f172a",
+                    border:"1px solid #1e3a5f",borderRadius:6,padding:"4px 10px",
+                    cursor:"pointer",color:"#94a3b8",fontSize:9,fontWeight:700}}>
+                  <FileText size={10}/>QC REPORT
+                </button>
+              </div>
               <div style={{fontSize:9,color:rep.pcolor,marginBottom:10}}>{rep.picon} {rep.plabel} · {rep.time}</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {[["Dur",rep.dur.toFixed(2)+"s"],["Rate",rep.sr+"Hz"],["Peak",rep.pkDb.toFixed(1)+"dBFS"],["RMS",rep.rDb.toFixed(1)+"dBFS"],["Noise",rep.nDb.toFixed(1)+"dBFS"],["SNR",rep.snr.toFixed(1)+"dB"],["Voice",rep.voice.pct+"%"],["Hum",rep.hum.detected?rep.hum.freq+"Hz":"None"]].map(([l,v])=>(
@@ -482,16 +531,13 @@ export default function AudioQualityAnalyzer() {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               <Badge label="HUM"
-                value={
-                  rep.qc?.metrics.noiseClass?.includes("hum") || rep.hum.detected
-                    ? "DETECTED" : "CLEAN"
-                }
-                ok={!rep.qc?.metrics.noiseClass?.includes("hum") && !rep.hum.detected}/>
-              <Badge label="VOICE" value={rep.voice.present?"PRESENT":"WEAK"}     ok={rep.voice.present}/>
+                value={rep.qc?.metrics.noiseClass?.includes("hum")||rep.hum.detected?"DETECTED":"CLEAN"}
+                ok={!rep.qc?.metrics.noiseClass?.includes("hum")&&!rep.hum.detected}/>
+              <Badge label="VOICE" value={rep.voice.present?"PRESENT":"WEAK"} ok={rep.voice.present}/>
             </div>
           </div>
 
-          {/* ── NEW: DSP Engine Metrics ── */}
+          {/* DSP Engine Metrics */}
           {qc&&<div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:12,padding:14}}>
             <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:10}}>DSP ENGINE · EBU R128 + FFT + VAD + SNR</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
@@ -501,9 +547,9 @@ export default function AudioQualityAnalyzer() {
               <MetricCard label="SNR"               value={safeNum(qc.metrics.snrDb)+" dB"} color={snrColor} sub={qc.metrics.quality.toUpperCase()}/>
               <MetricCard label="Noise Class"       value={qc.metrics.noiseClass.replace("_"," ").toUpperCase()} color={noiseColor}/>
               <MetricCard label="Environment"       value={qc.metrics.environment.replace("_"," ").toUpperCase()} color={envColor}/>
-              <MetricCard label="Speech Ratio"      value={(qc.metrics.speechRatio*100).toFixed(1)+"%" } color={qc.metrics.speechRatio>0.3?"#10b981":"#f59e0b"}/>
+              <MetricCard label="Speech Ratio"      value={(qc.metrics.speechRatio*100).toFixed(1)+"%"} color={qc.metrics.speechRatio>0.3?"#10b981":"#f59e0b"}/>
               <MetricCard label="QC Score"          value={qc.score+"/100"} color={qc.score>=75?"#10b981":qc.score>=50?"#f59e0b":"#ef4444"} sub={qc.deliveryRisk}/>
-              {vadResult&&<MetricCard label="Speech Regions" value={vadResult.speechRegions.length+""}  color="#10b981" sub={`${(vadResult.speechRatio*100).toFixed(1)}% speech`}/>}
+              {vadResult&&<MetricCard label="Speech Regions" value={vadResult.speechRegions.length+""} color="#10b981" sub={`${(vadResult.speechRatio*100).toFixed(1)}% speech`}/>}
               {vadResult&&<MetricCard label="Dominant Pitch" value={fmt.pitch(vadResult.dominantPitch)} color="#22d3ee"/>}
               {reverbResult&&<MetricCard label="RT60 Reverb"
                 value={fmt.rt60(reverbResult.rt60Ms)}
@@ -515,7 +561,6 @@ export default function AudioQualityAnalyzer() {
                 sub={reverbResult.clarity<=-40?"Reverb dominant":undefined}/>}
             </div>
 
-            {/* QC Problems */}
             {reverbResult&&reverbResult.problems.length>0&&<div style={{marginBottom:8}}>
               {reverbResult.problems.map((prob,i)=>(
                 <div key={i} style={{background:"#050d14",border:"1px solid #f59e0b33",
@@ -525,6 +570,7 @@ export default function AudioQualityAnalyzer() {
                 </div>
               ))}
             </div>}
+
             {qc.problems.length>0&&<div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
               <div style={{fontSize:9,color:"#4a8a9a",marginBottom:4}}>QC PROBLEMS DETECTED</div>
               {qc.problems.map((p,i)=>{
@@ -537,23 +583,78 @@ export default function AudioQualityAnalyzer() {
               })}
             </div>}
 
-            {/* Restoration */}
+            {/* ── RESTORATION SECTION ──────────────────────────────────────────
+                BEFORE: button + status text only. No buffer update.
+                AFTER:  button + status + gap counter update + Download button.
+            ─────────────────────────────────────────────────────────────── */}
             <div style={{borderTop:"1px solid #0f2a3a",paddingTop:10}}>
               <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                 <div style={{fontSize:9,color:"#4a8a9a"}}>NATURAL SILENCE RESTORATION</div>
-                <button onClick={doRestore} disabled={restoring} style={{display:"flex",alignItems:"center",gap:6,background:restoring?"#0f2a3a":"#10b98122",border:"1px solid #10b98144",borderRadius:6,padding:"5px 12px",cursor:restoring?"not-allowed":"pointer",color:"#10b981",fontSize:10,fontWeight:700}}>
+
+                {/* Run Restoration button */}
+                <button onClick={doRestore} disabled={restoring}
+                  style={{display:"flex",alignItems:"center",gap:6,
+                    background:restoring?"#0f2a3a":"#10b98122",
+                    border:"1px solid #10b98144",borderRadius:6,
+                    padding:"5px 12px",cursor:restoring?"not-allowed":"pointer",
+                    color:"#10b981",fontSize:10,fontWeight:700}}>
                   <Wand2 size={11}/>{restoring?"Restoring...":"Run Restoration"}
                 </button>
-                {restored&&<span style={{fontSize:9,color:restored.changed?"#10b981":"#4a8a9a"}}>
-                  {restored.changed?`✓ ${restored.segmentsRestored} segment(s) restored · ${restored.totalRestoredMs.toFixed(0)}ms`:"No digital silence found"}
-                </span>}
+
+                {/* Status text */}
+                {restored&&(
+                  <span style={{fontSize:9,color:restored.changed?"#10b981":"#4a8a9a"}}>
+                    {restored.changed
+                      ? `✓ ${restored.segmentsRestored} segment(s) restored · ${restored.totalRestoredMs.toFixed(0)}ms`
+                      : "No digital silence found"}
+                  </span>
+                )}
+
+                {/* ── NEW: Download Enhanced WAV button ──────────────────
+                    Appears only after a successful restoration.
+                    Glows green to draw attention.
+                ────────────────────────────────────────────────────── */}
+                {restored?.changed && restoredBuffer && (
+                  <button
+                    onClick={doDownloadRestored}
+                    style={{
+                      display:"flex",alignItems:"center",gap:6,
+                      background:"#10b98133",
+                      border:"1px solid #10b98166",
+                      borderRadius:6,padding:"5px 14px",
+                      cursor:"pointer",color:"#10b981",
+                      fontSize:10,fontWeight:700,
+                      boxShadow:"0 0 10px #10b98144",
+                    }}>
+                    <Download size={11}/>⬇ Download Enhanced WAV
+                  </button>
+                )}
+
+                {/* Gap counter after restoration */}
+                {restored?.changed && (
+                  <span style={{fontSize:9,color:"#4a8a9a",marginLeft:"auto"}}>
+                    {digitalGaps.filter(g=>g.type==="internal").length === 0
+                      ? "✓ 0 gaps remaining"
+                      : `${digitalGaps.filter(g=>g.type==="internal").length} gap(s) remaining`}
+                  </span>
+                )}
               </div>
             </div>
           </div>}
 
           {/* Spectrogram */}
           {spectrogramData&&<div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:12,padding:14}}>
-            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8,display:"flex",justifyContent:"space-between"}}><span>SPECTROGRAM · {spectrogramData.numFrames} FRAMES · FFT {spectrogramData.fftSize}</span>{digitalGaps.length>0&&<span style={{color:digitalGaps.some(g=>g.type==="internal")?"#ef4444":"#f59e0b"}}>{digitalGaps.filter(g=>g.type==="internal").length} INTERNAL GAP(S) DETECTED ⚠</span>}</div>
+            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8,display:"flex",justifyContent:"space-between"}}>
+              <span>SPECTROGRAM · {spectrogramData.numFrames} FRAMES · FFT {spectrogramData.fftSize}</span>
+              {digitalGaps.length>0
+                ? <span style={{color:digitalGaps.some(g=>g.type==="internal")?"#ef4444":"#f59e0b"}}>
+                    {digitalGaps.filter(g=>g.type==="internal").length} INTERNAL GAP(S) DETECTED ⚠
+                  </span>
+                : restored?.changed
+                  ? <span style={{color:"#10b981"}}>✓ ALL GAPS CLEARED</span>
+                  : null
+              }
+            </div>
             <div style={{position:"relative",width:"100%",borderRadius:8,overflow:"hidden",background:"#040c14"}}>
               <canvas ref={canvasRef} width={800} height={200}
                 style={{width:"100%",height:180,display:"block",borderRadius:8}}/>
@@ -565,8 +666,6 @@ export default function AudioQualityAnalyzer() {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}>
               <div style={{height:8,flex:1,borderRadius:4,background:"linear-gradient(to right,#08080a,#003c78,#008080,#00c878,#b4dc00,#ffa000,#ff3c14,#ffffff)"}}/>
-              <div style={{display:"flex",justifyContent:"space-between",width:"100%",position:"absolute",pointerEvents:"none"}}>
-              </div>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
               <span style={{fontSize:8,color:"#2a5a6a"}}>-90 dB</span>
@@ -577,149 +676,85 @@ export default function AudioQualityAnalyzer() {
 
           {/* Waveform Workstation */}
           {rep?._buf&&<div style={{marginBottom:0}}>
-            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8}}>
-              WAVEFORM WORKSTATION
-            </div>
+            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8}}>WAVEFORM WORKSTATION</div>
             <WaveformEditor
               buffer={rep._buf}
               fileName={rep.name}
               qcMarkers={[
-                // Leading silence marker
-                ...(rep.edges?.leadMs>500?[{
-                  timeSec:  0,
-                  type:     "LEADING_SILENCE",
-                  severity: "medium",
-                  message:  `Leading silence ${rep.edges.leadMs}ms`,
-                }]:[]),
-                // Trailing silence marker
-                ...(rep.edges?.trailMs>500?[{
-                  timeSec:  rep.dur - rep.edges.trailMs/1000,
-                  type:     "TRAILING_SILENCE",
-                  severity: "medium",
-                  message:  `Trailing silence ${rep.edges.trailMs}ms`,
-                }]:[]),
-                // Digital gaps from spectrogram
+                ...(rep.edges?.leadMs>500?[{timeSec:0,type:"LEADING_SILENCE",severity:"medium",message:`Leading silence ${rep.edges.leadMs}ms`}]:[]),
+                ...(rep.edges?.trailMs>500?[{timeSec:rep.dur-rep.edges.trailMs/1000,type:"TRAILING_SILENCE",severity:"medium",message:`Trailing silence ${rep.edges.trailMs}ms`}]:[]),
                 ...digitalGaps.filter(g=>g.type==="internal").map(g=>({
-                  timeSec:  g.startSec,
-                  type:     "DIGITAL_SILENCE",
-                  severity: "critical",
-                  message:  `Digital gap ${g.durationMs.toFixed(0)}ms at ${g.startSec.toFixed(2)}s`,
+                  timeSec:g.startSec,type:"DIGITAL_SILENCE",severity:"critical",
+                  message:`Digital gap ${g.durationMs.toFixed(0)}ms at ${g.startSec.toFixed(2)}s`,
                 })),
-                // QC problems from DSP engine
-                ...(rep.qc?.problems||[])
-                  .filter(p=>p.type&&typeof p.type==="string")
-                  .map((p,i)=>({
-                    timeSec:  p.startSample
-                      ? p.startSample / rep.sr
-                      : (rep.dur * (i+1)) / ((rep.qc?.problems?.length||1)+1),
-                    type:     p.type,
-                    severity: p.severity,
-                    message:  p.message,
-                  })),
+                ...(rep.qc?.problems||[]).filter(p=>p.type&&typeof p.type==="string").map((p,i)=>({
+                  timeSec:p.startSample?p.startSample/rep.sr:(rep.dur*(i+1))/((rep.qc?.problems?.length||1)+1),
+                  type:p.type,severity:p.severity,message:p.message,
+                })),
               ]}
             />
           </div>}
 
           {/* Human Review Panel */}
-      {rep && (
-        <div style={{background:"#050d18",border:"1px solid #0f2030",
-          borderRadius:12,padding:16,marginTop:12}}>
-
-          <div style={{fontSize:9,color:"#2a6a8a",letterSpacing:2,marginBottom:12}}>
-            HUMAN REVIEW
-          </div>
-
-          {/* Status Buttons */}
-          <div style={{display:"flex",gap:8,marginBottom:12}}>
-            {([
-              {key:"approved", label:"✓ Approved", color:"#10B981"},
-              {key:"review",   label:"⚠ Review",   color:"#F59E0B"},
-              {key:"rejected", label:"✗ Rejected",  color:"#EF4444"},
-            ] as const).map(({key,label,color})=>(
-              <div key={key} onClick={()=>setReviewStatus(key)}
-                style={{flex:1,textAlign:"center",padding:"10px 0",
-                  borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:11,
-                  background:reviewStatus===key?`${color}25`:"#030810",
-                  color:reviewStatus===key?color:"#4a6a7a",
-                  border:`2px solid ${reviewStatus===key?color:"#1a3a5a"}`,
-                  transition:"all 0.15s"}}>
-                {label}
+          {rep&&(
+            <div style={{background:"#050d18",border:"1px solid #0f2030",borderRadius:12,padding:16,marginTop:12}}>
+              <div style={{fontSize:9,color:"#2a6a8a",letterSpacing:2,marginBottom:12}}>HUMAN REVIEW</div>
+              <div style={{display:"flex",gap:8,marginBottom:12}}>
+                {([
+                  {key:"approved",label:"✓ Approved",color:"#10B981"},
+                  {key:"review",  label:"⚠ Review",  color:"#F59E0B"},
+                  {key:"rejected",label:"✗ Rejected", color:"#EF4444"},
+                ] as const).map(({key,label,color})=>(
+                  <div key={key} onClick={()=>setReviewStatus(key)}
+                    style={{flex:1,textAlign:"center",padding:"10px 0",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:11,
+                      background:reviewStatus===key?`${color}25`:"#030810",
+                      color:reviewStatus===key?color:"#4a6a7a",
+                      border:`2px solid ${reviewStatus===key?color:"#1a3a5a"}`,transition:"all 0.15s"}}>
+                    {label}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-
-          {/* Note */}
-          <div style={{marginBottom:12}}>
-            <div style={{fontSize:9,color:"#4a6a7a",letterSpacing:1,marginBottom:6}}>
-              NOTE
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:9,color:"#4a6a7a",letterSpacing:1,marginBottom:6}}>NOTE</div>
+                <textarea value={reviewNote} onChange={e=>setReviewNote(e.target.value)}
+                  placeholder="Add review notes..." rows={3}
+                  style={{width:"100%",boxSizing:"border-box",background:"#030810",border:"1px solid #1a3a5a",
+                    borderRadius:6,padding:"8px 12px",color:"#E2EEF6",fontSize:11,fontFamily:"inherit",outline:"none",resize:"vertical"}}/>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                <div style={{fontSize:9,color:"#4a6a7a"}}>Reviewer: <span style={{color:"#0EA5E9"}}>{reviewerName}</span></div>
+                <div style={{fontSize:9,color:"#4a6a7a",marginLeft:"auto"}}>{new Date().toLocaleDateString()}</div>
+                <button onClick={saveReview}
+                  style={{padding:"6px 14px",borderRadius:6,background:reviewSaved?"#10B98120":"#0EA5E920",
+                    color:reviewSaved?"#10B981":"#0EA5E9",fontSize:10,fontWeight:700,cursor:"pointer",
+                    fontFamily:"inherit",border:`1px solid ${reviewSaved?"#10B98140":"#0EA5E940"}`}}>
+                  {reviewSaved?"✓ Saved":"Save to DB"}
+                </button>
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <div style={{fontSize:8,color:"#4a6a7a",width:"100%",marginBottom:4,letterSpacing:1}}>EXPORT REVIEW</div>
+                {[
+                  {label:"Excel/CSV",fn:downloadExcel,color:"#10B981"},
+                  {label:"JSON",     fn:downloadJSON, color:"#0EA5E9"},
+                  {label:"JSONL",    fn:downloadJSONL,color:"#8B5CF6"},
+                ].map(({label,fn,color})=>(
+                  <button key={label} onClick={fn}
+                    style={{flex:1,padding:"8px 0",borderRadius:6,background:`${color}15`,
+                      border:`1px solid ${color}30`,color,fontSize:10,fontWeight:700,
+                      cursor:"pointer",fontFamily:"inherit"}}>
+                    ⬇ {label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <textarea
-              value={reviewNote}
-              onChange={e=>setReviewNote(e.target.value)}
-              placeholder="Add review notes..."
-              rows={3}
-              style={{width:"100%",boxSizing:"border-box",
-                background:"#030810",border:"1px solid #1a3a5a",
-                borderRadius:6,padding:"8px 12px",
-                color:"#E2EEF6",fontSize:11,
-                fontFamily:"inherit",outline:"none",resize:"vertical"}}/>
-          </div>
+          )}
 
-          {/* Reviewer + Save */}
-          <div style={{display:"flex",alignItems:"center",
-            gap:8,marginBottom:12,flexWrap:"wrap"}}>
-            <div style={{fontSize:9,color:"#4a6a7a"}}>
-              Reviewer: <span style={{color:"#0EA5E9"}}>{reviewerName}</span>
-            </div>
-            <div style={{fontSize:9,color:"#4a6a7a",marginLeft:"auto"}}>
-              {new Date().toLocaleDateString()}
-            </div>
-            <button onClick={saveReview}
-              style={{padding:"6px 14px",borderRadius:6,
-                background:reviewSaved?"#10B98120":"#0EA5E920",
-                color:reviewSaved?"#10B981":"#0EA5E9",
-                fontSize:10,fontWeight:700,cursor:"pointer",
-                fontFamily:"inherit",
-                border:`1px solid ${reviewSaved?"#10B98140":"#0EA5E940"}`}}>
-              {reviewSaved?"✓ Saved":"Save to DB"}
-            </button>
-          </div>
-
-          {/* Export Buttons */}
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <div style={{fontSize:8,color:"#4a6a7a",
-              width:"100%",marginBottom:4,letterSpacing:1}}>
-              EXPORT REVIEW
-            </div>
-            {[
-              {label:"Excel/CSV", fn:downloadExcel, color:"#10B981"},
-              {label:"JSON",      fn:downloadJSON,  color:"#0EA5E9"},
-              {label:"JSONL",     fn:downloadJSONL, color:"#8B5CF6"},
-            ].map(({label,fn,color})=>(
-              <button key={label} onClick={fn}
-                style={{flex:1,padding:"8px 0",borderRadius:6,
-                  background:`${color}15`,
-                  border:`1px solid ${color}30`,
-                  color,fontSize:10,fontWeight:700,
-                  cursor:"pointer",fontFamily:"inherit"}}>
-                ⬇ {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Delivery Readiness Score */}
+          {/* Delivery Readiness Score */}
           {appenResult&&<div style={{background:"#060e16",border:"1px solid "+(appenResult.verdict==="READY"?"#10b98144":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b44":"#ef444444"),borderRadius:12,padding:14}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <span style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,fontWeight:700}}>DELIVERY READINESS SCORE</span>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,fontWeight:700}}>DELIVERY READINESS SCORE</span>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:20,fontWeight:900,fontFamily:"monospace",
-                  color:appenResult.verdict==="READY"?"#10b981":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b":"#ef4444"}}>
-                  {appenResult.score}/100
-                </span>
+                <span style={{fontSize:20,fontWeight:900,fontFamily:"monospace",color:appenResult.verdict==="READY"?"#10b981":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b":"#ef4444"}}>{appenResult.score}/100</span>
                 <span style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:12,
                   background:appenResult.verdict==="READY"?"#10b98122":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b22":"#ef444422",
                   color:appenResult.verdict==="READY"?"#10b981":appenResult.verdict==="FIX_REQUIRED"?"#f59e0b":"#ef4444",
@@ -728,15 +763,11 @@ export default function AudioQualityAnalyzer() {
                 </span>
               </div>
             </div>
-            <div style={{fontSize:10,color:"#a0c4cc",marginBottom:10,padding:"6px 10px",
-              background:"#050d14",borderRadius:6}}>{appenResult.summary}</div>
+            <div style={{fontSize:10,color:"#a0c4cc",marginBottom:10,padding:"6px 10px",background:"#050d14",borderRadius:6}}>{appenResult.summary}</div>
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
               {appenResult.checks.map((c,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",
-                  background:"#050d14",borderRadius:6,border:"1px solid "+(c.passed?"#10b98122":c.critical?"#ef444433":"#f59e0b33")}}>
-                  <span style={{fontSize:11,color:c.passed?"#10b981":c.critical?"#ef4444":"#f59e0b"}}>
-                    {c.passed?"✓":"✗"}
-                  </span>
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"#050d14",borderRadius:6,border:"1px solid "+(c.passed?"#10b98122":c.critical?"#ef444433":"#f59e0b33")}}>
+                  <span style={{fontSize:11,color:c.passed?"#10b981":c.critical?"#ef4444":"#f59e0b"}}>{c.passed?"✓":"✗"}</span>
                   <span style={{fontSize:10,color:"#a0c4cc",flex:1}}>{c.label}</span>
                   <span style={{fontSize:10,color:"#4a8a9a",fontFamily:"monospace"}}>{c.value}</span>
                   {!c.passed&&c.fix&&<span style={{fontSize:9,color:"#4a8a9a",maxWidth:200,textAlign:"right"}}>→ {c.fix}</span>}
@@ -754,16 +785,15 @@ export default function AudioQualityAnalyzer() {
             <div style={{fontSize:9,color:"#4a8a9a",marginBottom:10,padding:"6px 10px",background:"#050d14",borderRadius:6,border:"1px solid #0f2a3a"}}>
               ⚠ Repairs are manual and should be reviewed before delivery.
             </div>
-            {/* Options */}
             <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
               {[
-                ["humRemoval",      "Remove Hum",          repairOpts.humRemoval],
-                ["loudnessNormalize","Normalize Loudness",  repairOpts.loudnessNormalize],
-                ["trimSilence",     "Trim Silence",         repairOpts.trimSilence],
-                ["shortenInternalSilence","Shorten Gaps",   repairOpts.shortenInternalSilence],
-                ["noiseReduction",      "Noise Reduction",   repairOpts.noiseReduction],
-                ["dynamicCompression",  "Compress Dynamics", repairOpts.dynamicCompression],
-                ["speechEQ",            "Speech EQ",         repairOpts.speechEQ],
+                ["humRemoval","Remove Hum",repairOpts.humRemoval],
+                ["loudnessNormalize","Normalize Loudness",repairOpts.loudnessNormalize],
+                ["trimSilence","Trim Silence",repairOpts.trimSilence],
+                ["shortenInternalSilence","Shorten Gaps",repairOpts.shortenInternalSilence],
+                ["noiseReduction","Noise Reduction",repairOpts.noiseReduction],
+                ["dynamicCompression","Compress Dynamics",repairOpts.dynamicCompression],
+                ["speechEQ","Speech EQ",repairOpts.speechEQ],
               ].map(([key,label,active])=>(
                 <div key={key} onClick={()=>setRepairOpts(p=>({...p,[key]:!p[key]}))}
                   style={{padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:10,fontWeight:700,
@@ -793,7 +823,6 @@ export default function AudioQualityAnalyzer() {
                 ))}
               </div>}
             </div>
-            {/* Action buttons */}
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:repairResult?12:0}}>
               <button onClick={doRepair} disabled={repairing||(!repairOpts.humRemoval&&!repairOpts.loudnessNormalize&&!repairOpts.trimSilence)}
                 style={{display:"flex",alignItems:"center",gap:6,
@@ -808,32 +837,23 @@ export default function AudioQualityAnalyzer() {
                 <Download size={11}/>Export WAV
               </button>}
             </div>
-            {/* Results */}
             {repairResult&&<div style={{borderTop:"1px solid #0f2a3a",paddingTop:10}}>
               {repairResult.operations.length>0&&<div style={{marginBottom:6}}>
                 <div style={{fontSize:9,color:"#4a8a9a",marginBottom:4}}>OPERATIONS APPLIED</div>
-                {repairResult.operations.map((op,i)=>(
-                  <div key={i} style={{fontSize:10,color:"#10b981",marginBottom:2}}>✓ {op}</div>
-                ))}
+                {repairResult.operations.map((op,i)=>(<div key={i} style={{fontSize:10,color:"#10b981",marginBottom:2}}>✓ {op}</div>))}
               </div>}
               {repairResult.warnings.length>0&&<div>
                 <div style={{fontSize:9,color:"#4a8a9a",marginBottom:4}}>WARNINGS</div>
-                {repairResult.warnings.map((w,i)=>(
-                  <div key={i} style={{fontSize:10,color:"#f59e0b",marginBottom:2}}>⚠ {w}</div>
-                ))}
+                {repairResult.warnings.map((w,i)=>(<div key={i} style={{fontSize:10,color:"#f59e0b",marginBottom:2}}>⚠ {w}</div>))}
               </div>}
               {!repairResult.changed&&<div style={{fontSize:10,color:"#4a8a9a"}}>No changes were needed.</div>}
-              {beforeAfter&&<div style={{marginTop:8,padding:"8px 10px",background:"#040c14",
-                borderRadius:6,border:"1px solid #0f2a3a"}}>
+              {beforeAfter&&<div style={{marginTop:8,padding:"8px 10px",background:"#040c14",borderRadius:6,border:"1px solid #0f2a3a"}}>
                 <div style={{fontSize:9,color:"#4a8a9a",marginBottom:6,fontWeight:700}}>BEFORE / AFTER COMPARISON</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                   {[
-                    ["QC Score", beforeAfter.before.score+"/100", beforeAfter.after.score+"/100",
-                      beforeAfter.after.score > beforeAfter.before.score],
-                    ["LUFS", safeNum(beforeAfter.before.lufs)+" LUFS", safeNum(beforeAfter.after.lufs)+" LUFS",
-                      Math.abs(beforeAfter.after.lufs+20) < Math.abs(beforeAfter.before.lufs+20)],
-                    ["SNR",  safeNum(beforeAfter.before.snr)+" dB",   safeNum(beforeAfter.after.snr)+" dB",
-                      beforeAfter.after.snr > beforeAfter.before.snr],
+                    ["QC Score",beforeAfter.before.score+"/100",beforeAfter.after.score+"/100",beforeAfter.after.score>beforeAfter.before.score],
+                    ["LUFS",safeNum(beforeAfter.before.lufs)+" LUFS",safeNum(beforeAfter.after.lufs)+" LUFS",Math.abs(beforeAfter.after.lufs+20)<Math.abs(beforeAfter.before.lufs+20)],
+                    ["SNR",safeNum(beforeAfter.before.snr)+" dB",safeNum(beforeAfter.after.snr)+" dB",beforeAfter.after.snr>beforeAfter.before.snr],
                   ].map(([label,before,after,improved])=>(
                     <div key={label} style={{textAlign:"center"}}>
                       <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4}}>{label}</div>
@@ -856,7 +876,10 @@ export default function AudioQualityAnalyzer() {
             <div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:8,padding:10,marginTop:4}}>
               <div style={{fontSize:9,color:"#4a8a9a",marginBottom:6}}>SILENCE EDGES</div>
               {[["Leading",rep.edges.leadMs+"ms"],["Trailing",rep.edges.trailMs+"ms"],["Ratio",(rep.edges.silRatio*100).toFixed(1)+"%"]].map(([l,v])=>(
-                <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:10,color:"#4a8a9a"}}>{l}</span><span style={{fontSize:10,color:"#cbd5e1",fontWeight:700}}>{v}</span></div>
+                <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <span style={{fontSize:10,color:"#4a8a9a"}}>{l}</span>
+                  <span style={{fontSize:10,color:"#cbd5e1",fontWeight:700}}>{v}</span>
+                </div>
               ))}
             </div>
           </div>
