@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * App.tsx — Aivora Platform v2.0
- * Unified — GPT components + Custom components + New Design System
+ * Unified — GPT components + Custom components + New Design System + Global DSP Engines
  */
 import React, { useEffect, useState } from "react";
 import NavIcon, { GROUP_COLORS } from "./components/ui/NavIcon";
@@ -44,6 +44,10 @@ import AudioEnhancementLab    from "./components/AudioEnhancementLab";
 import AudioPipeline          from "./components/AudioPipeline";
 import DeliveryReadinessScore from "./components/DeliveryReadinessScore";
 
+// Components — Global DSP Deployments (Aivora Core v2.5)
+import DSPManagementDashboard from "./components/dashboard/DSPManagementDashboard";
+import AudioAnnotationWorkspace from "./components/workspace/AudioAnnotationWorkspace";
+
 // Components — Repair
 import ForensicSilenceRepair      from "./components/ForensicSilenceRepair";
 import AivoraAuditionWorkstation  from "./components/AivoraAuditionWorkstation";
@@ -57,6 +61,7 @@ import StorePanel           from "./components/StorePanel";
 
 type Tab =
   | "dashboard"
+  | "audio_workspace"
   | "qc"
   | "batch"
   | "naming"
@@ -67,6 +72,7 @@ type Tab =
   | "audition"
   | "contributors"
   | "monitor"
+  | "dsp_management"
   | "dsp_validation"
   | "store"
   | "proeditor"
@@ -78,24 +84,26 @@ type Tab =
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
 const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
-  dashboard:      { title:"Dashboard",               subtitle:"AIVORA PLATFORM OVERVIEW" },
-  qc:             { title:"QC Workstation",           subtitle:"AUDIO QUALITY CONTROL" },
-  batch:          { title:"Batch Analyzer",           subtitle:"MULTI-FILE QC PROCESSING" },
-  naming:         { title:"Smart Naming",             subtitle:"SMART SEQUENCER S0001–S0200" },
-  enhancement:    { title:"Enhancement Lab",          subtitle:"AUDIO REPAIR & ENHANCEMENT" },
-  pipeline:       { title:"Audio Pipeline",           subtitle:"END-TO-END PROCESSING" },
-  readiness:      { title:"Delivery Readiness",       subtitle:"QC SCORE & COMPLIANCE" },
-  forensic_repair:{ title:"Forensic Silence Repair",  subtitle:"ADOBE-STYLE QA SIMULATION" },
-  audition:       { title:"Audition Workstation",     subtitle:"PROFESSIONAL AUDIO EDITOR" },
-  contributors:   { title:"Contributors",             subtitle:"TEAM MANAGEMENT" },
-  monitor:        { title:"Activity Monitor",         subtitle:"REAL-TIME TRACKING" },
-  dsp_validation: { title:"DSP Validation",           subtitle:"ACCURACY TESTING SUITE" },
-  store:          { title:"Aivora Store",             subtitle:"RESOURCES & TOOLS" },
-  proeditor:      { title:"Professional Editor",       subtitle:"ADOBE-STYLE FULL SCREEN EDITOR" },
-  audiobench:     { title:"Audio Bench",                subtitle:"VERIFIER-BACKED FORENSIC BENCHMARK" },
-  documentation:  { title:"Documentation",              subtitle:"PLATFORM REFERENCE & GUIDES" },
-  conversations:  { title:"Conversation Rooms",          subtitle:"DUAL-TRACK PODCAST MIXER" },
-  observability:  { title:"Observability",               subtitle:"DSP RUNTIME TELEMETRY" },
+  dashboard:       { title:"Dashboard",               subtitle:"AIVORA PLATFORM OVERVIEW" },
+  audio_workspace: { title:"Audio Workspace",         subtitle:"TASK-LINKED ANNOTATION & FILTERING WORKSPACE" },
+  qc:              { title:"QC Workstation",          subtitle:"AUDIO QUALITY CONTROL" },
+  batch:           { title:"Batch Analyzer",          subtitle:"MULTI-FILE QC PROCESSING" },
+  naming:          { title:"Smart Naming",            subtitle:"SMART SEQUENCER S0001–S0200" },
+  enhancement:     { title:"Enhancement Lab",         subtitle:"AUDIO REPAIR & ENHANCEMENT" },
+  pipeline:        { title:"Audio Pipeline",          subtitle:"END-TO-END PROCESSING" },
+  readiness:       { title:"Delivery Readiness",      subtitle:"QC SCORE & COMPLIANCE" },
+  forensic_repair: { title:"Forensic Silence Repair", subtitle:"ADOBE-STYLE QA SIMULATION" },
+  audition:        { title:"Audition Workstation",    subtitle:"PROFESSIONAL AUDIO EDITOR" },
+  contributors:    { title:"Contributors",            subtitle:"TEAM MANAGEMENT" },
+  monitor:         { title:"Activity Monitor",        subtitle:"REAL-TIME TRACKING" },
+  dsp_management:  { title:"DSP Management",         subtitle:"GLOBAL HARDWARE OPTIMIZATION & DE-NOISE PARAMETERS" },
+  dsp_validation:  { title:"DSP Validation",          subtitle:"ACCURACY TESTING SUITE" },
+  store:           { title:"Aivora Store",            subtitle:"RESOURCES & TOOLS" },
+  proeditor:       { title:"Professional Editor",      subtitle:"ADOBE-STYLE FULL SCREEN EDITOR" },
+  audiobench:      { title:"Audio Bench",               subtitle:"VERIFIER-BACKED FORENSIC BENCHMARK" },
+  documentation:   { title:"Documentation",             subtitle:"PLATFORM REFERENCE & GUIDES" },
+  conversations:   { title:"Conversation Rooms",         subtitle:"DUAL-TRACK PODCAST MIXER" },
+  observability:   { title:"Observability",              subtitle:"DSP RUNTIME TELEMETRY" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
@@ -103,23 +111,31 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
 const NAV_ITEMS = [
   // Production
   { id:"dashboard",       icon:"dashboard",    label:"Dashboard",          group:"production" },
+  { id:"audio_workspace", icon:"qc",           label:"Audio Workspace",     group:"production" },
   { id:"qc",              icon:"qc",           label:"QC Workstation",      group:"production" },
   { id:"batch",           icon:"batch",        label:"Batch Analyzer",      group:"production" },
   { id:"naming",          icon:"naming",       label:"Smart Naming",        group:"production" },
   { id:"enhancement",     icon:"enhancement",  label:"Enhancement Lab",     group:"production" },
   { id:"pipeline",        icon:"pipeline",     label:"Audio Pipeline",      group:"production" },
   { id:"readiness",       icon:"delivery",     label:"Delivery Readiness",  group:"production" },
+  { id:"conversations",   icon:"rooms",        label:"Conv. Rooms",         group:"production" },
+  
+  // Repair
   { id:"forensic_repair", icon:"forensic",     label:"Forensic Repair",     group:"repair"     },
   { id:"audition",        icon:"audition",     label:"Audition Editor",     group:"repair"     },
+  { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",          group:"repair"     },
+  
+  // Manage
   { id:"contributors",    icon:"contributors", label:"Contributors",        group:"manage"     },
   { id:"monitor",         icon:"monitor",      label:"Activity Monitor",    group:"manage"     },
+  
+  // System Controls
+  { id:"dsp_management",  icon:"dsp",          label:"DSP Management",      group:"system"     },
   { id:"dsp_validation",  icon:"dsp",          label:"DSP Validation",      group:"system"     },
-  { id:"store",           icon:"store",        label:"Store",               group:"system"     },
-  { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",          group:"repair"     },
   { id:"audiobench",      icon:"dsp",          label:"Audio Bench",         group:"system"     },
-  { id:"documentation",   icon:"info",         label:"Documentation",       group:"system"     },
   { id:"observability",   icon:"dsp",          label:"Observability",       group:"system"     },
-  { id:"conversations",   icon:"rooms",        label:"Conv. Rooms",          group:"production" },
+  { id:"store",           icon:"store",        label:"Store",               group:"system"     },
+  { id:"documentation",   icon:"info",         label:"Documentation",       group:"system"     },
 ];
 
 const GROUP_LABELS = {
@@ -274,7 +290,8 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
   const { user } = useAuth();
 
   const cards=[
-    { icon:"qc", label:"QC Workstation",    sub:"Analyze audio quality",     tab:"qc"             as Tab, color:colors.accent.sky    },
+    { icon:"qc", label:"Audio Workspace",   sub:"Task-linked processing",    tab:"audio_workspace"as Tab, color:colors.accent.sky    },
+    { icon:"qc", label:"QC Workstation",    sub:"Analyze audio quality",     tab:"qc"             as Tab, color:colors.accent.cyan   },
     { icon:"batch", label:"Batch Analyzer",    sub:"Process 200+ files",        tab:"batch"          as Tab, color:colors.accent.purple },
     { icon:"naming", label:"Smart Naming",      sub:"Smart Seq S0001–S0200",  tab:"naming"         as Tab, color:colors.accent.cyan   },
     { icon:"enhancement", label:"Enhancement Lab",   sub:"Audio repair & enhancement",tab:"enhancement"    as Tab, color:colors.accent.amber  },
@@ -283,6 +300,7 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
     { icon:"forensic", label:"Forensic Repair",   sub:"Silence reconstruction",    tab:"forensic_repair"as Tab, color:colors.accent.amber  },
     { icon:"audition", label:"Audition Editor",   sub:"Professional workstation",  tab:"audition"       as Tab, color:colors.accent.sky    },
     { icon:"monitor", label:"Activity Monitor",  sub:"Real-time tracking",        tab:"monitor"        as Tab, color:colors.accent.purple },
+    { icon:"dsp", label:"DSP Management",     sub:"Global hardware config",    tab:"dsp_management" as Tab, color:colors.accent.sky    },
   ];
 
   return(
@@ -306,7 +324,7 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
         </div>
         <div style={{marginLeft:"auto",textAlign:"right"}}>
           <div style={{fontSize:9,color:colors.text.muted,letterSpacing:1}}>VERSION</div>
-          <div style={{fontSize:13,color:colors.accent.sky,fontWeight:700}}>2.0</div>
+          <div style={{fontSize:13,color:colors.accent.sky,fontWeight:700}}>2.5</div>
         </div>
       </div>
 
@@ -352,13 +370,13 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
         letterSpacing:2,margin:"20px 0 10px"}}>PLATFORM CAPABILITIES</div>
       <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
         {[
-          ["30+","DSP Modules",     colors.accent.sky],
+          ["32+","DSP Modules",     colors.accent.sky],
           ["92%+","VAD Accuracy", colors.accent.green],
           ["94%","RT60 Accuracy", colors.accent.purple],
           ["200","Batch Files",   colors.accent.amber],
           ["32-bit","Float WAV",  colors.accent.cyan],
-          ["12","Repair Tools",    colors.accent.green],
-          ["29","DSP Files", colors.accent.sky],
+          ["14","Repair Tools",    colors.accent.green],
+          ["100%","Hardware Fit", colors.accent.sky],
         ].map(([v,l,c])=>(
           <div key={l} style={{background:colors.bg.surface,
             border:`1px solid ${colors.bg.border}`,
@@ -394,13 +412,11 @@ function AppContent(){
 
   // Clear Supabase auth params from URL
   useEffect(()=>{
-    // Clear hash tokens (access_token, refresh_token)
     if(window.location.hash.includes("access_token") ||
        window.location.hash.includes("refresh_token")) {
       window.history.replaceState({},"",window.location.pathname);
       return;
     }
-    // Clear search error params
     const url=new URL(window.location.href);
     if(url.searchParams.has("error")){
       url.searchParams.delete("error");
@@ -435,25 +451,23 @@ function AppContent(){
 
         <div style={{flex:1,overflow:"auto",background:colors.bg.base}}>
           {tab==="dashboard"       && <Dashboard onNavigate={setTab}/>}
+          {tab==="audio_workspace" && <AudioAnnotationWorkspace/>}
           {tab==="qc"              && <AudioQualityAnalyzer/>}
           {tab==="batch"           && <BatchAnalyzer/>}
           {tab==="naming"          && <SmartNamingSequencer/>}
           {tab==="enhancement"     && <AudioEnhancementLab/>}
           {tab==="pipeline"        && <AudioPipeline/>}
-          {tab==="readiness_old" && <DeliveryReadinessScore/>}
-                    {tab==="forensic_repair" && <ForensicSilenceRepair/>}
+          {tab==="forensic_repair" && <ForensicSilenceRepair/>}
+          {tab==="dsp_management"  && <DSPManagementDashboard/>}
           {tab==="dsp_validation"  && <DspValidationDashboard/>}
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <Contributors/>}
           {tab==="readiness"       && <DeliveryReadiness/>}
-          {tab==="conversations"   && <ConversationRooms/>}
-          {tab==="monitor" && <ActivityMonitor/>}
-          {tab==="readiness_old" && <DeliveryReadinessScore/>}
-          {tab==="documentation"  && <Documentation/>}
-          {tab==="observability"  && <ObservabilityDashboard/>}
-          {tab==="conversations"  && <ConversationRooms/>}
+          {tab==="monitor"         && <ActivityMonitor/>}
+          {tab==="documentation"   && <Documentation/>}
+          {tab==="observability"   && <ObservabilityDashboard/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
-          {tab==="proeditor"      && <ProfessionalAudioEditor/>}
+          {tab==="proeditor"       && <ProfessionalAudioEditor/>}
         </div>
       </div>
 
