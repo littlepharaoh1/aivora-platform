@@ -1158,6 +1158,65 @@ function ProfessionalAudioEditorInner() {
         </div>
       </div>
     </div>
+
+    {/* ── Audition Workspace ─────────────────────────────────────────── */}
+    {wsFiles.length > 0 && (
+      <div style={{margin:"8px 4px 0",borderTop:"1px solid #0a1520",paddingTop:8}}>
+        <div style={{fontSize:9,color:"#2a5a6a",letterSpacing:1,
+          marginBottom:6,padding:"0 4px",display:"flex",alignItems:"center",gap:8}}>
+          AUDITION WORKSPACE
+          <span style={{fontSize:8,color:"#1a3a4a"}}>
+            {wsFiles.length} file(s) · WebGL2 + STFT Worker
+          </span>
+        </div>
+        <AuditionWorkspace
+          files={wsFiles}
+          activeId={wsActiveId}
+          onTabSelect={id=>{
+            setWsActiveId(id);
+            const f=wsFiles.find(x=>x.id===id);
+            if(f){wsStop();wsOffsetRef.current=0;setWsHeadSec(0);}
+          }}
+          onTabClose={id=>{
+            setWsFiles(prev=>prev.filter(f=>f.id!==id));
+            if(wsActiveId===id){
+              const rem=wsFiles.filter(f=>f.id!==id);
+              setWsActiveId(rem[rem.length-1]?.id??"");
+            }
+            wsStop();
+          }}
+          playheadSec={wsHeadSec}
+          playing={wsPlaying}
+          onTogglePlay={wsToggle}
+          onSeek={wsSeek}
+          onDownload={()=>{
+            const f=wsFiles.find(x=>x.id===wsActiveId);
+            if(!f) return;
+            const nCh=f.buffer.numberOfChannels;
+            const nSmp=f.buffer.length;
+            const bytes=nSmp*nCh*4;
+            const ab=new ArrayBuffer(44+bytes);
+            const v=new DataView(ab);
+            const ws2=(o:number,s:string)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+            ws2(0,"RIFF");v.setUint32(4,36+bytes,true);ws2(8,"WAVE");ws2(12,"fmt ");
+            v.setUint32(16,18,true);v.setUint16(20,3,true);
+            v.setUint16(22,nCh,true);v.setUint32(24,f.buffer.sampleRate,true);
+            v.setUint32(28,f.buffer.sampleRate*nCh*4,true);
+            v.setUint16(32,nCh*4,true);v.setUint16(34,32,true);v.setUint16(36,0,true);
+            ws2(38,"data");v.setUint32(42,bytes,true);
+            const out=new Float32Array(ab,44);
+            for(let i=0;i<nSmp;i++)
+              for(let ch=0;ch<nCh;ch++)
+                out[i*nCh+ch]=f.buffer.getChannelData(ch)[i];
+            const blob=new Blob([ab],{type:"audio/wav"});
+            const a=document.createElement("a");
+            a.href=URL.createObjectURL(blob);
+            a.download=f.name.replace(/\.wav$/i,"")+"_export.wav";
+            a.click();
+          }}
+        />
+      </div>
+    )}
   );
 }
 
