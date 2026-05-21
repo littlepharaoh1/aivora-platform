@@ -173,6 +173,7 @@ export default function AudioQualityAnalyzer() {
   const { currentFile, setAudioFile, loading: globalLoading } = useGlobalAudio();
   const { user: qcUser } = useAuth();
   const [rep,setRep]=useState(null);
+  const [allReps,setAllReps]=useState<any[]>([]); // all loaded file analyses
   const [loading,setLoading]=useState(false);
   const [pk,setPk]=useState("wakeword");
   const [hist,setHist]=useState([]);
@@ -349,13 +350,18 @@ export default function AudioQualityAnalyzer() {
 
   async function go(file) {
     if(!file.name.toLowerCase().endsWith(".wav"))return;
-    setLoading(true);setRep(null);setRestored(null);setRestoredBuffer(null);
+    setLoading(true);
     try{
       const ab=await file.arrayBuffer();
       const ctx=new AudioContext();
       const buf=await ctx.decodeAudioData(ab);
       const r=await analyze(buf,file.name,pk);
-      setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
+      setRep(r);
+      setAllReps(prev=>{
+        const next=[...prev.filter(x=>x.name!==r.name),r];
+        return next;
+      });
+      setHist(prev=>[r,...prev.slice(0,9)]);
       setAudioFile(file,pk);
       wsAddFile(buf, file.name);
       const advVad = analyzeAdvancedVAD(buf, pk);
@@ -687,7 +693,12 @@ export default function AudioQualityAnalyzer() {
           ))}
         </div>
         <div onClick={()=>document.getElementById("aqa-i").click()} style={{border:"2px dashed "+prof.color+"44",borderRadius:10,padding:"18px 10px",textAlign:"center",cursor:"pointer",background:"#050d14"}}>
-          <input id="aqa-i" type="file" accept=".wav" hidden onChange={e=>{if(e.target.files[0])go(e.target.files[0]);}}/>
+          <input id="aqa-i" type="file" accept=".wav" multiple hidden onChange={async e=>{
+  const files=Array.from(e.target.files??[]);
+  if(!files.length) return;
+  // Load all files in parallel
+  await Promise.all(files.map(f=>go(f)));
+}}/>
           <Upload size={18} color={prof.color} style={{marginBottom:6}}/>
           <div style={{fontSize:11,color:"#a0c4cc"}}>{loading?"Analyzing...":"Upload WAV"}</div>
         </div>
@@ -928,14 +939,24 @@ export default function AudioQualityAnalyzer() {
                 activeId={wsActiveId}
                 onTabSelect={id => {
                   setWsActiveId(id);
-                  // Switch playback buffer when tab changes
                   const f = wsFiles.find(x => x.id === id);
                   if(f) {
                     stopEnhanced();
                     offsetRef.current = 0;
                     setPlayheadSec(0);
-                    // Update restoredBuffer so toggleEnhancedPlay uses correct buffer
                     setRestoredBuffer(f.buffer);
+                    setRestored(null);
+                    setRepairResult(null);
+                    // Switch full QC analysis to this file
+                    const saved = allReps.find(r=>r.name===f.name || r._buf===f.buffer);
+                    if(saved){
+                      setRep(saved);
+                      // Recompute spectrogram for this file
+                      const spec=computeSpectrogramPro(f.buffer,{fftSize:4096,minDb:-90,maxDb:-10,gain:1.3,colorMap:"aivora"});
+                      setSpectrogramData(spec);
+                      const gaps=detectDigitalGaps(f.buffer);
+                      setDigitalGaps(gaps);
+                    }
                   }
                 }}
                 onTabClose={id => {
