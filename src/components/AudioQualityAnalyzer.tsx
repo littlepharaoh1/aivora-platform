@@ -263,7 +263,7 @@ export default function AudioQualityAnalyzer() {
 
   // Toggle play/pause for enhanced buffer
   function toggleEnhancedPlay(): void {
-    const buf = restoredBuffer ?? repairResult?.repairedBuffer;
+    const buf = restoredBuffer ?? repairResult?.repairedBuffer ?? rep?._buf ?? null;
     if(!buf) return;
     if(enhPlaying) {
       // Pause: save current offset
@@ -276,7 +276,7 @@ export default function AudioQualityAnalyzer() {
 
   // Seek to position (0-1 normalized)
   function seekEnhanced(norm: number): void {
-    const buf = restoredBuffer ?? repairResult?.repairedBuffer;
+    const buf = restoredBuffer ?? repairResult?.repairedBuffer ?? rep?._buf ?? null;
     if(!buf) return;
     const sec = norm * buf.duration;
     offsetRef.current = sec;
@@ -947,7 +947,16 @@ export default function AudioQualityAnalyzer() {
                 }}
                 playheadSec={playheadSec}
                 playing={enhPlaying}
-                onTogglePlay={toggleEnhancedPlay}
+                onTogglePlay={()=>{
+                  // Use active workspace buffer if available
+                  const wsFile = wsFiles.find(f=>f.id===wsActiveId);
+                  if(wsFile && !restoredBuffer && !repairResult?.repairedBuffer){
+                    if(enhPlaying){ stopEnhanced(); }
+                    else { playEnhanced(wsFile.buffer, offsetRef.current); }
+                  } else {
+                    toggleEnhancedPlay();
+                  }
+                }}
                 onSeek={seekEnhanced}
                 onDownload={restoredBuffer || repairResult?.repairedBuffer
                   ? doDownloadRestored : undefined}
