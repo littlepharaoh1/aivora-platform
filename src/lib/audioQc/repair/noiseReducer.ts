@@ -140,6 +140,99 @@ function wienerGain(
   return Math.max(gain, 0.05);
 }
 
+// ── Noise Gate with Smooth Attack/Release Envelope ───────────────────────────
+//
+// Instead of binary gate (0 or 1), we use an exponential envelope:
+//   τ_attack  = 1 - e^(-1 / (sr × attackSec))
+//   τ_release = 1 - e^(-1 / (sr × releaseSec))
+//
+// When signal > threshold: envelope follows attack curve  (fast,  10ms)
+// When signal < threshold: envelope follows release curve (slow, 175ms)
+// This prevents abrupt cutoff at word endings.
+
+export interface NoiseGateOptions {
+  thresholdDb:  number;   // Gate open threshold (default -40dB)
+  attackMs:     number;   // Attack  time ms (default 10ms)
+  releaseMs:    number;   // Release time ms (default 175ms)
+  kneeDb:       number;   // Soft knee width dB (default 6dB)
+  floor:        number;   // Minimum gain below threshold (default 0.001)
+}
+
+export function applyNoiseGate(
+  samples:  Float32Array,
+  sr:       number,
+  options:  Partial<NoiseGateOptions> = {}
+): Float32Array {
+  const threshLin = Math.pow(10, (options.thresholdDb ?? -40) / 20);
+  const attackMs  = options.attackMs  ?? 10;
+  const releaseMs = options.releaseMs ?? 175;
+  const kneeDb    = options.kneeDb    ?? 6;
+  const floor     = options.floor     ?? 0.001;
+
+  // Exponential envelope coefficients
+  // τ = 1 - e^(-1 / (sr × timeInSeconds))
+  const attackCoeff  = 1 - Math.exp(-1 / (sr * attackMs  / 1000));
+  const releaseCoeff = 1 - Math.exp(-1 / (sr * releaseMs / 1000));
+
+  // Soft knee: transition zone around threshold
+  const kneeLinLow  = threshLin * Math.pow(10, -kneeDb / 40);
+  const kneeLinHigh = threshLin * Math.pow(10,  kneeDb / 40);
+
+  const output   = new Float32Array(samples.length);
+  let   envelope = 0;
+
+  for(let i = 0; i < samples.length; i++){
+    const abs = Math.abs(samples[i]);
+
+    // Smooth envelope tracking
+    if(abs > envelope){
+      // Attack: signal rising — follow quickly
+      envelope += attackCoeff * (abs - envelope);
+    } else {
+      // Release: signal falling — follow slowly (prevents word-end chop)
+      envelope += releaseCoeff * (abs - envelope);
+    }
+
+    // Compute gate gain with soft knee
+    let gateGain: number;
+
+    if(envelope >= kneeLinHigh){
+      // Above knee: fully open
+      gateGain = 1.0;
+    } else if(envelope <= kneeLinLow){
+      // Below knee: fully closed (but not silent — use floor)
+      gateGain = floor;
+    } else {
+      // Inside soft knee: smooth quadratic transition
+      // g = floor + (1 - floor) × ((env - kneeLinLow) / (kneeLinHigh - kneeLinLow))²
+      const t = (envelope - kneeLinLow) / (kneeLinHigh - kneeLinLow);
+      gateGain = floor + (1 - floor) * t * t;
+    }
+
+    output[i] = samples[i] * gateGain;
+  }
+
+  return output;
+}
+
+// ── Frame-level Temporal Gain Smoothing ───────────────────────────────────────
+//
+// Smooths Wiener gains BETWEEN FFT frames to prevent inter-frame discontinuity.
+// gainSmooth[k] = α × gainPrev[k] + (1-α) × gainCurr[k]
+// α = 0.7 provides ~3-frame smoothing at hop=256/48kHz ≈ 5ms per frame
+
+function smoothGainTemporal(
+  gainCurr: Float32Array,
+  gainPrev: Float32Array,
+  alpha     = 0.7
+): Float32Array {
+  const out = new Float32Array(gainCurr.length);
+  for(let i = 0; i < gainCurr.length; i++){
+    out[i] = alpha * gainPrev[i] + (1 - alpha) * gainCurr[i];
+  }
+  return out;
+}
+
 // ── Musical Noise Suppression ─────────────────────────────────────────────────
 
 function suppressMusicalNoise(
@@ -258,8 +351,8 @@ export function reduceNoise(
     const output  = new Float64Array(src.length+FFT_SIZE);
     const overlap = new Float64Array(src.length+FFT_SIZE);
 
-    let gainPrev: Float32Array<ArrayBuffer>  = new Float32Array(FFT_SIZE/2).fill(1);
-    let gainPrev2: Float32Array<ArrayBuffer> = new Float32Array(FFT_SIZE/2).fill(1);
+    let gainPrev: Float32Array  = new Float32Array(FFT_SIZE/2).fill(1);
+    let gainPrev2: Float32Array = new Float32Array(FFT_SIZE/2).fill(1);
     let prevEnergy = 0;
 
     for(let i=0;i+FFT_SIZE<=src.length;i+=HOP_SIZE){
@@ -295,10 +388,14 @@ export function reduceNoise(
       }
 
       // Musical noise suppression
-      let finalGain: Float32Array<ArrayBuffer> = gainCurr;
+      let finalGain: Float32Array = gainCurr;
       if(opts.musicSuppression && !isTransient){
         finalGain = suppressMusicalNoise(gainCurr, gainPrev, gainPrev2);
       }
+
+      // Temporal smoothing between frames (prevents inter-frame chopping)
+      // α=0.7 → smooth over ~3 frames, eliminating gain discontinuities
+      finalGain = smoothGainTemporal(finalGain, gainPrev, 0.7);
 
       gainPrev2 = gainPrev;
       gainPrev  = gainCurr;

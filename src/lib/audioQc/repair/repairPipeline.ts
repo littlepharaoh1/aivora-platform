@@ -4,6 +4,7 @@
  */
 
 import { removeHum }          from "./humRemover";
+import { applyNoiseGate }     from "./noiseReducer";
 import { normalizeLoudness }  from "./loudnessNormalizer";
 import { trimSilence }        from "./silenceTrimmer";
 import { reduceNoise }        from "./noiseReducer";
@@ -41,7 +42,30 @@ export function repairAudioBuffer(
   const operations: string[] = [];
   const warnings:   string[] = [];
 
-  // Step 0: Noise reduction
+  // Step 0a: Noise Gate with smooth attack/release envelope
+  // Attack 10ms, Release 175ms, Soft knee 6dB
+  // This MUST run before noise reduction to prevent gating artifacts
+  {
+    const mono = current.getChannelData(0);
+    const gated = applyNoiseGate(mono, current.sampleRate, {
+      thresholdDb: -42,
+      attackMs:    10,
+      releaseMs:   175,
+      kneeDb:      6,
+      floor:       0.001,
+    });
+    const ctx    = new OfflineAudioContext(current.numberOfChannels, current.length, current.sampleRate);
+    const gBuf   = ctx.createBuffer(current.numberOfChannels, current.length, current.sampleRate);
+    for(let ch = 0; ch < current.numberOfChannels; ch++){
+      const src  = current.getChannelData(ch);
+      const dest = gBuf.getChannelData(ch);
+      if(ch === 0){ dest.set(gated); }
+      else        { dest.set(applyNoiseGate(src, current.sampleRate, { thresholdDb:-42, attackMs:10, releaseMs:175, kneeDb:6, floor:0.001 })); }
+    }
+    current = gBuf;
+  }
+
+  // Step 0b: Noise reduction
   if (options.noiseReduction) {
     const result = reduceNoise(current, {
       strength:     options.noiseStrength ?? 0.7,
@@ -53,15 +77,16 @@ export function repairAudioBuffer(
     warnings.push(...result.warnings);
   }
 
-  // Step 0b: Dynamic compression
+  // Step 0c: Dynamic compression
   if (options.dynamicCompression) {
-    const result = compressDynamics(current, { threshold:-24, ratio:4, attack:10, release:100, makeupGain:6 });
+    const result = compressDynamics(current, { threshold:-24, ratio:4, attack:10, release:175, makeupGain:6 });
+    // release:175ms — prevents word-end chopping (was 100ms, too aggressive)
     current = result.buffer;
     operations.push(`Dynamic compression: ${result.gainReductionDb.toFixed(1)} dB max reduction`);
     warnings.push(...result.warnings);
   }
 
-  // Step 0c: Speech clarity EQ
+  // Step 0d: Speech clarity EQ
   if (options.speechEQ) {
     const result = applyEQ(current, { bands: SPEECH_CLARITY_EQ });
     current = result.buffer;
