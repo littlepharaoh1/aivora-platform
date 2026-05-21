@@ -15,6 +15,7 @@ import { fmt } from "../lib/dsp/metricGuards";
 import { analyzeAdvancedVAD } from "../lib/audioQc/advancedVAD";
 import { detectReverb } from "../lib/audioQc/reverbDetector";
 import WaveformEditor from "./audio/WaveformEditor";
+import AuditionWorkspace, { type WorkspaceFile } from "./audio/AuditionWorkspace";
 import { exportToWav, downloadWav } from "../lib/audioQc/repair/wavExporter";
 import { useGlobalAudio } from "../lib/store/GlobalAudioContext";
 import { supabase } from "../lib/supabase";
@@ -327,6 +328,22 @@ export default function AudioQualityAnalyzer() {
   },[currentFile]);
 
   const [digitalGaps,setDigitalGaps]=useState([]);
+
+  // ── Audition Workspace multi-file state ───────────────────────────────────
+  const [wsFiles,    setWsFiles]    = useState<WorkspaceFile[]>([]);
+  const [wsActiveId, setWsActiveId] = useState<string>("");
+
+  // Add file to workspace when loaded
+  function wsAddFile(buf: AudioBuffer, name: string): string {
+    const id = `wsf_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    const entry: WorkspaceFile = { id, name, buffer: buf };
+    setWsFiles(prev => {
+      const next = [...prev.filter(f => f.name !== name), entry].slice(-10);
+      return next;
+    });
+    setWsActiveId(id);
+    return id;
+  }
   const canvasRef=useRef(null);
   const prof=PROFILES[pk];
 
@@ -340,6 +357,7 @@ export default function AudioQualityAnalyzer() {
       const r=await analyze(buf,file.name,pk);
       setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
       setAudioFile(file,pk);
+      wsAddFile(buf, file.name);
       const advVad = analyzeAdvancedVAD(buf, pk);
       setVadResult(advVad);
       const reverb = detectReverb(buf);
@@ -497,6 +515,8 @@ export default function AudioQualityAnalyzer() {
         // 2. Store for the download button + encode WAV blob
         setRestoredBuffer(newBuf);
         prepareEnhWAV(newBuf);
+        // Add restored buffer as new workspace tab
+        wsAddFile(newBuf, (rep?.name??"audio").replace(/\.wav$/i,"")+"_restored.wav");
         offsetRef.current = 0;
         setPlayheadSec(0);
 
@@ -891,26 +911,38 @@ export default function AudioQualityAnalyzer() {
             </div>
           </div>}
 
-          {/* Waveform Workstation */}
-          {rep?._buf&&<div style={{marginBottom:0}}>
-            <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:8}}>WAVEFORM WORKSTATION</div>
-            <WaveformEditor
-              buffer={rep._buf}
-              fileName={rep.name}
-              qcMarkers={[
-                ...(rep.edges?.leadMs>500?[{timeSec:0,type:"LEADING_SILENCE",severity:"medium",message:`Leading silence ${rep.edges.leadMs}ms`}]:[]),
-                ...(rep.edges?.trailMs>500?[{timeSec:rep.dur-rep.edges.trailMs/1000,type:"TRAILING_SILENCE",severity:"medium",message:`Trailing silence ${rep.edges.trailMs}ms`}]:[]),
-                ...digitalGaps.filter(g=>g.type==="internal").map(g=>({
-                  timeSec:g.startSec,type:"DIGITAL_SILENCE",severity:"critical",
-                  message:`Digital gap ${g.durationMs.toFixed(0)}ms at ${g.startSec.toFixed(2)}s`,
-                })),
-                ...(rep.qc?.problems||[]).filter(p=>p.type&&typeof p.type==="string").map((p,i)=>({
-                  timeSec:p.startSample?p.startSample/rep.sr:(rep.dur*(i+1))/((rep.qc?.problems?.length||1)+1),
-                  type:p.type,severity:p.severity,message:p.message,
-                })),
-              ]}
-            />
-          </div>}
+          {/* ── Adobe Audition Pro Workspace ────────────────────────────── */}
+          {wsFiles.length > 0 && (
+            <div style={{ marginBottom: 0 }}>
+              <div style={{
+                fontSize: 9, color: "#4a8a9a", letterSpacing: 1, marginBottom: 6,
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+                AUDITION WORKSPACE
+                <span style={{ fontSize: 8, color: "#2a5a6a" }}>
+                  {wsFiles.length} file(s) in memory
+                </span>
+              </div>
+              <AuditionWorkspace
+                files={wsFiles}
+                activeId={wsActiveId}
+                onTabSelect={id => setWsActiveId(id)}
+                onTabClose={id => {
+                  setWsFiles(prev => prev.filter(f => f.id !== id));
+                  if(wsActiveId === id){
+                    const remaining = wsFiles.filter(f => f.id !== id);
+                    setWsActiveId(remaining[remaining.length - 1]?.id ?? "");
+                  }
+                }}
+                playheadSec={playheadSec}
+                playing={enhPlaying}
+                onTogglePlay={toggleEnhancedPlay}
+                onSeek={seekEnhanced}
+                onDownload={restoredBuffer || repairResult?.repairedBuffer
+                  ? doDownloadRestored : undefined}
+              />
+            </div>
+          )}
 
           {/* Human Review Panel */}
           {rep&&(
