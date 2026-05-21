@@ -226,7 +226,8 @@ function ProfessionalAudioEditorInner() {
         setUseWebGL(true);
       }
     }
-    return ()=>{ webglRendererRef.current?.dispose(); };
+    return (
+    <>)=>{ webglRendererRef.current?.dispose(); };
   },[]);
 
   const duration = buffer?.duration ?? 0;
@@ -1217,6 +1218,7 @@ function ProfessionalAudioEditorInner() {
         />
       </div>
     )}
+    </>
   );
 }
 
