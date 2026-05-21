@@ -1086,25 +1086,6 @@ function ProfessionalAudioEditorInner() {
         <div style={{fontSize:7,color:"#1a3a4a",letterSpacing:1}}>
           SPACE=Play  ±=Zoom  Scroll=Pan  Drag=Select
         </div>
-        {wsFiles.length>0&&(
-          <div style={{borderTop:"1px solid #0a1520",paddingTop:8,marginTop:8}}>
-            <div style={{fontSize:9,color:"#2a5a6a",letterSpacing:1,marginBottom:6,
-              display:"flex",alignItems:"center",gap:8}}>
-              AUDITION WORKSPACE
-              <span style={{fontSize:8,color:"#1a3a4a"}}>{wsFiles.length} file(s)</span>
-            </div>
-            <AuditionWorkspace
-              files={wsFiles}
-              activeId={wsActiveId}
-              onTabSelect={id=>{setWsActiveId(id);const f=wsFiles.find(x=>x.id===id);if(f){wsStop();wsOffRef.current=0;setWsHeadSec(0);}}}
-              onTabClose={id=>{setWsFiles(prev=>prev.filter(f=>f.id!==id));if(wsActiveId===id){const r=wsFiles.filter(f=>f.id!==id);setWsActiveId(r[r.length-1]?.id??"");}wsStop();}}
-              playheadSec={wsHeadSec}
-              playing={wsPlaying}
-              onTogglePlay={wsToggle}
-              onSeek={wsSeek}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
