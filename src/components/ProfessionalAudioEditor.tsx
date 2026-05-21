@@ -22,7 +22,6 @@ import { computeDNSMOSProxy } from "../lib/audioEditor/audioMetrics";
 import { applyLookaheadLimiter } from "../lib/audioEditor/professionalDSP";
 import { workletManager } from "../lib/audioEditor/audioWorkletManager";
 import { WebGLRenderer } from "../lib/audioEditor/webglRenderer";
-import AuditionWorkspace, { type WorkspaceFile } from "./audio/AuditionWorkspace";
 
 // ── File List Item ────────────────────────────────────────────────────────────
 
@@ -118,67 +117,6 @@ function ProfessionalAudioEditorInner() {
   const [densityData,    setDensityData]    = useState<SpectralDensityData|null>(null);
   const [densityMode,    setDensityMode]    = useState<"off"|"energy"|"entropy"|"transient">("off");
   const [harmonicFrames, setHarmonicFrames] = useState<HarmonicFrame[]>([]);
-
-  // ── Audition Workspace ────────────────────────────────────────────────────
-  const [wsFiles,    setWsFiles]    = useState<WorkspaceFile[]>([]);
-  const [wsActiveId, setWsActiveId] = useState<string>("");
-  const [wsPlaying,  setWsPlaying]  = useState(false);
-  const [wsHeadSec,  setWsHeadSec]  = useState(0);
-  const wsCtxRef    = useRef<AudioContext|null>(null);
-  const wsSrcRef    = useRef<AudioBufferSourceNode|null>(null);
-  const wsRafRef    = useRef(0);
-  const wsStartRef  = useRef(0);
-  const wsOffRef    = useRef(0);
-
-  function wsStop() {
-    try { wsSrcRef.current?.stop(); } catch {}
-    wsSrcRef.current=null;
-    cancelAnimationFrame(wsRafRef.current);
-    setWsPlaying(false);
-  }
-
-  function wsPlay(buf: AudioBuffer, off=0) {
-    wsStop();
-    if(!wsCtxRef.current||wsCtxRef.current.state==="closed")
-      wsCtxRef.current=new AudioContext({sampleRate:buf.sampleRate});
-    const ctx=wsCtxRef.current;
-    if(ctx.state==="suspended") ctx.resume();
-    const src=ctx.createBufferSource();
-    src.buffer=buf; src.connect(ctx.destination);
-    src.start(0,off);
-    wsSrcRef.current=src;
-    wsOffRef.current=off;
-    wsStartRef.current=ctx.currentTime;
-    setWsPlaying(true);
-    src.onended=()=>{ setWsPlaying(false); };
-    function tick(){
-      const el=ctx.currentTime-wsStartRef.current+wsOffRef.current;
-      setWsHeadSec(Math.min(el,buf.duration));
-      if(el<buf.duration) wsRafRef.current=requestAnimationFrame(tick);
-      else { setWsPlaying(false); wsOffRef.current=0; setWsHeadSec(0); }
-    }
-    wsRafRef.current=requestAnimationFrame(tick);
-  }
-
-  function wsToggle() {
-    const f=wsFiles.find(x=>x.id===wsActiveId); if(!f) return;
-    if(wsPlaying){ wsOffRef.current=wsHeadSec; wsStop(); }
-    else wsPlay(f.buffer, wsOffRef.current);
-  }
-
-  function wsSeek(norm: number) {
-    const f=wsFiles.find(x=>x.id===wsActiveId); if(!f) return;
-    const sec=norm*f.buffer.duration;
-    wsOffRef.current=sec; setWsHeadSec(sec);
-    if(wsPlaying) wsPlay(f.buffer, sec);
-  }
-
-  function wsAddFile(buf: AudioBuffer, name: string) {
-    const id=`pro_${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
-    setWsFiles(prev=>[...prev.filter(f=>f.name!==name),{id,name,buffer:buf}].slice(-10));
-    setWsActiveId(id);
-    wsOffRef.current=0; setWsHeadSec(0);
-  }
   const [roomTone,       setRoomTone]       = useState<RoomToneProfile|null>(null);
   const [harmonicMode,   setHarmonicMode]   = useState(false);
   const [repairData,     setRepairData]     = useState<RepairComparisonData|null>(null);
@@ -220,12 +158,7 @@ function ProfessionalAudioEditorInner() {
         setUseWebGL(true);
       }
     }
-    return (
-    <>)=>{
-      webglRendererRef.current?.dispose();
-      wsStop();
-      wsCtxRef.current?.close();
-    };
+    return ()=>{ webglRendererRef.current?.dispose(); };
   },[]);
 
   const duration = buffer?.duration ?? 0;
@@ -287,7 +220,6 @@ function ProfessionalAudioEditorInner() {
     setPanOffset(0);
     setPlayhead(0);
     setSelection(null);
-    wsAddFile(buf, file.name);
     } catch(err) {
       
     }
@@ -1154,46 +1086,30 @@ function ProfessionalAudioEditorInner() {
         <div style={{fontSize:7,color:"#1a3a4a",letterSpacing:1}}>
           SPACE=Play  ±=Zoom  Scroll=Pan  Drag=Select
         </div>
+        {wsFiles.length>0&&(
+          <div style={{borderTop:"1px solid #0a1520",paddingTop:8,marginTop:8}}>
+            <div style={{fontSize:9,color:"#2a5a6a",letterSpacing:1,marginBottom:6,
+              display:"flex",alignItems:"center",gap:8}}>
+              AUDITION WORKSPACE
+              <span style={{fontSize:8,color:"#1a3a4a"}}>{wsFiles.length} file(s)</span>
+            </div>
+            <AuditionWorkspace
+              files={wsFiles}
+              activeId={wsActiveId}
+              onTabSelect={id=>{setWsActiveId(id);const f=wsFiles.find(x=>x.id===id);if(f){wsStop();wsOffRef.current=0;setWsHeadSec(0);}}}
+              onTabClose={id=>{setWsFiles(prev=>prev.filter(f=>f.id!==id));if(wsActiveId===id){const r=wsFiles.filter(f=>f.id!==id);setWsActiveId(r[r.length-1]?.id??"");}wsStop();}}
+              playheadSec={wsHeadSec}
+              playing={wsPlaying}
+              onTogglePlay={wsToggle}
+              onSeek={wsSeek}
+            />
+          </div>
+        )}
       </div>
     </div>
-
-    {wsFiles.length>0&&(
-      <div style={{borderTop:"1px solid #0a1520",padding:8,marginTop:4}}>
-        <div style={{fontSize:9,color:"#2a5a6a",letterSpacing:1,marginBottom:6,
-          display:"flex",alignItems:"center",gap:8}}>
-          AUDITION WORKSPACE
-          <span style={{fontSize:8,color:"#1a3a4a"}}>{wsFiles.length} file(s) · WebGL2</span>
-        </div>
-        <AuditionWorkspace
-          files={wsFiles}
-          activeId={wsActiveId}
-          onTabSelect={id=>{
-            setWsActiveId(id);
-            const f=wsFiles.find(x=>x.id===id);
-            if(f){wsStop();wsOffRef.current=0;setWsHeadSec(0);}
-          }}
-          onTabClose={id=>{
-            setWsFiles(prev=>prev.filter(f=>f.id!==id));
-            if(wsActiveId===id){
-              const r=wsFiles.filter(f=>f.id!==id);
-              setWsActiveId(r[r.length-1]?.id??"");
-            }
-            wsStop();
-          }}
-          playheadSec={wsHeadSec}
-          playing={wsPlaying}
-          onTogglePlay={wsToggle}
-          onSeek={wsSeek}
-        />
-      </div>
-    )}
-    </>
   );
 }
 
-function AuditionWorkspaceWrapper() {
-  return null; // placeholder — workspace is inside ProfessionalAudioEditorInner
-}
 export default function ProfessionalAudioEditor() {
   return <EditorErrorBoundary><ProfessionalAudioEditorInner/></EditorErrorBoundary>;
 }
