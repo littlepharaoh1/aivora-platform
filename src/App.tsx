@@ -8,7 +8,6 @@ import NavIcon, { GROUP_COLORS } from "./components/ui/NavIcon";
 import LoginPage from "./components/LoginPage";
 import AivoraAudioBench from "./components/AivoraAudioBench";
 import ActivityMonitor from "./components/ActivityMonitor";
-import DeliveryReadiness from "./components/DeliveryReadiness";
 import Documentation from "./components/Documentation";
 import ObservabilityDashboard from "./components/ObservabilityDashboard";
 import Contributors from "./components/Contributors";
@@ -24,6 +23,7 @@ import { colors }  from "./lib/design/tokens";
 // Auth
 import AuthGate        from "./components/AuthGate";
 import LandingPage     from "./components/LandingPage";
+import ForensicIntelPanel from "./components/ForensicIntelPanel";
 import { useAuth }     from "./lib/auth/AuthContext";
 import UserAvatar      from "./components/UserAvatar";
 import NetworkStatus   from "./components/NetworkStatus";
@@ -42,7 +42,6 @@ import BatchAnalyzer          from "./components/BatchAnalyzer";
 import SmartNamingSequencer   from "./components/SmartNamingSequencer";
 import AudioEnhancementLab    from "./components/AudioEnhancementLab";
 import AudioPipeline          from "./components/AudioPipeline";
-import DeliveryReadinessScore from "./components/DeliveryReadinessScore";
 
 // Components — Global DSP Deployments (Aivora Core v2.5)
 import DSPManagementDashboard from "./components/dashboard/DSPManagementDashboard";
@@ -67,7 +66,7 @@ type Tab =
   | "naming"
   | "enhancement"
   | "pipeline"
-  | "readiness"
+  | "forensic_intel"
   | "forensic_repair"
   | "audition"
   | "contributors"
@@ -91,7 +90,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   naming:          { title:"Smart Naming",            subtitle:"SMART SEQUENCER S0001–S0200" },
   enhancement:     { title:"Enhancement Lab",         subtitle:"AUDIO REPAIR & ENHANCEMENT" },
   pipeline:        { title:"Audio Pipeline",          subtitle:"END-TO-END PROCESSING" },
-  readiness:       { title:"Delivery Readiness",      subtitle:"QC SCORE & COMPLIANCE" },
+  forensic_intel:  { title:"Forensic Intelligence",   subtitle:"NEURAL PROVENANCE ENGINE" },
   forensic_repair: { title:"Forensic Silence Repair", subtitle:"ADOBE-STYLE QA SIMULATION" },
   audition:        { title:"Audition Workstation",    subtitle:"PROFESSIONAL AUDIO EDITOR" },
   contributors:    { title:"Contributors",            subtitle:"TEAM MANAGEMENT" },
@@ -117,7 +116,7 @@ const NAV_ITEMS = [
   { id:"naming",          icon:"naming",       label:"Smart Naming",        group:"production" },
   { id:"enhancement",     icon:"enhancement",  label:"Enhancement Lab",     group:"production" },
   { id:"pipeline",        icon:"pipeline",     label:"Audio Pipeline",      group:"production" },
-  { id:"readiness",       icon:"delivery",     label:"Delivery Readiness",  group:"production" },
+  { id:"forensic_intel",  icon:"forensic",     label:"Forensic Intel",      group:"production" },
   { id:"conversations",   icon:"rooms",        label:"Conv. Rooms",         group:"production" },
   
   // Repair
@@ -296,7 +295,7 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
     { icon:"naming", label:"Smart Naming",      sub:"Smart Seq S0001–S0200",  tab:"naming"         as Tab, color:colors.accent.cyan   },
     { icon:"enhancement", label:"Enhancement Lab",   sub:"Audio repair & enhancement",tab:"enhancement"    as Tab, color:colors.accent.amber  },
     { icon:"pipeline", label:"Audio Pipeline",    sub:"End-to-end processing",     tab:"pipeline"       as Tab, color:colors.accent.green  },
-    { icon:"delivery", label:"Delivery Readiness",sub:"QC score & compliance",     tab:"readiness"      as Tab, color:colors.accent.green  },
+    { icon:"forensic", label:"Forensic Intel",    sub:"Neural provenance engine",  tab:"forensic_intel" as Tab, color:colors.accent.cyan   },
     { icon:"forensic", label:"Forensic Repair",   sub:"Silence reconstruction",    tab:"forensic_repair"as Tab, color:colors.accent.amber  },
     { icon:"audition", label:"Audition Editor",   sub:"Professional workstation",  tab:"audition"       as Tab, color:colors.accent.sky    },
     { icon:"monitor", label:"Activity Monitor",  sub:"Real-time tracking",        tab:"monitor"        as Tab, color:colors.accent.purple },
@@ -462,7 +461,7 @@ function AppContent(){
           {tab==="dsp_validation"  && <DspValidationDashboard/>}
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <Contributors/>}
-          {tab==="readiness"       && <DeliveryReadiness/>}
+          {tab==="forensic_intel"  && <ForensicIntelPanel/>}
           {tab==="monitor"         && <ActivityMonitor/>}
           {tab==="documentation"   && <Documentation/>}
           {tab==="observability"   && <ObservabilityDashboard/>}
