@@ -220,7 +220,8 @@ function ProfessionalAudioEditorInner() {
         setUseWebGL(true);
       }
     }
-    return ()=>{
+    return (
+    <>)=>{
       webglRendererRef.current?.dispose();
       wsStop();
       wsCtxRef.current?.close();
@@ -1186,6 +1187,7 @@ function ProfessionalAudioEditorInner() {
         />
       </div>
     )}
+    </>
   );
 }
 
