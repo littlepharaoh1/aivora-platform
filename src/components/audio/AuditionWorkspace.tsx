@@ -965,17 +965,9 @@ export default function AuditionWorkspace({
             </div>
 
             {/* Zoom buttons */}
-            {[
-              ["+", ()=>{ const m=(viewStart+viewEnd)/2,h=(viewEnd-viewStart)/4; setViewStart(Math.max(0,m-h));setViewEnd(Math.min(1,m+h)); }],
-              ["−", ()=>{ const m=(viewStart+viewEnd)/2,h=(viewEnd-viewStart);   setViewStart(Math.max(0,m-h));setViewEnd(Math.min(1,m+h)); }],
-              ["FIT",()=>{ setViewStart(0);setViewEnd(1); }],
-            ] as [string,(()=>void)][]).map(([l,fn],i)=>(
-              <button key={i} onClick={fn} style={{
-                background:AU.bgDark, border:`1px solid ${AU.border}`,
-                borderRadius:3, padding:"2px 8px",
-                cursor:"pointer", color:AU.textDim, fontSize:10,
-              }}>{l}</button>
-            ))}
+            <button onClick={()=>{ const m=(viewStart+viewEnd)/2,h=(viewEnd-viewStart)/4; setViewStart(Math.max(0,m-h));setViewEnd(Math.min(1,m+h)); }} style={{background:AU.bgDark,border:`1px solid ${AU.border}`,borderRadius:3,padding:"2px 8px",cursor:"pointer",color:AU.textDim,fontSize:10}}>+</button>
+            <button onClick={()=>{ const m=(viewStart+viewEnd)/2,h=(viewEnd-viewStart);   setViewStart(Math.max(0,m-h));setViewEnd(Math.min(1,m+h)); }} style={{background:AU.bgDark,border:`1px solid ${AU.border}`,borderRadius:3,padding:"2px 8px",cursor:"pointer",color:AU.textDim,fontSize:10}}>−</button>
+            <button onClick={()=>{ setViewStart(0);setViewEnd(1); }} style={{background:AU.bgDark,border:`1px solid ${AU.border}`,borderRadius:3,padding:"2px 8px",cursor:"pointer",color:AU.textDim,fontSize:9}}>FIT</button>
 
             <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
               <LEDMeter level={peakLevel}/>
