@@ -926,7 +926,18 @@ export default function AudioQualityAnalyzer() {
               <AuditionWorkspace
                 files={wsFiles}
                 activeId={wsActiveId}
-                onTabSelect={id => setWsActiveId(id)}
+                onTabSelect={id => {
+                  setWsActiveId(id);
+                  // Switch playback buffer when tab changes
+                  const f = wsFiles.find(x => x.id === id);
+                  if(f) {
+                    stopEnhanced();
+                    offsetRef.current = 0;
+                    setPlayheadSec(0);
+                    // Update restoredBuffer so toggleEnhancedPlay uses correct buffer
+                    setRestoredBuffer(f.buffer);
+                  }
+                }}
                 onTabClose={id => {
                   setWsFiles(prev => prev.filter(f => f.id !== id));
                   if(wsActiveId === id){
