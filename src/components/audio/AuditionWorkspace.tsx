@@ -969,8 +969,8 @@ export default function AuditionWorkspace({
               ["+", ()=>{ const m=(viewStart+viewEnd)/2,h=(viewEnd-viewStart)/4; setViewStart(Math.max(0,m-h));setViewEnd(Math.min(1,m+h)); }],
               ["−", ()=>{ const m=(viewStart+viewEnd)/2,h=(viewEnd-viewStart);   setViewStart(Math.max(0,m-h));setViewEnd(Math.min(1,m+h)); }],
               ["FIT",()=>{ setViewStart(0);setViewEnd(1); }],
-            ].map(([l,fn],i)=>(
-              <button key={i} onClick={fn as ()=>void} style={{
+            ] as [string,(()=>void)][]).map(([l,fn],i)=>(
+              <button key={i} onClick={fn} style={{
                 background:AU.bgDark, border:`1px solid ${AU.border}`,
                 borderRadius:3, padding:"2px 8px",
                 cursor:"pointer", color:AU.textDim, fontSize:10,
