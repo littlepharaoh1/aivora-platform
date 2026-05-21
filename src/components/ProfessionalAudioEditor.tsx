@@ -117,7 +117,9 @@ function ProfessionalAudioEditorInner() {
   const [silenceMode,    setSilenceMode]    = useState(false);
   const [densityData,    setDensityData]    = useState<SpectralDensityData|null>(null);
   const [densityMode,    setDensityMode]    = useState<"off"|"energy"|"entropy"|"transient">("off");
-  // ── AuditionWorkspace state ─────────────────────────────────────────────
+  const [harmonicFrames, setHarmonicFrames] = useState<HarmonicFrame[]>([]);
+
+  // ── Audition Workspace ────────────────────────────────────────────────────
   const [wsFiles,    setWsFiles]    = useState<WorkspaceFile[]>([]);
   const [wsActiveId, setWsActiveId] = useState<string>("");
   const [wsPlaying,  setWsPlaying]  = useState(false);
@@ -126,65 +128,57 @@ function ProfessionalAudioEditorInner() {
   const wsSrcRef    = useRef<AudioBufferSourceNode|null>(null);
   const wsRafRef    = useRef(0);
   const wsStartRef  = useRef(0);
-  const wsOffsetRef = useRef(0);
-  const wsDecayRef  = useRef(0);
+  const wsOffRef    = useRef(0);
 
   function wsStop() {
     try { wsSrcRef.current?.stop(); } catch {}
-    wsSrcRef.current = null;
+    wsSrcRef.current=null;
     cancelAnimationFrame(wsRafRef.current);
     setWsPlaying(false);
   }
 
-  function wsPlay(buf: AudioBuffer, offset=0) {
+  function wsPlay(buf: AudioBuffer, off=0) {
     wsStop();
     if(!wsCtxRef.current||wsCtxRef.current.state==="closed")
-      wsCtxRef.current = new AudioContext({sampleRate:buf.sampleRate});
-    const ctx = wsCtxRef.current;
+      wsCtxRef.current=new AudioContext({sampleRate:buf.sampleRate});
+    const ctx=wsCtxRef.current;
     if(ctx.state==="suspended") ctx.resume();
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    src.start(0, offset);
-    wsSrcRef.current = src;
-    wsOffsetRef.current = offset;
-    wsStartRef.current  = ctx.currentTime;
+    const src=ctx.createBufferSource();
+    src.buffer=buf; src.connect(ctx.destination);
+    src.start(0,off);
+    wsSrcRef.current=src;
+    wsOffRef.current=off;
+    wsStartRef.current=ctx.currentTime;
     setWsPlaying(true);
-    src.onended = () => { setWsPlaying(false); };
-    function tick() {
-      const el = ctx.currentTime - wsStartRef.current + wsOffsetRef.current;
-      setWsHeadSec(Math.min(el, buf.duration));
-      if(el < buf.duration) wsRafRef.current = requestAnimationFrame(tick);
-      else { setWsPlaying(false); wsOffsetRef.current=0; setWsHeadSec(0); }
+    src.onended=()=>{ setWsPlaying(false); };
+    function tick(){
+      const el=ctx.currentTime-wsStartRef.current+wsOffRef.current;
+      setWsHeadSec(Math.min(el,buf.duration));
+      if(el<buf.duration) wsRafRef.current=requestAnimationFrame(tick);
+      else { setWsPlaying(false); wsOffRef.current=0; setWsHeadSec(0); }
     }
-    wsRafRef.current = requestAnimationFrame(tick);
+    wsRafRef.current=requestAnimationFrame(tick);
   }
 
   function wsToggle() {
-    const f = wsFiles.find(x=>x.id===wsActiveId);
-    if(!f) return;
-    if(wsPlaying) { wsOffsetRef.current=wsHeadSec; wsStop(); }
-    else wsPlay(f.buffer, wsOffsetRef.current);
+    const f=wsFiles.find(x=>x.id===wsActiveId); if(!f) return;
+    if(wsPlaying){ wsOffRef.current=wsHeadSec; wsStop(); }
+    else wsPlay(f.buffer, wsOffRef.current);
   }
 
   function wsSeek(norm: number) {
-    const f = wsFiles.find(x=>x.id===wsActiveId);
-    if(!f) return;
-    const sec = norm*f.buffer.duration;
-    wsOffsetRef.current = sec;
-    setWsHeadSec(sec);
+    const f=wsFiles.find(x=>x.id===wsActiveId); if(!f) return;
+    const sec=norm*f.buffer.duration;
+    wsOffRef.current=sec; setWsHeadSec(sec);
     if(wsPlaying) wsPlay(f.buffer, sec);
   }
 
   function wsAddFile(buf: AudioBuffer, name: string) {
-    const id = `pro_${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
+    const id=`pro_${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
     setWsFiles(prev=>[...prev.filter(f=>f.name!==name),{id,name,buffer:buf}].slice(-10));
     setWsActiveId(id);
-    wsOffsetRef.current=0; setWsHeadSec(0);
-    return id;
+    wsOffRef.current=0; setWsHeadSec(0);
   }
-
-  const [harmonicFrames, setHarmonicFrames] = useState<HarmonicFrame[]>([]);
   const [roomTone,       setRoomTone]       = useState<RoomToneProfile|null>(null);
   const [harmonicMode,   setHarmonicMode]   = useState(false);
   const [repairData,     setRepairData]     = useState<RepairComparisonData|null>(null);
@@ -226,8 +220,11 @@ function ProfessionalAudioEditorInner() {
         setUseWebGL(true);
       }
     }
-    return (
-    <>)=>{ webglRendererRef.current?.dispose(); };
+    return ()=>{
+      webglRendererRef.current?.dispose();
+      wsStop();
+      wsCtxRef.current?.close();
+    };
   },[]);
 
   const duration = buffer?.duration ?? 0;
@@ -289,7 +286,6 @@ function ProfessionalAudioEditorInner() {
     setPanOffset(0);
     setPlayhead(0);
     setSelection(null);
-    // Add to AuditionWorkspace
     wsAddFile(buf, file.name);
     } catch(err) {
       
@@ -1159,69 +1155,12 @@ function ProfessionalAudioEditorInner() {
         </div>
       </div>
     </div>
-
-    {/* ── Audition Workspace ─────────────────────────────────────────── */}
-    {wsFiles.length > 0 && (
-      <div style={{margin:"8px 4px 0",borderTop:"1px solid #0a1520",paddingTop:8}}>
-        <div style={{fontSize:9,color:"#2a5a6a",letterSpacing:1,
-          marginBottom:6,padding:"0 4px",display:"flex",alignItems:"center",gap:8}}>
-          AUDITION WORKSPACE
-          <span style={{fontSize:8,color:"#1a3a4a"}}>
-            {wsFiles.length} file(s) · WebGL2 + STFT Worker
-          </span>
-        </div>
-        <AuditionWorkspace
-          files={wsFiles}
-          activeId={wsActiveId}
-          onTabSelect={id=>{
-            setWsActiveId(id);
-            const f=wsFiles.find(x=>x.id===id);
-            if(f){wsStop();wsOffsetRef.current=0;setWsHeadSec(0);}
-          }}
-          onTabClose={id=>{
-            setWsFiles(prev=>prev.filter(f=>f.id!==id));
-            if(wsActiveId===id){
-              const rem=wsFiles.filter(f=>f.id!==id);
-              setWsActiveId(rem[rem.length-1]?.id??"");
-            }
-            wsStop();
-          }}
-          playheadSec={wsHeadSec}
-          playing={wsPlaying}
-          onTogglePlay={wsToggle}
-          onSeek={wsSeek}
-          onDownload={()=>{
-            const f=wsFiles.find(x=>x.id===wsActiveId);
-            if(!f) return;
-            const nCh=f.buffer.numberOfChannels;
-            const nSmp=f.buffer.length;
-            const bytes=nSmp*nCh*4;
-            const ab=new ArrayBuffer(44+bytes);
-            const v=new DataView(ab);
-            const ws2=(o:number,s:string)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
-            ws2(0,"RIFF");v.setUint32(4,36+bytes,true);ws2(8,"WAVE");ws2(12,"fmt ");
-            v.setUint32(16,18,true);v.setUint16(20,3,true);
-            v.setUint16(22,nCh,true);v.setUint32(24,f.buffer.sampleRate,true);
-            v.setUint32(28,f.buffer.sampleRate*nCh*4,true);
-            v.setUint16(32,nCh*4,true);v.setUint16(34,32,true);v.setUint16(36,0,true);
-            ws2(38,"data");v.setUint32(42,bytes,true);
-            const out=new Float32Array(ab,44);
-            for(let i=0;i<nSmp;i++)
-              for(let ch=0;ch<nCh;ch++)
-                out[i*nCh+ch]=f.buffer.getChannelData(ch)[i];
-            const blob=new Blob([ab],{type:"audio/wav"});
-            const a=document.createElement("a");
-            a.href=URL.createObjectURL(blob);
-            a.download=f.name.replace(/\.wav$/i,"")+"_export.wav";
-            a.click();
-          }}
-        />
-      </div>
-    )}
-    </>
   );
 }
 
+function AuditionWorkspaceWrapper() {
+  return null; // placeholder — workspace is inside ProfessionalAudioEditorInner
+}
 export default function ProfessionalAudioEditor() {
   return <EditorErrorBoundary><ProfessionalAudioEditorInner/></EditorErrorBoundary>;
 }
