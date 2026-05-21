@@ -7,7 +7,7 @@ export interface SyntheticResult {
   confidence:   number;
   naturalness:  number;
   scores: {
-    jitter:     number;  // 0-100
+    jitter:     number;
     shimmer:    number;
     bispectrum: number;
     cpp:        number;
@@ -16,7 +16,7 @@ export interface SyntheticResult {
 }
 
 export interface MicResult {
-  signature:    number[];  // 32-dim normalized mel
+  signature:    number[];
   noiseFloorDb: number;
   rolloffHz:    number;
 }
