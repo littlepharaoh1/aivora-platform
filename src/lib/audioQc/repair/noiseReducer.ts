@@ -236,11 +236,11 @@ function smoothGainTemporal(
 // ── Musical Noise Suppression ─────────────────────────────────────────────────
 
 function suppressMusicalNoise(
-  gainCurr: Float32Array<ArrayBuffer>,
-  gainPrev: Float32Array<ArrayBuffer>,
-  gainPrev2: Float32Array<ArrayBuffer>
-): Float32Array<ArrayBuffer> {
-  const smoothed: Float32Array<ArrayBuffer> = new Float32Array(gainCurr.length);
+  gainCurr: Float32Array,
+  gainPrev: Float32Array,
+  gainPrev2: Float32Array
+): Float32Array {
+  const smoothed: Float32Array = new Float32Array(gainCurr.length);
   for(let i=0;i<gainCurr.length;i++){
     // Median of 3 frames + neighboring bins
     const left  = i>0 ? gainCurr[i-1] : gainCurr[i];
