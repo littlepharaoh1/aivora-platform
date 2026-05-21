@@ -25,6 +25,60 @@ import { computeDNSMOSProxy, computeSISDR } from "../lib/audioEditor/audioMetric
 import { validateExport } from "../lib/audioEditor/exportValidator";
 import { useAuth } from "../lib/auth/AuthContext";
 
+// ── In-Memory WAV Encoder (32-bit float PCM, non-blocking) ──────────────────
+// Encodes AudioBuffer → WAV Blob entirely in-browser, zero server round-trips.
+// Format: IEEE 754 float32 LE, standard RIFF/WAVE/fmt/data chunks.
+function encodeWAV32(buffer: AudioBuffer): Blob {
+  const numCh  = buffer.numberOfChannels;
+  const numSmp = buffer.length;
+  const sr     = buffer.sampleRate;
+  const bytesPerSmp = 4; // float32
+  const dataLen     = numCh * numSmp * bytesPerSmp;
+  const ab          = new ArrayBuffer(44 + dataLen);
+  const view        = new DataView(ab);
+
+  const writeStr = (off: number, s: string) => {
+    for(let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+  };
+
+  // RIFF header
+  writeStr(0, "RIFF");
+  view.setUint32(4,  36 + dataLen, true);
+  writeStr(8,  "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 18, true);          // chunk size (18 = extended PCM)
+  view.setUint16(20, 3,  true);          // AudioFormat = IEEE float
+  view.setUint16(22, numCh, true);
+  view.setUint32(24, sr, true);
+  view.setUint32(28, sr * numCh * bytesPerSmp, true); // byteRate
+  view.setUint16(32, numCh * bytesPerSmp, true);       // blockAlign
+  view.setUint16(34, 32, true);                         // bitsPerSample
+  view.setUint16(36, 0,  true);                         // extension size
+  writeStr(38, "data");
+  view.setUint32(42, dataLen, true);
+
+  // Interleave channels into float32 PCM
+  const out = new Float32Array(ab, 44);
+  for(let i = 0; i < numSmp; i++) {
+    for(let ch = 0; ch < numCh; ch++) {
+      out[i * numCh + ch] = buffer.getChannelData(ch)[i];
+    }
+  }
+
+  return new Blob([ab], { type: "audio/wav" });
+}
+
+// ── Trigger instant browser download without blocking UI ─────────────────────
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement("a");
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  // Revoke after 60s to free memory
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function safeNum(v: number, decimals=1, fallback="—"): string {
   if (!isFinite(v) || isNaN(v)) return fallback;
   return v.toFixed(decimals);
@@ -134,6 +188,115 @@ export default function AudioQualityAnalyzer() {
 
   // ── NEW: holds the restored AudioBuffer for download ─────────────────
   const [restoredBuffer, setRestoredBuffer] = useState<AudioBuffer|null>(null);
+
+  // ── WebAudio in-memory playback ───────────────────────────────────────────
+  // Uses AudioBufferSourceNode → zero-latency, lossless 48kHz playback.
+  // Avoids HTML5 <audio> re-buffering completely.
+  const audioCtxRef    = useRef<AudioContext | null>(null);
+  const sourceNodeRef  = useRef<AudioBufferSourceNode | null>(null);
+  const playStartRef   = useRef<number>(0);    // audioCtx.currentTime when play started
+  const offsetRef      = useRef<number>(0);    // seek offset in seconds
+  const rafRef         = useRef<number>(0);    // requestAnimationFrame id
+  const [enhPlaying,   setEnhPlaying]   = useState(false);
+  const [playheadSec,  setPlayheadSec]  = useState(0);
+  const [enhWavBlob,   setEnhWavBlob]   = useState<Blob | null>(null);
+
+  // Stop any running enhanced playback
+  function stopEnhanced(): void {
+    if(sourceNodeRef.current){
+      try { sourceNodeRef.current.stop(); } catch {}
+      sourceNodeRef.current.disconnect();
+      sourceNodeRef.current = null;
+    }
+    cancelAnimationFrame(rafRef.current);
+    setEnhPlaying(false);
+  }
+
+  // Animate playhead position in real-time via RAF
+  function startPlayheadRAF(duration: number): void {
+    cancelAnimationFrame(rafRef.current);
+    const ctx = audioCtxRef.current!;
+    function tick() {
+      const elapsed = ctx.currentTime - playStartRef.current + offsetRef.current;
+      const clamped = Math.min(elapsed, duration);
+      setPlayheadSec(clamped);
+      if(clamped < duration) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        setEnhPlaying(false);
+        offsetRef.current = 0;
+        setPlayheadSec(0);
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  // Play enhanced AudioBuffer via AudioBufferSourceNode
+  function playEnhanced(buf: AudioBuffer, seekSec = 0): void {
+    stopEnhanced();
+
+    // Reuse or create AudioContext
+    if(!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new AudioContext({ sampleRate: buf.sampleRate });
+    }
+    const ctx = audioCtxRef.current;
+    if(ctx.state === "suspended") ctx.resume();
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+
+    offsetRef.current   = seekSec;
+    playStartRef.current= ctx.currentTime;
+    src.start(0, seekSec);
+    sourceNodeRef.current = src;
+    setEnhPlaying(true);
+
+    src.onended = () => {
+      cancelAnimationFrame(rafRef.current);
+      if(enhPlaying) setEnhPlaying(false);
+    };
+
+    startPlayheadRAF(buf.duration);
+  }
+
+  // Toggle play/pause for enhanced buffer
+  function toggleEnhancedPlay(): void {
+    const buf = restoredBuffer ?? repairResult?.repairedBuffer;
+    if(!buf) return;
+    if(enhPlaying) {
+      // Pause: save current offset
+      offsetRef.current = playheadSec;
+      stopEnhanced();
+    } else {
+      playEnhanced(buf, offsetRef.current);
+    }
+  }
+
+  // Seek to position (0-1 normalized)
+  function seekEnhanced(norm: number): void {
+    const buf = restoredBuffer ?? repairResult?.repairedBuffer;
+    if(!buf) return;
+    const sec = norm * buf.duration;
+    offsetRef.current = sec;
+    setPlayheadSec(sec);
+    if(enhPlaying) playEnhanced(buf, sec);
+  }
+
+  // Encode + prepare WAV blob (called after repair/restore completes)
+  function prepareEnhWAV(buf: AudioBuffer): void {
+    // Non-blocking: runs synchronously but is fast for typical durations
+    const blob = encodeWAV32(buf);
+    setEnhWavBlob(blob);
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopEnhanced();
+      audioCtxRef.current?.close();
+    };
+  }, []);
 
   React.useEffect(()=>{
     if(window.location.hash.includes("access_token")) {
@@ -331,8 +494,11 @@ export default function AudioQualityAnalyzer() {
         // 1. Update rep so WaveformEditor plays the clean version
         setRep(prev => prev ? { ...prev, _buf: newBuf } : prev);
 
-        // 2. Store for the download button
+        // 2. Store for the download button + encode WAV blob
         setRestoredBuffer(newBuf);
+        prepareEnhWAV(newBuf);
+        offsetRef.current = 0;
+        setPlayheadSec(0);
 
         // 3. Re-render spectrogram — red silence lines will vanish
         const spec = computeSpectrogramPro(newBuf, {
@@ -352,18 +518,23 @@ export default function AudioQualityAnalyzer() {
 
   // ── NEW: download the restored buffer as a named WAV file ─────────────
   function doDownloadRestored() {
-    const buf = restoredBuffer;
-    if (!buf || !rep) return;
+    const buf = restoredBuffer ?? repairResult?.repairedBuffer;
+    if(!buf || !rep) return;
     const baseName = rep.name.replace(/\.wav$/i, "");
-    const wav = exportToWav(buf, `${baseName}_restored`);
-    downloadWav(wav);
+    const suffix   = repairResult?.changed ? "_enhanced" : "_restored";
+    const filename = `${baseName}${suffix}.wav`;
+
+    // Use pre-encoded blob if ready; otherwise encode now
+    const blob = enhWavBlob ?? encodeWAV32(buf);
+    triggerDownload(blob, filename);
+
     trackEvent({
       eventType: "wav_exported",
-      module:    "silence_restoration",
+      module:    "repair_suite",
       userId:    qcUser?.uid,
       userEmail: qcUser?.email,
       userRole:  qcUser?.role,
-      metadata:  { fileName: wav.filename, segmentsRestored: restored?.segmentsRestored },
+      metadata:  { fileName: filename, operations: repairResult?.operations },
     });
   }
 
@@ -425,6 +596,11 @@ export default function AudioQualityAnalyzer() {
           after:  { score: qcAfter.score, lufs: qcAfter.metrics.lufs, snr: qcAfter.metrics.snrDb },
         });
       }
+      if(result.changed && result.repairedBuffer){
+        prepareEnhWAV(result.repairedBuffer);
+        offsetRef.current = 0;
+        setPlayheadSec(0);
+      }
       if(result.changed){
         trackEvent({
           eventType: "repair_applied",
@@ -440,16 +616,18 @@ export default function AudioQualityAnalyzer() {
   }
 
   function doExport(){
-    if(!repairResult?.repairedBuffer)return;
-    const wav=exportToWav(repairResult.repairedBuffer,rep?.name||"audio");
-    downloadWav(wav);
+    if(!repairResult?.repairedBuffer || !rep) return;
+    const baseName = rep.name.replace(/\.wav$/i, "");
+    const filename = `${baseName}_enhanced.wav`;
+    const blob     = enhWavBlob ?? encodeWAV32(repairResult.repairedBuffer);
+    triggerDownload(blob, filename);
     trackEvent({
       eventType: "wav_exported",
       module:    "repair_suite",
       userId:    qcUser?.uid,
       userEmail: qcUser?.email,
       userRole:  qcUser?.role,
-      metadata:  { fileName: wav.filename, operations: repairResult.operations },
+      metadata:  { fileName: filename, operations: repairResult.operations },
     });
   }
 
@@ -610,11 +788,50 @@ export default function AudioQualityAnalyzer() {
                   </span>
                 )}
 
-                {/* ── NEW: Download Enhanced WAV button ──────────────────
-                    Appears only after a successful restoration.
-                    Glows green to draw attention.
+                {/* ── In-Memory AudioBuffer Playback Controls ─────────
+                    AudioBufferSourceNode → zero-latency 48kHz playback
+                    No HTML5 <audio>, no re-buffering, lossless fidelity
                 ────────────────────────────────────────────────────── */}
-                {restored?.changed && restoredBuffer && (
+                {(restoredBuffer || repairResult?.repairedBuffer) && (()=>{
+                  const buf = restoredBuffer ?? repairResult?.repairedBuffer;
+                  const dur = buf?.duration ?? 1;
+                  const pct = Math.min(100, (playheadSec / dur) * 100);
+                  return (
+                    <div style={{display:"flex",alignItems:"center",gap:8,
+                      background:"#050d14",border:"1px solid #10b98133",
+                      borderRadius:8,padding:"5px 10px",flexWrap:"wrap"}}>
+                      {/* Play/Pause */}
+                      <button onClick={toggleEnhancedPlay}
+                        style={{background:"#10b98122",border:"1px solid #10b98144",
+                          borderRadius:5,padding:"3px 10px",cursor:"pointer",
+                          color:"#10b981",fontSize:11,fontWeight:700,minWidth:36}}>
+                        {enhPlaying ? "⏸" : "▶"}
+                      </button>
+                      {/* Playhead scrubber — click to seek */}
+                      <div
+                        onClick={e=>{
+                          const r=e.currentTarget.getBoundingClientRect();
+                          seekEnhanced((e.clientX-r.left)/r.width);
+                        }}
+                        style={{flex:1,minWidth:80,height:4,background:"#0f2a3a",
+                          borderRadius:2,cursor:"pointer",position:"relative"}}>
+                        <div style={{position:"absolute",left:0,top:0,height:"100%",
+                          width:pct+"%",background:"#10b981",borderRadius:2,
+                          transition:"width 0.1s linear"}}/>
+                      </div>
+                      {/* Time display */}
+                      <span style={{fontSize:9,color:"#4a8a9a",minWidth:70,textAlign:"right"}}>
+                        {playheadSec.toFixed(2)}s / {dur.toFixed(2)}s
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* ── Download Enhanced WAV ─────────────────────────────
+                    Uses pre-encoded Float32 WAV blob → instant download
+                    Filename: [original]_enhanced.wav
+                ────────────────────────────────────────────────────── */}
+                {(restored?.changed && restoredBuffer || repairResult?.repairedBuffer) && (
                   <button
                     onClick={doDownloadRestored}
                     style={{
