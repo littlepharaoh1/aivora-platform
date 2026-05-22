@@ -19,6 +19,7 @@ import { analyzeAdvancedVAD }     from "../lib/audioQc/advancedVAD";
 import { detectReverb }           from "../lib/audioQc/reverbDetector";
 import { computeAppenScore }      from "../lib/audioQc/appenScore";
 import { analyzeForensicSilence } from "../lib/audioEditor/forensicSilenceMode";
+import { supabase } from "../lib/supabase";
 import {
   SYNTHETIC_WORKER_SRC,
   MIC_WORKER_SRC,
@@ -88,6 +89,8 @@ export interface QCWorkstationState {
 
 export function useQCWorkstation() {
   const mountedRef     = useRef(true);
+  const fileRef        = useRef<string>("");
+  const bufRef         = useRef<AudioBuffer|null>(null);
   const audioCtxRef    = useRef<AudioContext | null>(null);
   const sourceRef      = useRef<AudioBufferSourceNode | null>(null);
   const rafRef         = useRef(0);
@@ -276,7 +279,17 @@ export function useQCWorkstation() {
         done++;
         setForensicProgress(Math.round(done / total * 100));
         setAgentResult({ ...partial });
-        if(done === total) setForensicAnalyzing(false);
+        if(done === total) {
+          setForensicAnalyzing(false);
+          // Update persistence with forensic results
+          if(mountedRef.current) {
+            const currentFile = fileRef.current;
+            const currentBuf  = bufRef.current;
+            if(currentFile && currentBuf) {
+              persistDSPMetadata(currentBuf, currentFile.name, null, null, partial);
+            }
+          }
+        }
       };
 
       w.onerror = () => {
@@ -291,6 +304,74 @@ export function useQCWorkstation() {
       new Float32Array(copy).set(mono);
       w.postMessage({ samples: copy, sr, id }, [copy]);
     });
+  }, []);
+
+  // ── Persist DSP Metadata ─────────────────────────────────────────────────
+  const persistDSPMetadata = useCallback(async (
+    buf:      AudioBuffer,
+    name:     string,
+    rep:      any,
+    appen:    any,
+    agents:   any,
+  ) => {
+    try {
+      // Build lightweight summary — NO embeddings, NO spectral matrices
+      const summary = {
+        schema_version: "1.0.0",
+        generated_at:   new Date().toISOString(),
+        audio: {
+          duration_sec: buf.duration,
+          sample_rate:  buf.sampleRate,
+          channels:     buf.numberOfChannels,
+          bit_depth:    32,
+          format:       "wav",
+        },
+        qc: {
+          score:          rep?.score ?? 0,
+          delivery_risk:  rep?.deliveryRisk ?? "UNKNOWN",
+          appen_score:    appen?.score ?? 0,
+          appen_verdict:  appen?.verdict ?? "UNKNOWN",
+          metrics: {
+            lufs:         rep?.metrics?.lufs ?? 0,
+            true_peak:    rep?.metrics?.truePeak ?? 0,
+            lra:          rep?.metrics?.lra ?? 0,
+            snr_db:       rep?.metrics?.snrDb ?? 0,
+            noise_class:  rep?.metrics?.noiseClass ?? "",
+            environment:  rep?.metrics?.environment ?? "",
+            speech_ratio: rep?.metrics?.speechRatio ?? 0,
+          },
+          problem_count: rep?.problems?.length ?? 0,
+        },
+        forensic: agents?.synthetic ? {
+          verdict:              agents.synthetic.isSynthetic ? "SYNTHETIC" : "AUTHENTIC",
+          confidence:           agents.synthetic.confidence,
+          synthetic_probability:agents.synthetic.isSynthetic ? agents.synthetic.confidence : 1 - agents.synthetic.confidence,
+          room_category:        agents.room?.roomCategory ?? null,
+          rt60_overall:         agents.room?.rt60Overall ?? null,
+          noise_floor_db:       agents.mic?.noiseFloorDb ?? null,
+          artifact_clean:       agents.artifact?.clean ?? null,
+        } : null,
+      };
+
+      // Persist to processing_jobs
+      const correlationId = crypto.randomUUID();
+      await supabase.from("processing_jobs").insert({
+        file_name:      name,
+        status:         "done",
+        job_type:       "audio_qc",
+        score:          rep?.score ?? 0,
+        lufs:           rep?.metrics?.lufs ?? 0,
+        snr_db:         rep?.metrics?.snrDb ?? 0,
+        completed_at:   new Date().toISOString(),
+        correlation_id: correlationId,
+        dsp_version:    "1.0.0",
+        metadata:       summary,
+      });
+
+    } catch(err) {
+      // Non-blocking — persistence failure must not break UI
+      console.warn("DSP metadata persistence failed:", err);
+    }
   }, []);
 
   // ── Load File ─────────────────────────────────────────────────────────────
@@ -337,6 +418,8 @@ export function useQCWorkstation() {
         channels:   buf.numberOfChannels,
       };
       setFile(sharedFile);
+      fileRef.current = rawFile.name;
+      bufRef.current  = buf;
       setAllFiles(prev => {
         const filtered = prev.filter(f => f.name !== rawFile.name);
         return [...filtered, sharedFile].slice(-5); // max 5 files
@@ -387,6 +470,9 @@ export function useQCWorkstation() {
         setAnalysis({ rep, appenResult, spectrogramData:spec, digitalGaps:gaps, vadResult:vad, reverbResult:reverb, silenceReport:silence });
         setAnalysisLoading(false);
       }
+
+      // ── Persist DSP metadata (non-blocking) ──────────────────────────────
+      persistDSPMetadata(buf, rawFile.name, rep, appenResult, {});
 
       // ── Auto-trigger Forensic Analysis ───────────────────────────────────
       runForensicAnalysis(buf);
