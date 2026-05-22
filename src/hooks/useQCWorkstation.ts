@@ -14,6 +14,72 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { analyzeAudioQuality }    from "../lib/audioQc/audioAnalyzerCore";
 import { computeSpectrogramPro }  from "../lib/audioQc/spectrogramPro";
+import spectrogramWorkerSrc     from "../lib/workers/spectrogramWorker?worker&inline";
+
+// ── Spectrogram Worker Helper ──────────────────────────────────────────────────
+let _specGeneration = 0;
+
+function computeSpectrogramOffThread(
+  buf: AudioBuffer,
+  opts: { fftSize:number; minDb:number; maxDb:number }
+): Promise<import("../lib/audioQc/spectrogramPro").SpectrogramProData> {
+  return new Promise((resolve, reject) => {
+    const id  = ++_specGeneration;
+    const w   = new spectrogramWorkerSrc();
+
+    // Timeout 20s
+    const timeout = setTimeout(() => {
+      w.terminate();
+      reject(new Error("Spectrogram worker timeout"));
+    }, 20000);
+
+    w.onmessage = (e: MessageEvent) => {
+      if(e.data.id !== id) return;
+      if(e.data.type === "progress") return; // ignore progress for now
+      if(e.data.type === "complete") {
+        clearTimeout(timeout);
+        w.terminate();
+        const { nFrames, nBins, sampleRate, fftSize, flatTex } = e.data;
+        const arr = new Float32Array(flatTex);
+        // Reconstruct frames array for SpectrogramProData compatibility
+        const frames: Float32Array[] = [];
+        for(let f = 0; f < nFrames; f++) {
+          frames.push(arr.subarray(f * nBins, (f+1) * nBins));
+        }
+        resolve({
+          frames,
+          numFrames:  nFrames,
+          numBins:    nBins,
+          sampleRate,
+          fftSize,
+          minDb:      opts.minDb,
+          maxDb:      opts.maxDb,
+          durationSec:buf.duration,
+          windowFn:   "hann",
+          overlap:    0.875,
+        });
+      }
+    };
+    w.onerror = (err) => {
+      clearTimeout(timeout);
+      w.terminate();
+      reject(err);
+    };
+
+    // Mix to mono + transfer
+    const mono = new Float32Array(buf.length);
+    for(let ch=0;ch<buf.numberOfChannels;ch++){
+      const d = buf.getChannelData(ch);
+      for(let i=0;i<buf.length;i++) mono[i]+=d[i]/buf.numberOfChannels;
+    }
+    const copy = mono.buffer.slice(0);
+    w.postMessage({
+      id, samples: copy, sr: buf.sampleRate,
+      fftSize: opts.fftSize, overlap: 0.875,
+      minDb: opts.minDb, maxDb: opts.maxDb,
+    }, [copy]);
+  });
+}
 import { detectDigitalGaps }      from "../lib/audioQc/silenceRestorer";
 import { analyzeAdvancedVAD }     from "../lib/audioQc/advancedVAD";
 import { detectReverb }           from "../lib/audioQc/reverbDetector";
@@ -436,7 +502,9 @@ export function useQCWorkstation() {
 
       const [rep, spec, gaps, vad, reverb, silence] = await Promise.all([
         analyzeAudioQuality(mono, buf.sampleRate, profile as any),
-        Promise.resolve(computeSpectrogramPro(buf, {
+        computeSpectrogramOffThread(buf, {
+          fftSize:4096, minDb:-90, maxDb:-10,
+        }).catch(() => computeSpectrogramPro(buf, {
           fftSize:4096, minDb:-90, maxDb:-10, gain:1.3, colorMap:"aivora"
         })),
         Promise.resolve(detectDigitalGaps(buf)),
@@ -515,9 +583,11 @@ export function useQCWorkstation() {
       const d=f.buffer.getChannelData(ch);
       for(let i=0;i<f.buffer.length;i++) mono[i]+=d[i]/f.buffer.numberOfChannels;
     }
-    analyzeAudioQuality(mono, f.buffer.sampleRate, profile as any).then(rep => {
+    analyzeAudioQuality(mono, f.buffer.sampleRate, profile as any).then(async rep => {
       if(!mountedRef.current) return;
-      const spec = computeSpectrogramPro(f.buffer, {fftSize:4096,minDb:-90,maxDb:-10,gain:1.3,colorMap:"aivora"});
+      const spec = await computeSpectrogramOffThread(f.buffer, {fftSize:4096,minDb:-90,maxDb:-10}).catch(
+        () => computeSpectrogramPro(f.buffer, {fftSize:4096,minDb:-90,maxDb:-10,gain:1.3,colorMap:"aivora"})
+      );
       const gaps = detectDigitalGaps(f.buffer);
       setAnalysis(prev => ({ ...prev!, rep, spectrogramData:spec, digitalGaps:gaps }));
       setAnalysisLoading(false);
