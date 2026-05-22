@@ -296,6 +296,30 @@ export default function AudioQualityAnalyzer() {
     setEnhWavBlob(blob);
   }
 
+  // AudioContext recovery — iOS Safari + Android Chrome
+  // Handles: background tab, phone call interruption, screen lock
+  useEffect(() => {
+    function handleVisibility() {
+      if(document.visibilityState === "visible" && audioCtxRef.current) {
+        const state = audioCtxRef.current.state;
+        if(state === "suspended" || state === "interrupted" as AudioContextState) {
+          audioCtxRef.current.resume().catch(() => {});
+        }
+      }
+    }
+    function handleFocus() {
+      if(audioCtxRef.current?.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {

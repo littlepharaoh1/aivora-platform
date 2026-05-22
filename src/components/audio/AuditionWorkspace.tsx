@@ -32,8 +32,14 @@ const AU = {
 // ── Device Detection ──────────────────────────────────────────────────────────
 
 function isMobileDevice(): boolean {
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
-    || window.innerWidth < 768;
+  const ua = navigator.userAgent;
+  // Primary: user agent check
+  if(/Android|iPhone|iPad|iPod/i.test(ua)) return true;
+  // Secondary: touch points (tablets in landscape have width > 768)
+  if(navigator.maxTouchPoints > 1) return true;
+  // Tertiary: small screen in portrait
+  if(Math.min(window.innerWidth, window.innerHeight) < 500) return true;
+  return false;
 }
 
 function getAdaptiveFFT(): number {
