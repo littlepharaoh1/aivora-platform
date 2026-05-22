@@ -48,6 +48,13 @@ export interface AgentResult {
   artifact?:  ArtifactResult;
 }
 
+export interface EvidenceItem {
+  source: "synthetic" | "artifact" | "room" | "mic";
+  ok:     boolean;
+  label:  string;
+  detail: string;
+}
+
 export interface Verdict {
   label:      "AUTHENTIC" | "SUSPICIOUS" | "SYNTHETIC" | "PENDING";
   confidence: number;
