@@ -116,7 +116,8 @@ self.onmessage = function(e) {
   const normEnt = biTotal > 0
     ? biEnt / (biTotal * Math.log2((halfBN >> 1) + 1))
     : 0;
-  const bispectrumScore = Math.min(1, normEnt * 2.0);
+  // Clamp to [0,1] — entropy can be negative for very tonal signals
+  const bispectrumScore = Math.max(0, Math.min(1, normEnt * 2.0));
 
   // ── CPP with liftering + linear regression (correct) ──────────────────────
   const CN = 1024;

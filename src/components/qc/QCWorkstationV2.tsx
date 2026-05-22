@@ -517,7 +517,8 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
             ["CPP (ITU-T P.563)",s.cpp,        "Cepstral peak prominence"],
             ["Modulation 3-9Hz", s.modulation, "Syllabic rate FFT"],
           ].map(([label, val, detail]) => {
-            const v = val as number;
+            // Clamp to 0-100 — bispectrum can return negative on some files
+            const v = Math.max(0, Math.min(100, val as number));
             const color = v > 50 ? T.green : T.red;
             return (
               <div key={label as string} style={{ marginBottom:8 }}>
