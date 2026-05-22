@@ -24,6 +24,7 @@ import { colors }  from "./lib/design/tokens";
 import AuthGate        from "./components/AuthGate";
 import LandingPage     from "./components/LandingPage";
 import ForensicIntelPanel from "./components/ForensicIntelPanel";
+import QCWorkstationV2    from "./components/qc/QCWorkstationV2";
 import { useAuth }     from "./lib/auth/AuthContext";
 import UserAvatar      from "./components/UserAvatar";
 import NetworkStatus   from "./components/NetworkStatus";
@@ -451,7 +452,7 @@ function AppContent(){
         <div style={{flex:1,overflow:"auto",background:colors.bg.base}}>
           {tab==="dashboard"       && <Dashboard onNavigate={setTab}/>}
           {tab==="audio_workspace" && <AudioAnnotationWorkspace/>}
-          {tab==="qc"              && <AudioQualityAnalyzer/>}
+          {tab==="qc"              && <QCWorkstationV2/>}
           {tab==="batch"           && <BatchAnalyzer/>}
           {tab==="naming"          && <SmartNamingSequencer/>}
           {tab==="enhancement"     && <AudioEnhancementLab/>}
