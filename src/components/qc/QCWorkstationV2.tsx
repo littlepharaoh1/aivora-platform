@@ -15,6 +15,8 @@ import { useQCWorkstation } from "../../hooks/useQCWorkstation";
 import AuditionWorkspace   from "../audio/AuditionWorkspace";
 import { drawSpectrogramPro } from "../../lib/audioQc/spectrogramPro";
 import RadarChart           from "../forensic/RadarChart";
+import { repairAudioBuffer } from "../../lib/audioQc/repair/repairPipeline";
+import { exportToWav, downloadWav } from "../../lib/audioQc/repair/wavExporter";
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -683,24 +685,240 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
 
 // ── Tab 4: Repair Suite ───────────────────────────────────────────────────────
 function RepairTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> }) {
+  const [opts, setOpts] = React.useState({
+    humRemoval:             false,
+    humFrequency:           50 as 50|60,
+    loudnessNormalize:      false,
+    targetLufs:             -23,
+    trimSilence:            false,
+    shortenInternalSilence: false,
+    noiseReduction:         false,
+    noiseStrength:          0.7,
+    dynamicCompression:     false,
+    speechEQ:               false,
+    profile:                "wakeword" as "wakeword"|"asr"|"tts"|"conversation",
+  });
+  const [repairing, setRepairing] = React.useState(false);
+  const [result,    setResult]    = React.useState<any>(null);
+  const [error,     setError]     = React.useState("");
+
   if(!qc.file) return (
     <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:11 }}>
       Load a WAV file to access repair tools
     </div>
   );
 
+  async function runRepair() {
+    const buf = qc.file!.buffer;
+    setRepairing(true); setError(""); setResult(null);
+    try {
+      const r = repairAudioBuffer(buf, opts, qc.file!.name);
+      setResult(r);
+      if(r.changed) qc.setRepairedBuffer(r.repairedBuffer);
+    } catch(e) {
+      setError(e instanceof Error ? e.message : "Repair failed");
+    }
+    setRepairing(false);
+  }
+
+  const toggleOpt = (key: string) =>
+    setOpts(p => ({ ...p, [key]: !(p as any)[key] }));
+
+  const TOOLS = [
+    { key:"noiseReduction",       label:"Noise Reduction",    icon:"🌊" },
+    { key:"humRemoval",           label:"Hum Removal",        icon:"⚡" },
+    { key:"trimSilence",          label:"Trim Silence",       icon:"✂️" },
+    { key:"shortenInternalSilence",label:"Shorten Gaps",      icon:"⏩" },
+    { key:"loudnessNormalize",    label:"Loudness Normalize", icon:"📊" },
+    { key:"dynamicCompression",   label:"Compression",        icon:"🎚" },
+    { key:"speechEQ",             label:"Speech EQ",          icon:"🎛" },
+  ];
+
   return (
-    <div style={{ padding:16 }}>
+    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:12 }}>
+
+      {/* Tools */}
       <div style={{
         background:T.panel, border:`1px solid ${T.border}`,
         borderRadius:12, padding:14,
-        fontSize:10, color:T.textDim, textAlign:"center",
       }}>
-        🔧 Repair Suite — Coming in Phase D
-        <div style={{ fontSize:8, marginTop:8, color:"#1a3a4a" }}>
-          Noise reduction · Hum removal · Silence restoration · EQ · Compression
+        <div style={{ fontSize:9, color:T.textDim, letterSpacing:1, marginBottom:10 }}>
+          REPAIR TOOLS
+        </div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:12 }}>
+          {TOOLS.map(({ key, label, icon }) => {
+            const active = (opts as any)[key];
+            return (
+              <button key={key}
+                onClick={() => toggleOpt(key)}
+                style={{
+                  padding:"6px 12px", borderRadius:6,
+                  cursor:"pointer", fontSize:10, fontWeight:700,
+                  background:active?"#10b98122":"#050d14",
+                  border:`1px solid ${active?"#10b98166":T.border}`,
+                  color:active?T.green:T.textDim,
+                  display:"flex", alignItems:"center", gap:5,
+                }}>
+                <span>{icon}</span>
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sub-options */}
+        {opts.noiseReduction && (
+          <div style={{
+            display:"flex", alignItems:"center", gap:8,
+            padding:"6px 10px", background:"#050d14",
+            borderRadius:6, marginBottom:8,
+          }}>
+            <span style={{ fontSize:9, color:T.textDim }}>Strength:</span>
+            <input type="range" min="0.1" max="1.0" step="0.1"
+              value={opts.noiseStrength}
+              onChange={e => setOpts(p => ({...p, noiseStrength:parseFloat(e.target.value)}))}
+              style={{ width:80, accentColor:T.accent }}/>
+            <span style={{ fontSize:9, color:T.accent }}>
+              {Math.round(opts.noiseStrength*100)}%
+            </span>
+          </div>
+        )}
+
+        {opts.humRemoval && (
+          <div style={{
+            display:"flex", gap:6, marginBottom:8,
+          }}>
+            {([50,60] as const).map(f => (
+              <button key={f}
+                onClick={() => setOpts(p => ({...p, humFrequency:f}))}
+                style={{
+                  padding:"4px 12px", borderRadius:5, cursor:"pointer",
+                  fontSize:10, fontWeight:700,
+                  background:opts.humFrequency===f?"#f59e0b22":"#050d14",
+                  border:`1px solid ${opts.humFrequency===f?"#f59e0b66":T.border}`,
+                  color:opts.humFrequency===f?T.yellow:T.textDim,
+                }}>
+                {f}Hz
+              </button>
+            ))}
+          </div>
+        )}
+
+        {opts.loudnessNormalize && (
+          <div style={{
+            display:"flex", alignItems:"center", gap:8,
+            padding:"6px 10px", background:"#050d14",
+            borderRadius:6, marginBottom:8,
+          }}>
+            <span style={{ fontSize:9, color:T.textDim }}>Target LUFS:</span>
+            <input type="range" min="-32" max="-14" step="0.5"
+              value={opts.targetLufs}
+              onChange={e => setOpts(p => ({...p, targetLufs:parseFloat(e.target.value)}))}
+              style={{ width:80, accentColor:T.accent }}/>
+            <span style={{ fontSize:9, color:T.accent }}>
+              {opts.targetLufs} LUFS
+            </span>
+          </div>
+        )}
+
+        {/* Warning */}
+        <div style={{
+          padding:"6px 10px", background:"#050d14",
+          borderRadius:6, fontSize:8, color:T.textDim,
+          border:`1px solid ${T.border}`,
+        }}>
+          ⚠ Repairs are manual and should be reviewed before delivery
         </div>
       </div>
+
+      {/* Run button */}
+      <button
+        onClick={runRepair}
+        disabled={repairing}
+        style={{
+          padding:"10px 20px", borderRadius:8, cursor:"pointer",
+          fontWeight:700, fontSize:11, letterSpacing:1,
+          background:repairing?"#1a2a3a":"#10b98122",
+          border:`1px solid ${repairing?"#2a4a5a":"#10b98166"}`,
+          color:repairing?T.textDim:T.green,
+          transition:"all 0.2s",
+        }}>
+        {repairing ? "⟳ Repairing..." : "▶ Run Repair Suite"}
+      </button>
+
+      {/* Error */}
+      {error && (
+        <div style={{
+          padding:"8px 12px", borderRadius:6,
+          background:"#ef444422", border:"1px solid #ef444444",
+          fontSize:9, color:T.red,
+        }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {/* Result */}
+      {result && (
+        <div style={{
+          background:T.panel, border:`1px solid ${result.changed?T.green:T.border}`,
+          borderRadius:12, padding:14,
+        }}>
+          <div style={{
+            fontSize:9, color:result.changed?T.green:T.textDim,
+            letterSpacing:1, marginBottom:10, fontWeight:700,
+          }}>
+            {result.changed ? "✓ REPAIR COMPLETE" : "ℹ NO CHANGES NEEDED"}
+          </div>
+
+          {result.operations.length > 0 && (
+            <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
+              {result.operations.map((op: string, i: number) => (
+                <div key={i} style={{
+                  fontSize:8, color:T.text,
+                  padding:"3px 8px", background:"#050d14",
+                  borderRadius:4, border:`1px solid ${T.border}`,
+                }}>
+                  ✓ {op}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {result.warnings.length > 0 && (
+            <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:10 }}>
+              {result.warnings.map((w: string, i: number) => (
+                <div key={i} style={{
+                  fontSize:8, color:T.yellow,
+                  padding:"3px 8px", background:"#050d14",
+                  borderRadius:4, border:"1px solid #f59e0b33",
+                }}>
+                  ⚠ {w}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {result.changed && (
+            <button
+              onClick={() => {
+                const exported = exportToWav(result.repairedBuffer, result.exportNameSuggestion);
+                downloadWav(exported);
+              }}
+              style={{
+                width:"100%", padding:"8px 16px",
+                borderRadius:6, cursor:"pointer",
+                fontWeight:700, fontSize:10,
+                background:"#10b98122",
+                border:"1px solid #10b98166",
+                color:T.green,
+                display:"flex", alignItems:"center",
+                justifyContent:"center", gap:6,
+              }}>
+              ⬇ Download Repaired WAV
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
