@@ -12,9 +12,9 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { analyze }                from "../lib/audioQc/analyzer";
+import { analyzeAudioQuality }    from "../lib/audioQc/audioAnalyzerCore";
 import { computeSpectrogramPro }  from "../lib/audioQc/spectrogramPro";
-import { detectDigitalGaps }      from "../lib/audioQc/gapDetector";
+import { detectDigitalGaps }      from "../lib/audioQc/silenceRestorer";
 import { analyzeAdvancedVAD }     from "../lib/audioQc/advancedVAD";
 import { detectReverb }           from "../lib/audioQc/reverbDetector";
 import { computeAppenScore }      from "../lib/audioQc/appenScore";
@@ -347,12 +347,12 @@ export function useQCWorkstation() {
       }
 
       const [rep, spec, gaps, vad, reverb, silence] = await Promise.all([
-        analyze(buf, rawFile.name, profile),
+        analyzeAudioQuality(buf, rawFile.name),
         Promise.resolve(computeSpectrogramPro(buf, {
           fftSize:4096, minDb:-90, maxDb:-10, gain:1.3, colorMap:"aivora"
         })),
         Promise.resolve(detectDigitalGaps(buf)),
-        Promise.resolve(analyzeAdvancedVAD(buf, profile)),
+        Promise.resolve(analyzeAdvancedVAD(buf, profile as any)),
         Promise.resolve(detectReverb(buf)),
         Promise.resolve(analyzeForensicSilence(mono, buf.sampleRate)),
       ]);
@@ -364,12 +364,12 @@ export function useQCWorkstation() {
         ).length;
         appenResult = computeAppenScore({
           fileName:        rawFile.name,
-          profile,
+          profile:         profile as any,
           sampleRate:      buf.sampleRate,
           duration:        buf.duration,
           lufs:            {integrated:rep.qc.metrics.lufs,truePeak:rep.qc.metrics.truePeak,lra:rep.qc.metrics.lra,problems:[]},
           fft:             {centroid:0,rolloff:0,flatness:0,noiseClass:rep.qc.metrics.noiseClass,environment:rep.qc.metrics.environment,bandEnergies:{sub:0,low:0,lowMid:0,mid:0,highMid:0,high:0},problems:[]},
-          vad:             {speechRegions:[],silenceMetrics:{leadingSec:rep.edges.leadMs/1000,trailingSec:rep.edges.trailMs/1000,totalSilenceSec:0,speechRatio:rep.qc.metrics.speechRatio,longestGapSec:0},speechRatio:rep.qc.metrics.speechRatio,problems:[]},
+          vad:             vad as any,
           snr:             {snrDb:rep.qc.metrics.snrDb,noiseFloorDb:rep.nDb,signalDb:0,segmentalSnr:0,fakeStudio:false,quality:rep.qc.metrics.quality,problems:[]},
           hasDigitalGaps:  gaps2>0,
           digitalGapCount: gaps2,
