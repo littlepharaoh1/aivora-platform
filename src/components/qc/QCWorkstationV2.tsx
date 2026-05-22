@@ -13,6 +13,7 @@
 import React, { useState, useRef, useCallback } from "react";
 import { useQCWorkstation } from "../../hooks/useQCWorkstation";
 import AuditionWorkspace   from "../audio/AuditionWorkspace";
+import { drawSpectrogramPro } from "../../lib/audioQc/spectrogramPro";
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -298,6 +299,31 @@ export default function QCWorkstationV2() {
   );
 }
 
+// ── Spectrogram Canvas ───────────────────────────────────────────────────────
+function SpectrogramCanvas({ data, colorMap="aivora" }: { data:any; colorMap?:string }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  React.useEffect(() => {
+    const cv = canvasRef.current;
+    if(!cv || !data) return;
+    cv.width  = cv.offsetWidth  || 600;
+    cv.height = cv.offsetHeight || 120;
+    drawSpectrogramPro(cv, data, {
+      colorMap: colorMap as any,
+      logFreq:  true,
+      gain:     1.3,
+      showGrid: true,
+      showLabels: true,
+    });
+  }, [data, colorMap]);
+
+  return (
+    <canvas ref={canvasRef} style={{
+      width:"100%", height:120, display:"block",
+      borderRadius:6, background:"#080808",
+    }}/>
+  );
+}
+
 // ── Tab 1: QC Analysis ────────────────────────────────────────────────────────
 function QCAnalysisTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> }) {
   if(!qc.file) return (
@@ -391,6 +417,25 @@ function QCAnalysisTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> 
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Spectrogram */}
+      {qc.analysis?.spectrogramData && (
+        <div style={{
+          background:T.panel, border:`1px solid ${T.border}`,
+          borderRadius:12, padding:14,
+        }}>
+          <div style={{
+            fontSize:9, color:T.textDim, letterSpacing:1, marginBottom:8,
+            display:"flex", justifyContent:"space-between", alignItems:"center",
+          }}>
+            <span>SPECTROGRAM</span>
+            <span style={{ fontSize:7, color:"#1a3a4a" }}>
+              Log frequency · Aivora colormap
+            </span>
+          </div>
+          <SpectrogramCanvas data={qc.analysis.spectrogramData}/>
         </div>
       )}
 
