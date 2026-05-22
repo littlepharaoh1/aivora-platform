@@ -479,6 +479,7 @@ export default function AudioQualityAnalyzer() {
           score:    d.score,
           lufs:     d.lufs,
           snr_db:   d.snr,
+          job_type: "audio_qc",
           completed_at: new Date().toISOString(),
         }]);
         setReviewSaved(true);

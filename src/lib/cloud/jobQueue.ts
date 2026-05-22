@@ -268,6 +268,7 @@ export class JobQueue {
         file_name:    job.payload.fileId ?? job.payload.type,
         status:       job.status,
         score:        job.progress,
+        job_type:     "cloud_job",
         completed_at: job.completedAt ? new Date(job.completedAt).toISOString() : null,
         metadata:     {
           priority: job.priority, retryCount: job.retryCount,

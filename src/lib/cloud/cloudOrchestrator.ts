@@ -397,7 +397,7 @@ export class CloudOrchestrator {
 
   private async _persistBatch(job: BatchJob): Promise<void> {
     try {
-      await supabase.from("processing_jobs").upsert({
+      await supabase.from("processing_jobs").upsert({ job_type: "orchestrator",
         id:           job.id,
         user_id:      job.userId,
         file_name:    `batch:${job.files.length}files`,

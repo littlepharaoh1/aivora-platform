@@ -362,7 +362,7 @@ export class AgentOrchestrator {
 
   private async _persistTask(task: AgentTask): Promise<void> {
     try {
-      await supabase.from("processing_jobs").insert({
+      await supabase.from("processing_jobs").insert({ job_type: "agent",
         id:           task.id,
         user_id:      task.input.userId??"orchestrator",
         file_name:    task.input.fileId??task.type,

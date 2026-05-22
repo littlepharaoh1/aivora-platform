@@ -411,6 +411,7 @@ export class QAAgent {
         file_name:    fileId,
         status:       verdict==="pass"?"done":verdict==="reject"?"failed":"pending",
         score,
+        job_type:     "qa",
         metadata:     { verdict, agentVersion:"QAAgent-v1.0" },
         completed_at: new Date().toISOString(),
       });

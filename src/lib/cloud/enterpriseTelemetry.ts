@@ -380,7 +380,7 @@ export class EnterpriseTelemetry {
   // ── Persistence ───────────────────────────────────────────────────────────
 
   private async _persist(snap: TelemetrySnapshot): Promise<void> {
-    await supabase.from("processing_jobs").insert({
+    await supabase.from("processing_jobs").insert({ job_type: "telemetry",
       id:          `telemetry_${snap.timestamp}`,
       user_id:     "system",
       file_name:   "telemetry_snapshot",

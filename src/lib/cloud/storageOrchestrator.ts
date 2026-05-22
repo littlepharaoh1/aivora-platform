@@ -345,7 +345,7 @@ export class StorageOrchestrator {
 
   private async _persistMeta(file: AudioFile): Promise<void> {
     try {
-      await supabase.from("processing_jobs").upsert({
+      await supabase.from("processing_jobs").upsert({ job_type: "storage",
         id:          `storage_${file.id}`,
         user_id:     file.userId,
         file_name:   file.name,
