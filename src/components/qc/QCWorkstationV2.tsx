@@ -169,10 +169,6 @@ function FileHeader({
         </div>
       )}
       </div>
-      {/* Silence Reconstruction */}
-      <div style={{ display: activeRepairTab==="silence" ? "block" : "none" }}>
-        <ForensicSilenceRepair/>
-      </div>
     </div>
   );
 }
