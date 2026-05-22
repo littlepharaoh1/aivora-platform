@@ -57,11 +57,10 @@ function monoMix(buf: AudioBuffer): Float32Array {
 }
 
 function workerCopy(mono: Float32Array): ArrayBuffer {
-  // Slice creates independent copy — safe to transfer
-  return mono.buffer.slice(
-    mono.byteOffset,
-    mono.byteOffset + mono.byteLength
-  );
+  // Create independent ArrayBuffer copy — safe to transfer to worker
+  const copy = new ArrayBuffer(mono.byteLength);
+  new Float32Array(copy).set(mono);
+  return copy;
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
