@@ -215,15 +215,22 @@ export default function AudioQualityAnalyzer() {
     setEnhPlaying(false);
   }
 
-  // Animate playhead position in real-time via RAF
+  // Animate playhead — throttled to 10fps setState (not 60fps)
+  // Prevents render storm on component with 20+ state variables
+  const lastPlayheadUpdate = useRef(0);
   function startPlayheadRAF(duration: number): void {
     cancelAnimationFrame(rafRef.current);
     const ctx = audioCtxRef.current!;
     function tick() {
       const elapsed = ctx.currentTime - playStartRef.current + offsetRef.current;
       const clamped = Math.min(elapsed, duration);
-      setPlayheadSec(clamped);
       if(clamped < duration) {
+        // Throttle setState to max 10fps — RAF still runs at 60fps for accuracy
+        const now = performance.now();
+        if(now - lastPlayheadUpdate.current >= 100) {
+          lastPlayheadUpdate.current = now;
+          setPlayheadSec(clamped);
+        }
         rafRef.current = requestAnimationFrame(tick);
       } else {
         setEnhPlaying(false);
