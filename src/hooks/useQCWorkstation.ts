@@ -98,6 +98,7 @@ export function useQCWorkstation() {
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [file,            setFile]            = useState<QCSharedFile | null>(null);
+  const [allFiles,        setAllFiles]        = useState<QCSharedFile[]>([]);
   const [loading,         setLoading]         = useState(false);
   const [error,           setError]           = useState("");
   const [analysis,        setAnalysis]        = useState<QCAnalysisResults | null>(null);
@@ -336,6 +337,10 @@ export function useQCWorkstation() {
         channels:   buf.numberOfChannels,
       };
       setFile(sharedFile);
+      setAllFiles(prev => {
+        const filtered = prev.filter(f => f.name !== rawFile.name);
+        return [...filtered, sharedFile].slice(-5); // max 5 files
+      });
       setLoading(false);
 
       // ── Run QC Analysis ──────────────────────────────────────────────────
@@ -408,9 +413,35 @@ export function useQCWorkstation() {
     return               { label:"AUTHENTIC",  confidence: 1-risk };
   })();
 
+  // Switch to another loaded file
+  const switchFile = useCallback((name: string) => {
+    const f = allFiles.find(x => x.name === name);
+    if(!f) return;
+    stopPlayback();
+    offsetRef.current = 0;
+    setPlayheadSec(0);
+    setRepairedBuffer(null);
+    setFile(f);
+    // Re-run analysis for this file
+    setAnalysisLoading(true);
+    const mono = new Float32Array(f.buffer.length);
+    for(let ch=0;ch<f.buffer.numberOfChannels;ch++){
+      const d=f.buffer.getChannelData(ch);
+      for(let i=0;i<f.buffer.length;i++) mono[i]+=d[i]/f.buffer.numberOfChannels;
+    }
+    analyzeAudioQuality(mono, f.buffer.sampleRate, profile as any).then(rep => {
+      if(!mountedRef.current) return;
+      const spec = computeSpectrogramPro(f.buffer, {fftSize:4096,minDb:-90,maxDb:-10,gain:1.3,colorMap:"aivora"});
+      const gaps = detectDigitalGaps(f.buffer);
+      setAnalysis(prev => ({ ...prev!, rep, spectrogramData:spec, digitalGaps:gaps }));
+      setAnalysisLoading(false);
+    }).catch(() => setAnalysisLoading(false));
+    runForensicAnalysis(f.buffer);
+  }, [allFiles, profile, stopPlayback, runForensicAnalysis]);
+
   return {
     // File
-    file, loading, error, loadFile,
+    file, allFiles, loading, error, loadFile, switchFile,
     // Analysis
     analysis, analysisLoading,
     // Profile
