@@ -286,7 +286,7 @@ export function useQCWorkstation() {
             const currentFile = fileRef.current;
             const currentBuf  = bufRef.current;
             if(currentFile && currentBuf) {
-              persistDSPMetadata(currentBuf, currentFile.name, null, null, partial);
+              persistDSPMetadata(currentBuf, currentFile, null, null, partial);
             }
           }
         }
