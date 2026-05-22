@@ -86,6 +86,7 @@ import { detectReverb }           from "../lib/audioQc/reverbDetector";
 import { computeAppenScore }      from "../lib/audioQc/appenScore";
 import { analyzeForensicSilence } from "../lib/audioEditor/forensicSilenceMode";
 import { supabase } from "../lib/supabase";
+import { telemetry, startSpan } from "../lib/telemetry/emitter";
 import {
   SYNTHETIC_WORKER_SRC,
   MIC_WORKER_SRC,
@@ -331,12 +332,14 @@ export function useQCWorkstation() {
         if(!mountedRef.current) return;
         w.terminate();
         done++;
+        telemetry.workerTimeout(fileRef.current || "unknown", src as any);
         if(mountedRef.current) {
           setForensicProgress(Math.round(done / total * 100));
           if(done === total) setForensicAnalyzing(false);
         }
       }, 15000);
 
+      const workerStart = Date.now();
       w.onmessage = (e: MessageEvent) => {
         clearTimeout(timeout);
         if(!mountedRef.current) return;
@@ -345,6 +348,11 @@ export function useQCWorkstation() {
         done++;
         setForensicProgress(Math.round(done / total * 100));
         setAgentResult({ ...partial });
+        telemetry.workerCompleted(
+          fileRef.current || "unknown",
+          type as any,
+          Date.now() - workerStart
+        );
         if(done === total) {
           setForensicAnalyzing(false);
           // Update persistence with forensic results
@@ -461,6 +469,10 @@ export function useQCWorkstation() {
     offsetRef.current = 0;
     setPlayheadSec(0);
 
+    const corrId = crypto.randomUUID();
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? "";
+    telemetry.fileLoadStarted(corrId, userId, rawFile.name);
+
     try {
       const ab = await rawFile.arrayBuffer();
 
@@ -486,6 +498,13 @@ export function useQCWorkstation() {
       setFile(sharedFile);
       fileRef.current = rawFile.name;
       bufRef.current  = buf;
+      telemetry.fileLoadCompleted(corrId, userId, {
+        fileName:    rawFile.name,
+        durationSec: buf.duration,
+        sampleRate:  buf.sampleRate,
+        channels:    buf.numberOfChannels,
+        fileSizeKb:  Math.round(rawFile.size / 1024),
+      });
       setAllFiles(prev => {
         const filtered = prev.filter(f => f.name !== rawFile.name);
         return [...filtered, sharedFile].slice(-5); // max 5 files
@@ -537,6 +556,12 @@ export function useQCWorkstation() {
       if(mountedRef.current) {
         setAnalysis({ rep, appenResult, spectrogramData:spec, digitalGaps:gaps, vadResult:vad, reverbResult:reverb, silenceReport:silence });
         setAnalysisLoading(false);
+        telemetry.qcAnalysisCompleted(corrId, userId, {
+          qc_score:     rep?.score ?? 0,
+          appen_score:  appenResult?.score ?? 0,
+          duration_ms:  0,
+          problem_count:rep?.problems?.length ?? 0,
+        });
       }
 
       // ── Persist DSP metadata (non-blocking) ──────────────────────────────
