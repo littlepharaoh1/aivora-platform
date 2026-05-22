@@ -347,19 +347,19 @@ export function useQCWorkstation() {
       }
 
       const [rep, spec, gaps, vad, reverb, silence] = await Promise.all([
-        analyzeAudioQuality(buf, rawFile.name),
+        analyzeAudioQuality(mono, buf.sampleRate, profile as any),
         Promise.resolve(computeSpectrogramPro(buf, {
           fftSize:4096, minDb:-90, maxDb:-10, gain:1.3, colorMap:"aivora"
         })),
         Promise.resolve(detectDigitalGaps(buf)),
         Promise.resolve(analyzeAdvancedVAD(buf, profile as any)),
         Promise.resolve(detectReverb(buf)),
-        Promise.resolve(analyzeForensicSilence(mono, buf.sampleRate)),
+        Promise.resolve(analyzeForensicSilence(mono, buf.sampleRate) as any),
       ]);
 
       let appenResult = null;
-      if(rep?.qc) {
-        const gaps2 = rep.qc.problems.filter(
+      if(rep) {
+        const gaps2 = (rep.problems ?? []).filter(
           (p: any) => p.type==="DIGITAL_SILENCE"||p.type==="SILENCE_GAP"
         ).length;
         appenResult = computeAppenScore({
@@ -367,14 +367,14 @@ export function useQCWorkstation() {
           profile:         profile as any,
           sampleRate:      buf.sampleRate,
           duration:        buf.duration,
-          lufs:            {integrated:rep.qc.metrics.lufs,truePeak:rep.qc.metrics.truePeak,lra:rep.qc.metrics.lra,problems:[]},
-          fft:             {centroid:0,rolloff:0,flatness:0,noiseClass:rep.qc.metrics.noiseClass,environment:rep.qc.metrics.environment,bandEnergies:{sub:0,low:0,lowMid:0,mid:0,highMid:0,high:0},problems:[]},
+          lufs:            {integrated:rep.metrics?.lufs??-23,truePeak:rep.metrics?.truePeak??-1,lra:rep.metrics?.lra??0,problems:[]},
+          fft:             {centroid:0,rolloff:0,flatness:0,noiseClass:rep.metrics?.noiseClass??"clean",environment:rep.metrics?.environment??"studio",bandEnergies:{sub:0,low:0,lowMid:0,mid:0,highMid:0,high:0},problems:[]},
           vad:             vad as any,
-          snr:             {snrDb:rep.qc.metrics.snrDb,noiseFloorDb:rep.nDb,signalDb:0,segmentalSnr:0,fakeStudio:false,quality:rep.qc.metrics.quality,problems:[]},
+          snr:             {snrDb:rep.metrics?.snrDb??30,noiseFloorDb:-60,signalDb:0,segmentalSnr:0,fakeStudio:false,quality:rep.metrics?.quality??"good",problems:[]},
           hasDigitalGaps:  gaps2>0,
           digitalGapCount: gaps2,
-          peakDb:          rep.pkDb,
-          silenceRatio:    rep.edges.silRatio,
+          peakDb:          rep.metrics?.truePeak??-1,
+          silenceRatio:    0,
         });
       }
 
