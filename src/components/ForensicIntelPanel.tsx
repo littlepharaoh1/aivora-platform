@@ -137,6 +137,24 @@ export default function ForensicIntelPanel() {
         if(done === total) setAnalyzing(false);
       };
 
+      // Worker timeout: 15 seconds per agent
+      const timeout = setTimeout(() => {
+        if(!mountedRef.current) return;
+        if(done < total) {
+          w.terminate();
+          done++;
+          setProgress(Math.round(done / total * 100));
+          if(done === total) setAnalyzing(false);
+        }
+      }, 15000);
+
+      // Clear timeout when worker responds
+      const origOnMessage = w.onmessage;
+      w.onmessage = (e: MessageEvent) => {
+        clearTimeout(timeout);
+        origOnMessage?.call(w, e);
+      };
+
       // Each worker gets its own copy — transfer is destructive
       const copy = workerCopy(mono);
       w.postMessage({ samples: copy, sr, id }, [copy]);
@@ -148,17 +166,39 @@ export default function ForensicIntelPanel() {
     if(!file.name.toLowerCase().endsWith(".wav")) {
       setError("Please upload a WAV file"); return;
     }
+
+    // File size limit: 200MB
+    const MAX_BYTES = 200 * 1024 * 1024;
+    if(file.size > MAX_BYTES) {
+      setError(`File too large (${(file.size/1024/1024).toFixed(0)}MB). Max: 200MB`);
+      return;
+    }
+
     setError("");
     try {
       const ab  = await file.arrayBuffer();
-      // Close ctx immediately after decode — not needed after this point
       const ctx = new AudioContext();
       const buf = await ctx.decodeAudioData(ab);
       ctx.close();
+
+      // Duration limit: 30 minutes
+      const MAX_DURATION = 30 * 60;
+      if(buf.duration > MAX_DURATION) {
+        setError(`File too long (${(buf.duration/60).toFixed(1)} min). Max: 30 min`);
+        return;
+      }
+
       setFileBuffer(buf);
       runAnalysis(buf, file.name);
-    } catch {
-      setError("Failed to decode audio file — ensure it is a valid WAV");
+    } catch(err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      if(msg.includes("Unable to decode")) {
+        setError("Corrupted or unsupported audio format");
+      } else if(msg.includes("out of memory") || msg.includes("memory")) {
+        setError("Not enough memory — try a shorter file");
+      } else {
+        setError("Failed to decode audio — ensure it is a valid WAV file");
+      }
     }
   }
 
