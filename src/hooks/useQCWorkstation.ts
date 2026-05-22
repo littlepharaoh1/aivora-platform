@@ -1,0 +1,426 @@
+/**
+ * useQCWorkstation.ts — Shared State Hook
+ * Single source of truth for QC Workstation
+ *
+ * Architecture:
+ * - audioBuffer in useRef (no re-render on buffer change)
+ * - audioCtx in useRef (persistent — no GC on buffer)
+ * - All analysis results in useState (trigger re-render when ready)
+ * - Playback state in useRef + throttled setState
+ * - Forensic workers auto-triggered on file load
+ * - All 4 tabs share same buffer — decoded once only
+ */
+
+import { useState, useRef, useCallback, useEffect } from "react";
+import { analyze }                from "../lib/audioQc/analyzer";
+import { computeSpectrogramPro }  from "../lib/audioQc/spectrogramPro";
+import { detectDigitalGaps }      from "../lib/audioQc/gapDetector";
+import { analyzeAdvancedVAD }     from "../lib/audioQc/advancedVAD";
+import { detectReverb }           from "../lib/audioQc/reverbDetector";
+import { computeAppenScore }      from "../lib/audioQc/appenScore";
+import { analyzeForensicSilence } from "../lib/audioEditor/forensicSilenceMode";
+import {
+  SYNTHETIC_WORKER_SRC,
+  MIC_WORKER_SRC,
+  ROOM_WORKER_SRC,
+  ARTIFACT_WORKER_SRC,
+  makeWorker,
+} from "../lib/forensics/workers";
+import type { AgentResult, Verdict } from "../lib/forensics/types";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface QCSharedFile {
+  buffer:     AudioBuffer;
+  name:       string;
+  sampleRate: number;
+  duration:   number;
+  channels:   number;
+}
+
+export interface QCAnalysisResults {
+  rep:            any;
+  appenResult:    any;
+  spectrogramData:any;
+  digitalGaps:    any[];
+  vadResult:      any;
+  reverbResult:   any;
+  silenceReport:  any;
+}
+
+export interface QCPlaybackState {
+  isPlaying:   boolean;
+  playheadSec: number;
+  activeBuffer: AudioBuffer | null; // original or repaired
+}
+
+export interface QCForensicResults {
+  agentResult: AgentResult;
+  verdict:     Verdict;
+  progress:    number;
+  analyzing:   boolean;
+}
+
+export interface QCWorkstationState {
+  // File
+  file:           QCSharedFile | null;
+  loading:        boolean;
+  error:          string;
+
+  // Analysis
+  analysis:       QCAnalysisResults | null;
+  analysisLoading:boolean;
+
+  // Forensic
+  forensic:       QCForensicResults;
+
+  // Playback
+  playback:       QCPlaybackState;
+
+  // Repair
+  repairedBuffer: AudioBuffer | null;
+
+  // Profile
+  profile:        string;
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
+export function useQCWorkstation() {
+  const mountedRef     = useRef(true);
+  const audioCtxRef    = useRef<AudioContext | null>(null);
+  const sourceRef      = useRef<AudioBufferSourceNode | null>(null);
+  const rafRef         = useRef(0);
+  const playStartRef   = useRef(0);
+  const offsetRef      = useRef(0);
+  const lastUIUpdate   = useRef(0);
+  const forensicWorkers= useRef<Worker[]>([]);
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  const [file,            setFile]            = useState<QCSharedFile | null>(null);
+  const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState("");
+  const [analysis,        setAnalysis]        = useState<QCAnalysisResults | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [repairedBuffer,  setRepairedBuffer]  = useState<AudioBuffer | null>(null);
+  const [profile,         setProfile]         = useState("wakeword");
+
+  // Playback
+  const [isPlaying,   setIsPlaying]   = useState(false);
+  const [playheadSec, setPlayheadSec] = useState(0);
+
+  // Forensic
+  const [agentResult, setAgentResult] = useState<AgentResult>({});
+  const [forensicProgress, setForensicProgress] = useState(0);
+  const [forensicAnalyzing, setForensicAnalyzing] = useState(false);
+
+  // ── Lifecycle ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    mountedRef.current = true;
+
+    // AudioContext recovery on mobile
+    function handleVisibility() {
+      if(document.visibilityState === "visible" && audioCtxRef.current) {
+        if(audioCtxRef.current.state === "suspended") {
+          audioCtxRef.current.resume().catch(() => {});
+        }
+      }
+    }
+    function handleFocus() {
+      if(audioCtxRef.current?.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      mountedRef.current = false;
+      cancelAnimationFrame(rafRef.current);
+      try { sourceRef.current?.stop(); } catch {}
+      audioCtxRef.current?.close();
+      forensicWorkers.current.forEach(w => w.terminate());
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
+  // ── Playback ─────────────────────────────────────────────────────────────────
+  const stopPlayback = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    try { sourceRef.current?.stop(); } catch {}
+    try { sourceRef.current?.disconnect(); } catch {}
+    sourceRef.current = null;
+    setIsPlaying(false);
+  }, []);
+
+  const startPlayback = useCallback((buf: AudioBuffer, offsetSec = 0) => {
+    stopPlayback();
+    if(!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new AudioContext({ sampleRate: buf.sampleRate });
+    }
+    const ctx = audioCtxRef.current;
+    if(ctx.state === "suspended") ctx.resume();
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0, offsetSec);
+    sourceRef.current  = src;
+    offsetRef.current  = offsetSec;
+    playStartRef.current = ctx.currentTime;
+    setIsPlaying(true);
+
+    src.onended = () => {
+      if(!mountedRef.current) return;
+      cancelAnimationFrame(rafRef.current);
+      setIsPlaying(false);
+      offsetRef.current = 0;
+      setPlayheadSec(0);
+    };
+
+    // RAF throttled to 10fps setState
+    function tick() {
+      const elapsed = ctx.currentTime - playStartRef.current + offsetRef.current;
+      const clamped = Math.min(elapsed, buf.duration);
+      if(clamped < buf.duration) {
+        const now = performance.now();
+        if(now - lastUIUpdate.current >= 100) {
+          lastUIUpdate.current = now;
+          if(mountedRef.current) setPlayheadSec(clamped);
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        if(mountedRef.current) {
+          setIsPlaying(false);
+          setPlayheadSec(0);
+          offsetRef.current = 0;
+        }
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  }, [stopPlayback]);
+
+  const togglePlayback = useCallback(() => {
+    const buf = repairedBuffer ?? file?.buffer ?? null;
+    if(!buf) return;
+    if(isPlaying) {
+      offsetRef.current = playheadSec;
+      stopPlayback();
+    } else {
+      startPlayback(buf, offsetRef.current);
+    }
+  }, [isPlaying, file, repairedBuffer, playheadSec, stopPlayback, startPlayback]);
+
+  const seekTo = useCallback((norm: number) => {
+    const buf = repairedBuffer ?? file?.buffer ?? null;
+    if(!buf) return;
+    const sec = norm * buf.duration;
+    offsetRef.current = sec;
+    setPlayheadSec(sec);
+    if(isPlaying) startPlayback(buf, sec);
+  }, [file, repairedBuffer, isPlaying, startPlayback]);
+
+  // ── Forensic Workers ──────────────────────────────────────────────────────
+  const runForensicAnalysis = useCallback((buf: AudioBuffer) => {
+    if(!mountedRef.current) return;
+
+    // Terminate previous workers
+    forensicWorkers.current.forEach(w => w.terminate());
+    forensicWorkers.current = [];
+
+    setForensicAnalyzing(true);
+    setForensicProgress(0);
+    setAgentResult({});
+
+    const sr      = buf.sampleRate;
+    const mono    = new Float32Array(buf.length);
+    for(let ch = 0; ch < buf.numberOfChannels; ch++) {
+      const data = buf.getChannelData(ch);
+      for(let i = 0; i < buf.length; i++)
+        mono[i] += data[i] / buf.numberOfChannels;
+    }
+
+    const id      = Date.now();
+    let   done    = 0;
+    const total   = 4;
+    const partial: AgentResult = {};
+
+    const srcs = [
+      SYNTHETIC_WORKER_SRC,
+      MIC_WORKER_SRC,
+      ROOM_WORKER_SRC,
+      ARTIFACT_WORKER_SRC,
+    ];
+
+    srcs.forEach(src => {
+      const w = makeWorker(src);
+      forensicWorkers.current.push(w);
+
+      const timeout = setTimeout(() => {
+        if(!mountedRef.current) return;
+        w.terminate();
+        done++;
+        if(mountedRef.current) {
+          setForensicProgress(Math.round(done / total * 100));
+          if(done === total) setForensicAnalyzing(false);
+        }
+      }, 15000);
+
+      w.onmessage = (e: MessageEvent) => {
+        clearTimeout(timeout);
+        if(!mountedRef.current) return;
+        const { type, result } = e.data;
+        (partial as Record<string, unknown>)[type] = result;
+        done++;
+        setForensicProgress(Math.round(done / total * 100));
+        setAgentResult({ ...partial });
+        if(done === total) setForensicAnalyzing(false);
+      };
+
+      w.onerror = () => {
+        clearTimeout(timeout);
+        if(!mountedRef.current) return;
+        done++;
+        setForensicProgress(Math.round(done / total * 100));
+        if(done === total) setForensicAnalyzing(false);
+      };
+
+      const copy = new ArrayBuffer(mono.byteLength);
+      new Float32Array(copy).set(mono);
+      w.postMessage({ samples: copy, sr, id }, [copy]);
+    });
+  }, []);
+
+  // ── Load File ─────────────────────────────────────────────────────────────
+  const loadFile = useCallback(async (rawFile: File) => {
+    if(!rawFile.name.toLowerCase().endsWith(".wav")) {
+      setError("Please upload a WAV file"); return;
+    }
+    const MAX_BYTES = 200 * 1024 * 1024;
+    if(rawFile.size > MAX_BYTES) {
+      setError(`File too large (${(rawFile.size/1024/1024).toFixed(0)}MB). Max: 200MB`);
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    setAnalysis(null);
+    setRepairedBuffer(null);
+    setAgentResult({});
+    setForensicProgress(0);
+    stopPlayback();
+    offsetRef.current = 0;
+    setPlayheadSec(0);
+
+    try {
+      const ab = await rawFile.arrayBuffer();
+
+      // Reuse or create AudioContext — keep alive for buffer
+      if(!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        audioCtxRef.current = new AudioContext();
+      }
+      const buf = await audioCtxRef.current.decodeAudioData(ab);
+
+      const MAX_DURATION = 30 * 60;
+      if(buf.duration > MAX_DURATION) {
+        setError(`File too long (${(buf.duration/60).toFixed(1)} min). Max: 30 min`);
+        setLoading(false); return;
+      }
+
+      const sharedFile: QCSharedFile = {
+        buffer:     buf,
+        name:       rawFile.name,
+        sampleRate: buf.sampleRate,
+        duration:   buf.duration,
+        channels:   buf.numberOfChannels,
+      };
+      setFile(sharedFile);
+      setLoading(false);
+
+      // ── Run QC Analysis ──────────────────────────────────────────────────
+      setAnalysisLoading(true);
+      const mono = new Float32Array(buf.length);
+      for(let ch = 0; ch < buf.numberOfChannels; ch++) {
+        const d = buf.getChannelData(ch);
+        for(let i = 0; i < buf.length; i++) mono[i] += d[i] / buf.numberOfChannels;
+      }
+
+      const [rep, spec, gaps, vad, reverb, silence] = await Promise.all([
+        analyze(buf, rawFile.name, profile),
+        Promise.resolve(computeSpectrogramPro(buf, {
+          fftSize:4096, minDb:-90, maxDb:-10, gain:1.3, colorMap:"aivora"
+        })),
+        Promise.resolve(detectDigitalGaps(buf)),
+        Promise.resolve(analyzeAdvancedVAD(buf, profile)),
+        Promise.resolve(detectReverb(buf)),
+        Promise.resolve(analyzeForensicSilence(mono, buf.sampleRate)),
+      ]);
+
+      let appenResult = null;
+      if(rep?.qc) {
+        const gaps2 = rep.qc.problems.filter(
+          (p: any) => p.type==="DIGITAL_SILENCE"||p.type==="SILENCE_GAP"
+        ).length;
+        appenResult = computeAppenScore({
+          fileName:        rawFile.name,
+          profile,
+          sampleRate:      buf.sampleRate,
+          duration:        buf.duration,
+          lufs:            {integrated:rep.qc.metrics.lufs,truePeak:rep.qc.metrics.truePeak,lra:rep.qc.metrics.lra,problems:[]},
+          fft:             {centroid:0,rolloff:0,flatness:0,noiseClass:rep.qc.metrics.noiseClass,environment:rep.qc.metrics.environment,bandEnergies:{sub:0,low:0,lowMid:0,mid:0,highMid:0,high:0},problems:[]},
+          vad:             {speechRegions:[],silenceMetrics:{leadingSec:rep.edges.leadMs/1000,trailingSec:rep.edges.trailMs/1000,totalSilenceSec:0,speechRatio:rep.qc.metrics.speechRatio,longestGapSec:0},speechRatio:rep.qc.metrics.speechRatio,problems:[]},
+          snr:             {snrDb:rep.qc.metrics.snrDb,noiseFloorDb:rep.nDb,signalDb:0,segmentalSnr:0,fakeStudio:false,quality:rep.qc.metrics.quality,problems:[]},
+          hasDigitalGaps:  gaps2>0,
+          digitalGapCount: gaps2,
+          peakDb:          rep.pkDb,
+          silenceRatio:    rep.edges.silRatio,
+        });
+      }
+
+      if(mountedRef.current) {
+        setAnalysis({ rep, appenResult, spectrogramData:spec, digitalGaps:gaps, vadResult:vad, reverbResult:reverb, silenceReport:silence });
+        setAnalysisLoading(false);
+      }
+
+      // ── Auto-trigger Forensic Analysis ───────────────────────────────────
+      runForensicAnalysis(buf);
+
+    } catch(err) {
+      if(!mountedRef.current) return;
+      const msg = err instanceof Error ? err.message : "";
+      if(msg.includes("Unable to decode")) setError("Corrupted or unsupported audio");
+      else if(msg.includes("memory"))       setError("Not enough memory — try shorter file");
+      else                                  setError("Failed to load WAV file");
+      setLoading(false);
+      setAnalysisLoading(false);
+    }
+  }, [profile, stopPlayback, runForensicAnalysis]);
+
+  // ── Verdict ───────────────────────────────────────────────────────────────
+  const verdict: Verdict = (() => {
+    if(!agentResult.synthetic) return { label:"PENDING", confidence:0 };
+    const synthRisk = agentResult.synthetic.isSynthetic ? agentResult.synthetic.confidence : 0;
+    const artRisk   = agentResult.artifact?.artifactScore ?? 0;
+    const risk      = synthRisk * 0.65 + artRisk * 0.35;
+    if(risk > 0.65) return { label:"SYNTHETIC",  confidence:risk };
+    if(risk > 0.45) return { label:"SUSPICIOUS",  confidence:risk };
+    return               { label:"AUTHENTIC",  confidence: 1-risk };
+  })();
+
+  return {
+    // File
+    file, loading, error, loadFile,
+    // Analysis
+    analysis, analysisLoading,
+    // Profile
+    profile, setProfile,
+    // Playback
+    isPlaying, playheadSec, togglePlayback, seekTo,
+    activeBuffer: repairedBuffer ?? file?.buffer ?? null,
+    // Repair
+    repairedBuffer, setRepairedBuffer,
+    // Forensic
+    agentResult, forensicProgress, forensicAnalyzing, verdict,
+  };
+}
