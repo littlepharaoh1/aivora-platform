@@ -221,4 +221,4 @@ console.log(`\n═════════════════════�
 console.log(`CHECKPOINT 1 RESULTS: ${passed} passed, ${failed} failed`);
 console.log(`══════════════════════════════════════`);
 
-if(failed > 0) process.exit(1);
+if(failed > 0) throw new Error(`${failed} tests failed`);
