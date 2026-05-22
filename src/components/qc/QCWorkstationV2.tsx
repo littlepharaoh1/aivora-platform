@@ -15,6 +15,8 @@ import { useQCWorkstation } from "../../hooks/useQCWorkstation";
 import AuditionWorkspace   from "../audio/AuditionWorkspace";
 import { drawSpectrogramPro } from "../../lib/audioQc/spectrogramPro";
 import RadarChart           from "../forensic/RadarChart";
+import VerdictBadge         from "../forensic/VerdictBadge";
+import EvidenceLedger       from "../forensic/EvidenceLedger";
 import { repairAudioBuffer } from "../../lib/audioQc/repair/repairPipeline";
 import { exportToWav, downloadWav } from "../../lib/audioQc/repair/wavExporter";
 
@@ -543,41 +545,67 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
   return (
     <div style={{ padding:16, display:"flex", flexDirection:"column", gap:12 }}>
 
-      {/* Progress */}
+      {/* Progress bar */}
       {forensicAnalyzing && (
-        <div style={{ background:T.panel, border:`1px solid ${T.border}`, borderRadius:12, padding:14 }}>
+        <div style={{
+          background:T.panel, border:`1px solid ${T.border}`,
+          borderRadius:12, padding:14,
+        }}>
           <div style={{ fontSize:9, color:T.accent, marginBottom:8 }}>
             ⟳ Running 4-agent forensic analysis... {forensicProgress}%
           </div>
-          <div style={{ height:3, background:T.border, borderRadius:2 }}>
+          <div style={{ height:3, background:T.border, borderRadius:2, overflow:"hidden" }}>
             <div style={{
               height:"100%", width:`${forensicProgress}%`,
               background:T.accent, borderRadius:2,
-              transition:"width 0.2s",
+              transition:"width 0.15s",
             }}/>
+          </div>
+          <div style={{
+            display:"flex", gap:8, marginTop:8, flexWrap:"wrap",
+          }}>
+            {["Synthetic","Mic","Room","Artifact"].map((agent, i) => {
+              const done = forensicProgress >= (i+1)*25;
+              return (
+                <div key={agent} style={{
+                  fontSize:8, padding:"2px 8px", borderRadius:4,
+                  background:done?"#10b98122":"#050d14",
+                  border:`1px solid ${done?"#10b98144":T.border}`,
+                  color:done?T.green:T.textDim,
+                }}>
+                  {done?"✓":forensicProgress>i*25?"⟳":"○"} {agent}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Radar + Verdict row */}
+      {/* Radar + Verdict */}
       {agentResult.synthetic && (() => {
-        const s = agentResult.synthetic!.scores;
+        const sc = agentResult.synthetic!.scores;
         const radarScores = [
-          Math.max(0, Math.min(1, s.jitter     / 100)),
-          Math.max(0, Math.min(1, s.shimmer    / 100)),
-          Math.max(0, Math.min(1, s.bispectrum / 100)),
-          Math.max(0, Math.min(1, s.cpp        / 100)),
-          agentResult.artifact ? Math.max(0,1-agentResult.artifact.artifactScore) : 0,
-          Math.max(0, Math.min(1, s.modulation / 100)),
+          Math.max(0, Math.min(1, sc.jitter     / 100)),
+          Math.max(0, Math.min(1, sc.shimmer    / 100)),
+          Math.max(0, Math.min(1, sc.bispectrum / 100)),
+          Math.max(0, Math.min(1, sc.cpp        / 100)),
+          agentResult.artifact ? Math.max(0, 1-agentResult.artifact.artifactScore) : 0,
+          Math.max(0, Math.min(1, sc.modulation / 100)),
         ];
         return (
           <div style={{
-            display:"flex", gap:12, flexWrap:"wrap",
             background:T.panel, border:`1px solid ${T.border}`,
             borderRadius:12, padding:14,
+            display:"flex", gap:16, flexWrap:"wrap",
+            alignItems:"center",
           }}>
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-              <div style={{ fontSize:9, color:T.textDim, letterSpacing:1 }}>NATURALNESS RADAR</div>
+            <div style={{
+              display:"flex", flexDirection:"column",
+              alignItems:"center", gap:4,
+            }}>
+              <div style={{ fontSize:9, color:T.textDim, letterSpacing:1 }}>
+                NATURALNESS RADAR
+              </div>
               <RadarChart
                 scores={radarScores}
                 labels={["Jitter","Shimmer","Bispec","CPP","Clean","Mod"]}
@@ -585,41 +613,19 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
                 size={200}
               />
             </div>
-            <div style={{ flex:1, minWidth:180 }}>
-              <div style={{ fontSize:9, color:T.textDim, letterSpacing:1, marginBottom:8 }}>
+            <div style={{ flex:1, minWidth:160, display:"flex", flexDirection:"column", gap:8 }}>
+              <div style={{ fontSize:9, color:T.textDim, letterSpacing:1 }}>
                 PROVENANCE VERDICT
               </div>
-              <div style={{
-                padding:"10px 16px", borderRadius:8, marginBottom:8,
-                background:`${verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow}15`,
-                border:`1px solid ${verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow}44`,
-                display:"flex", flexDirection:"column", alignItems:"center", gap:4,
-              }}>
-                <div style={{
-                  fontSize:13, fontWeight:900, letterSpacing:2,
-                  color:verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow,
-                }}>
-                  {verdict.label==="AUTHENTIC"?"✓":verdict.label==="SYNTHETIC"?"✗":"⚠"} {verdict.label}
-                </div>
-                <div style={{ fontSize:8, color:T.textDim }}>
-                  Confidence:{" "}
-                  <span style={{
-                    color:verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow,
-                    fontWeight:700,
-                  }}>
-                    {Math.round(verdict.confidence*100)}%
-                  </span>
-                </div>
-              </div>
-              <div style={{ fontSize:8, color:T.textDim }}>
-                4 Web Workers · Bispectrum + CPP (ITU-T) + RT60 · Ensemble scoring
+              <VerdictBadge verdict={verdict}/>
+              <div style={{ fontSize:8, color:T.textDim, lineHeight:1.5 }}>
+                4 Web Workers · Bispectrum + CPP (ITU-T P.563) +
+                Modulation FFT · Schroeder RT60 · Ensemble scoring
               </div>
             </div>
           </div>
         );
       })()}
-
-      {/* Verdict — now inside radar block above */}
 
       {/* Synthetic scores */}
       {s && (
@@ -631,22 +637,26 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
             SYNTHETIC SPEECH DETECTION
           </div>
           {[
-            ["Jitter RAP",       s.jitter,     "Vocal fold irregularity (YIN)"],
-            ["Shimmer APQ-3",    s.shimmer,    "Amplitude perturbation"],
-            ["Bispectrum",       s.bispectrum, "Phase coupling entropy B(k,k) — low in reverb/hum environments"],
-            ["CPP (ITU-T P.563)",s.cpp,        "Cepstral peak prominence"],
-            ["Modulation 3-9Hz", s.modulation, "Syllabic rate FFT"],
+            ["Jitter RAP",        s.jitter,     "Vocal fold cycle-to-cycle irregularity (YIN normalized)"],
+            ["Shimmer APQ-3",     s.shimmer,    "Amplitude perturbation quotient (3-point)"],
+            ["Bispectrum",        s.bispectrum, "Phase coupling entropy B(k,k) — low in reverb/hum"],
+            ["CPP (ITU-T P.563)", s.cpp,        "Cepstral peak prominence with liftering + regression"],
+            ["Modulation 3-9Hz",  s.modulation, "Syllabic rate via modulation FFT spectrum"],
           ].map(([label, val, detail]) => {
-            // Clamp to 0-100 — bispectrum can return negative on some files
-            const v = Math.max(0, Math.min(100, val as number));
+            const v     = Math.max(0, Math.min(100, val as number));
             const color = v > 50 ? T.green : T.red;
             return (
               <div key={label as string} style={{ marginBottom:8 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                <div style={{
+                  display:"flex", justifyContent:"space-between", marginBottom:3,
+                }}>
                   <span style={{ fontSize:9, color:T.text }}>{label as string}</span>
                   <span style={{ fontSize:9, color, fontWeight:700 }}>{v}%</span>
                 </div>
-                <div style={{ height:4, background:"#0a1a24", borderRadius:2, overflow:"hidden" }}>
+                <div style={{
+                  height:4, background:"#0a1a24",
+                  borderRadius:2, overflow:"hidden",
+                }}>
                   <div style={{
                     height:"100%", width:`${v}%`,
                     background:color, borderRadius:2,
@@ -654,10 +664,23 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
                     transition:"width 0.5s",
                   }}/>
                 </div>
-                <div style={{ fontSize:7, color:T.textDim, marginTop:2 }}>{detail as string}</div>
+                <div style={{ fontSize:7, color:T.textDim, marginTop:2 }}>
+                  {detail as string}
+                </div>
               </div>
             );
           })}
+          <div style={{
+            marginTop:8, padding:"6px 10px", borderRadius:6,
+            background:agentResult.synthetic!.isSynthetic?"#ef444422":"#10b98122",
+            border:`1px solid ${agentResult.synthetic!.isSynthetic?"#ef444444":"#10b98144"}`,
+            fontSize:9,
+            color:agentResult.synthetic!.isSynthetic?T.red:T.green,
+          }}>
+            {agentResult.synthetic!.isSynthetic
+              ? `⚠ SYNTHETIC — ${Math.round(agentResult.synthetic!.confidence*100)}% confidence`
+              : `✓ NATURAL — ${Math.round(agentResult.synthetic!.naturalness*100)}% naturalness`}
+          </div>
         </div>
       )}
 
@@ -673,14 +696,35 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
           <div style={{
             padding:"6px 10px", borderRadius:6, marginBottom:8,
             background:"#22d3ee11", border:"1px solid #22d3ee22",
-            display:"flex", justifyContent:"space-between",
+            display:"flex", justifyContent:"space-between", alignItems:"center",
           }}>
             <span style={{ fontSize:10, color:T.accent, fontWeight:700 }}>
               {agentResult.room.roomCategory.replace(/_/g," ").toUpperCase()}
             </span>
             <span style={{ fontSize:9, color:T.text }}>
-              RT60: {agentResult.room.rt60Overall.toFixed(3)}s
+              RT60₁ₖ: {agentResult.room.rt60Overall.toFixed(3)}s
             </span>
+          </div>
+          <div style={{
+            display:"grid", gridTemplateColumns:"1fr 1fr 1fr",
+            gap:4, marginBottom:8,
+          }}>
+            {Object.entries(agentResult.room.rt60s).map(([f, v]) => {
+              const val = v as number;
+              const c = val<0.3?T.green:val<0.6?T.yellow:T.red;
+              return (
+                <div key={f} style={{
+                  background:"#050d14", border:`1px solid ${T.border}`,
+                  borderRadius:4, padding:"3px 6px",
+                  display:"flex", justifyContent:"space-between",
+                }}>
+                  <span style={{ fontSize:7, color:T.textDim }}>{f}Hz</span>
+                  <span style={{ fontSize:8, color:c, fontWeight:700 }}>
+                    {val.toFixed(2)}s
+                  </span>
+                </div>
+              );
+            })}
           </div>
           {agentResult.mic && (
             <div style={{
@@ -693,14 +737,20 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
                 <div style={{ fontSize:10, color:"#8b5cf6", fontWeight:700 }}>
                   {agentResult.mic.noiseFloorDb.toFixed(1)} dBFS
                 </div>
+                <div style={{ fontSize:7, color:T.textDim, marginTop:2 }}>
+                  {agentResult.mic.noiseFloorDb<-60?"Studio grade":
+                   agentResult.mic.noiseFloorDb<-45?"Professional":
+                   agentResult.mic.noiseFloorDb<-30?"Consumer":"High noise"}
+                </div>
               </div>
               <div style={{ textAlign:"right" }}>
                 <div style={{ fontSize:7, color:T.textDim }}>Rolloff 95%</div>
                 <div style={{ fontSize:10, color:"#8b5cf6", fontWeight:700 }}>
-                  {agentResult.mic.rolloffHz >= 1000
-                    ? (agentResult.mic.rolloffHz/1000).toFixed(1)+"kHz"
-                    : agentResult.mic.rolloffHz+"Hz"}
+                  {agentResult.mic.rolloffHz>=1000
+                    ?(agentResult.mic.rolloffHz/1000).toFixed(1)+"kHz"
+                    :agentResult.mic.rolloffHz+"Hz"}
                 </div>
+                <div style={{ fontSize:7, color:T.textDim, marginTop:2 }}>32-band mel</div>
               </div>
             </div>
           )}
@@ -716,18 +766,47 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
           <div style={{ fontSize:9, color:T.textDim, letterSpacing:1, marginBottom:8 }}>
             AI ARTIFACT DETECTION
           </div>
+          {[
+            ["Spectral holes",   1-agentResult.artifact.scores.holeRatio*8,   agentResult.artifact.scores.holeRatio<0.05?T.green:T.red,    "Over-suppression (3-bin context)"],
+            ["Comb filter",      1-agentResult.artifact.scores.combScore,      agentResult.artifact.scores.combScore<0.25?T.green:T.orange, "Metallic resonance (4-40 bin scan)"],
+            ["Spectral entropy", agentResult.artifact.scores.entropy,          agentResult.artifact.scores.entropy>0.7?T.green:T.yellow,   "Natural vs artificial regularity"],
+            ["Bandwidth",        agentResult.artifact.scores.bandwidth,        agentResult.artifact.scores.bandwidth>0.75?T.green:T.yellow,"High-freq coverage"],
+            ["Phase continuity", 1-agentResult.artifact.scores.phaseJumps*10, agentResult.artifact.scores.phaseJumps<0.05?T.green:T.orange,"Edit stitching detection"],
+          ].map(([label, val, color, detail]) => {
+            const v = Math.max(0,Math.min(100,Math.round((val as number)*100)));
+            return (
+              <div key={label as string} style={{ marginBottom:6 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
+                  <span style={{ fontSize:9, color:T.text }}>{label as string}</span>
+                  <span style={{ fontSize:9, color:color as string, fontWeight:700 }}>{v}%</span>
+                </div>
+                <div style={{ height:3, background:"#0a1a24", borderRadius:2, overflow:"hidden" }}>
+                  <div style={{
+                    height:"100%", width:`${v}%`,
+                    background:color as string, borderRadius:2,
+                    transition:"width 0.5s",
+                  }}/>
+                </div>
+                <div style={{ fontSize:7, color:T.textDim, marginTop:1 }}>{detail as string}</div>
+              </div>
+            );
+          })}
           <div style={{
-            padding:"6px 10px", borderRadius:6,
+            marginTop:8, padding:"6px 10px", borderRadius:6,
             background:agentResult.artifact.clean?"#10b98122":"#ef444422",
             border:`1px solid ${agentResult.artifact.clean?"#10b98144":"#ef444444"}`,
-            fontSize:10,
-            color:agentResult.artifact.clean?T.green:T.red,
+            fontSize:9, color:agentResult.artifact.clean?T.green:T.red,
           }}>
             {agentResult.artifact.clean
-              ? "✓ CLEAN — No AI artifacts detected"
-              : `⚠ ${agentResult.artifact.dominantType.replace(/_/g," ").toUpperCase()}`}
+              ?"✓ CLEAN — No AI artifacts detected"
+              :`⚠ ${agentResult.artifact.dominantType.replace(/_/g," ").toUpperCase()}`}
           </div>
         </div>
+      )}
+
+      {/* Evidence Ledger */}
+      {Object.keys(agentResult).length > 0 && (
+        <EvidenceLedger results={agentResult}/>
       )}
     </div>
   );
