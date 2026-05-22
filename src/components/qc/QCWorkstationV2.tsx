@@ -71,13 +71,15 @@ function ScoreBadge({ score, verdict }: { score:number; verdict:string }) {
 
 // ── File Header ───────────────────────────────────────────────────────────────
 function FileHeader({
-  file, score, verdict, loading, onUpload,
+  file, allFiles, score, verdict, loading, onUpload, onSwitch,
 }: {
   file:     any;
+  allFiles: any[];
   score:    number;
   verdict:  string;
   loading:  boolean;
   onUpload: (f: File) => void;
+  onSwitch: (name: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -107,9 +109,36 @@ function FileHeader({
         ref={inputRef} type="file" accept=".wav" multiple hidden
         onChange={e => {
           const files = Array.from(e.target.files ?? []);
-          if(files[0]) onUpload(files[0]);
+          files.forEach(f => onUpload(f));
         }}
       />
+
+      {/* File tabs — multiple files */}
+      {allFiles.length > 1 && (
+        <div style={{
+          display:"flex", gap:4, overflowX:"auto",
+          alignItems:"center",
+        }}>
+          {allFiles.map((f: any) => {
+            const active = f.name === file?.name;
+            return (
+              <button key={f.name}
+                onClick={() => onSwitch(f.name)}
+                style={{
+                  padding:"3px 10px", borderRadius:5, cursor:"pointer",
+                  fontSize:8, fontWeight:active?700:400, whiteSpace:"nowrap",
+                  background:active?"#22d3ee22":"#050d14",
+                  border:`1px solid ${active?"#22d3ee44":T.border}`,
+                  color:active?T.accent:T.textDim,
+                  maxWidth:120, overflow:"hidden",
+                  textOverflow:"ellipsis",
+                }}>
+                {f.name.replace(/\.wav$/i,"")}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* File info */}
       {file ? (
@@ -223,10 +252,12 @@ export default function QCWorkstationV2() {
       {/* Sticky File Header */}
       <FileHeader
         file={qc.file}
+        allFiles={qc.allFiles}
         score={score}
         verdict={verdict}
         loading={qc.loading}
         onUpload={qc.loadFile}
+        onSwitch={qc.switchFile}
       />
 
       {/* Error */}
