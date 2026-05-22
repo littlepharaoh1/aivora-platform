@@ -26,13 +26,22 @@ function scoreColor(s) {
 async function analyzeFile(file, pk) {
   const ab  = await file.arrayBuffer();
   const ctx = new AudioContext();
-  const buf = await ctx.decodeAudioData(ab);
+  let buf: AudioBuffer;
+  try {
+    buf = await ctx.decodeAudioData(ab);
+  } catch(e) {
+    await ctx.close();
+    throw e;
+  }
   const analysis  = await analyzeAudioBuffer(buf);
   const scored    = scoreAnalysis(analysis, pk);
   const mono      = buf.getChannelData(0);
   const qcResult  = await analyzeAudioQuality(mono, buf.sampleRate, pk);
   const gaps      = detectDigitalGaps(buf);
   const internalGaps = gaps.filter(g=>g.type==="internal").length;
+
+  // Release AudioContext after analysis — prevent leak on N files
+  await ctx.close().catch(() => {});
 
   return {
     name:     file.name,
@@ -91,8 +100,13 @@ export default function BatchAnalyzer() {
       // Extract speaker profile
       const ctx2 = new AudioContext();
       const ab2  = await wavFiles[i].arrayBuffer();
-      const buf2 = await ctx2.decodeAudioData(ab2);
-      r._speakerProfile = extractSpeakerEmbedding(buf2, wavFiles[i].name);
+      let buf2: AudioBuffer;
+      try {
+        buf2 = await ctx2.decodeAudioData(ab2);
+        r._speakerProfile = extractSpeakerEmbedding(buf2, wavFiles[i].name);
+      } finally {
+        await ctx2.close().catch(() => {});
+      }
         out.push(r);
         setResults([...out]);
         setProgress({done:i+1,total:wavFiles.length});
