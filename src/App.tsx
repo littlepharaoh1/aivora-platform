@@ -67,9 +67,6 @@ type Tab =
   | "naming"
   | "enhancement"
   | "pipeline"
-  | "forensic_intel"
-  | "forensic_repair"
-  | "audition"
   | "contributors"
   | "monitor"
   | "dsp_management"
@@ -91,9 +88,6 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   naming:          { title:"Smart Naming",            subtitle:"SMART SEQUENCER S0001–S0200" },
   enhancement:     { title:"Enhancement Lab",         subtitle:"AUDIO REPAIR & ENHANCEMENT" },
   pipeline:        { title:"Audio Pipeline",          subtitle:"END-TO-END PROCESSING" },
-  forensic_intel:  { title:"Forensic Intelligence",   subtitle:"NEURAL PROVENANCE ENGINE" },
-  forensic_repair: { title:"Forensic Silence Repair", subtitle:"ADOBE-STYLE QA SIMULATION" },
-  audition:        { title:"Audition Workstation",    subtitle:"PROFESSIONAL AUDIO EDITOR" },
   contributors:    { title:"Contributors",            subtitle:"TEAM MANAGEMENT" },
   monitor:         { title:"Activity Monitor",        subtitle:"REAL-TIME TRACKING" },
   dsp_management:  { title:"DSP Management",         subtitle:"GLOBAL HARDWARE OPTIMIZATION & DE-NOISE PARAMETERS" },
@@ -117,12 +111,9 @@ const NAV_ITEMS = [
   { id:"naming",          icon:"naming",       label:"Smart Naming",        group:"production" },
   { id:"enhancement",     icon:"enhancement",  label:"Enhancement Lab",     group:"production" },
   { id:"pipeline",        icon:"pipeline",     label:"Audio Pipeline",      group:"production" },
-  { id:"forensic_intel",  icon:"forensic",     label:"Forensic Intel",      group:"production" },
   { id:"conversations",   icon:"rooms",        label:"Conv. Rooms",         group:"production" },
   
   // Repair
-  { id:"forensic_repair", icon:"forensic",     label:"Forensic Repair",     group:"repair"     },
-  { id:"audition",        icon:"audition",     label:"Audition Editor",     group:"repair"     },
   { id:"proeditor",       icon:"proeditor",    label:"Pro Editor",          group:"repair"     },
   
   // Manage
@@ -296,8 +287,6 @@ function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
     { icon:"naming", label:"Smart Naming",      sub:"Smart Seq S0001–S0200",  tab:"naming"         as Tab, color:colors.accent.cyan   },
     { icon:"enhancement", label:"Enhancement Lab",   sub:"Audio repair & enhancement",tab:"enhancement"    as Tab, color:colors.accent.amber  },
     { icon:"pipeline", label:"Audio Pipeline",    sub:"End-to-end processing",     tab:"pipeline"       as Tab, color:colors.accent.green  },
-    { icon:"forensic", label:"Forensic Intel",    sub:"Neural provenance engine",  tab:"forensic_intel" as Tab, color:colors.accent.cyan   },
-    { icon:"forensic", label:"Forensic Repair",   sub:"Silence reconstruction",    tab:"forensic_repair"as Tab, color:colors.accent.amber  },
     { icon:"audition", label:"Audition Editor",   sub:"Professional workstation",  tab:"audition"       as Tab, color:colors.accent.sky    },
     { icon:"monitor", label:"Activity Monitor",  sub:"Real-time tracking",        tab:"monitor"        as Tab, color:colors.accent.purple },
     { icon:"dsp", label:"DSP Management",     sub:"Global hardware config",    tab:"dsp_management" as Tab, color:colors.accent.sky    },
@@ -437,7 +426,6 @@ function AppContent(){
   if(showLanding) return <LandingPage onEnter={()=>setShowLanding(false)}/>;
 
   // Audition = full screen
-  if(tab==="audition") return <AivoraAuditionWorkstation/>;
 
   return(
     <div style={{display:"flex",height:"100vh",width:"100vw",
@@ -457,12 +445,10 @@ function AppContent(){
           {tab==="naming"          && <SmartNamingSequencer/>}
           {tab==="enhancement"     && <AudioEnhancementLab/>}
           {tab==="pipeline"        && <AudioPipeline/>}
-          {tab==="forensic_repair" && <ForensicSilenceRepair/>}
           {tab==="dsp_management"  && <DSPManagementDashboard/>}
           {tab==="dsp_validation"  && <DspValidationDashboard/>}
           {tab==="store"           && <StorePanel/>}
           {tab==="contributors"    && <Contributors/>}
-          {tab==="forensic_intel"  && <ForensicIntelPanel/>}
           {tab==="monitor"         && <ActivityMonitor/>}
           {tab==="documentation"   && <Documentation/>}
           {tab==="observability"   && <ObservabilityDashboard/>}
