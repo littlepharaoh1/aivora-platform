@@ -768,10 +768,10 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
           </div>
           {[
             ["Spectral holes",   1-agentResult.artifact.scores.holeRatio*8,   agentResult.artifact.scores.holeRatio<0.05?T.green:T.red,    "Over-suppression (3-bin context)"],
-            ["Comb filter",      1-agentResult.artifact.scores.combScore,      agentResult.artifact.scores.combScore<0.25?T.green:T.orange, "Metallic resonance (4-40 bin scan)"],
+            ["Comb filter",      1-agentResult.artifact.scores.combScore,      agentResult.artifact.scores.combScore<0.25?T.green:"#f97316", "Metallic resonance (4-40 bin scan)"],
             ["Spectral entropy", agentResult.artifact.scores.entropy,          agentResult.artifact.scores.entropy>0.7?T.green:T.yellow,   "Natural vs artificial regularity"],
             ["Bandwidth",        agentResult.artifact.scores.bandwidth,        agentResult.artifact.scores.bandwidth>0.75?T.green:T.yellow,"High-freq coverage"],
-            ["Phase continuity", 1-agentResult.artifact.scores.phaseJumps*10, agentResult.artifact.scores.phaseJumps<0.05?T.green:T.orange,"Edit stitching detection"],
+            ["Phase continuity", 1-agentResult.artifact.scores.phaseJumps*10, agentResult.artifact.scores.phaseJumps<0.05?T.green:"#f97316","Edit stitching detection"],
           ].map(([label, val, color, detail]) => {
             const v = Math.max(0,Math.min(100,Math.round((val as number)*100)));
             return (
