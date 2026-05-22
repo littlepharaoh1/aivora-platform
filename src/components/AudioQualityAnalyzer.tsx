@@ -388,9 +388,12 @@ export default function AudioQualityAnalyzer() {
     setLoading(true);
     try{
       const ab=await file.arrayBuffer();
-      const decodeCtx=new AudioContext();
-      const buf=await decodeCtx.decodeAudioData(ab);
-      decodeCtx.close(); // close immediately after decode — prevent leak
+      // Keep AudioContext alive — closing it can GC the decoded buffer
+      // on some browsers (Safari, older Chrome)
+      if(!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        audioCtxRef.current = new AudioContext();
+      }
+      const buf=await audioCtxRef.current.decodeAudioData(ab);
       const r=await analyze(buf,file.name,pk);
       setRep(r);
       setAllReps(prev=>{
