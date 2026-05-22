@@ -422,14 +422,33 @@ function QCAnalysisTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> 
         </div>
       )}
 
+      {/* Score explanation — show when both scores differ significantly */}
+      {a && r && Math.abs((a.score??0) - (r.score??0)) > 15 && (
+        <div style={{
+          padding:"8px 12px", borderRadius:8,
+          background:"#22d3ee11", border:"1px solid #22d3ee22",
+          fontSize:8, color:T.textDim,
+        }}>
+          ℹ <span style={{ color:T.accent, fontWeight:700 }}>Two different scores:</span>{" "}
+          <span style={{ color:T.text }}>
+            Appen Delivery ({a.score}/100) measures compliance with delivery requirements.
+            Audio Quality ({r.score}/100) measures technical audio quality.
+            Both are correct — they measure different things.
+          </span>
+        </div>
+      )}
+
       {/* QC Metrics */}
       {r && (
         <div style={{
           background:T.panel, border:`1px solid ${T.border}`,
           borderRadius:12, padding:14,
         }}>
-          <div style={{ fontSize:9, color:T.textDim, letterSpacing:1, marginBottom:10 }}>
-            TECHNICAL METRICS
+          <div style={{ fontSize:9, color:T.textDim, letterSpacing:1, marginBottom:4 }}>
+            TECHNICAL AUDIO QUALITY
+          </div>
+          <div style={{ fontSize:7, color:"#1a3a4a", marginBottom:8 }}>
+            Audio quality score (SNR · peaks · clipping · speech ratio) — independent of delivery requirements
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6 }}>
             {[
@@ -614,7 +633,7 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
           {[
             ["Jitter RAP",       s.jitter,     "Vocal fold irregularity (YIN)"],
             ["Shimmer APQ-3",    s.shimmer,    "Amplitude perturbation"],
-            ["Bispectrum",       s.bispectrum, "Phase coupling entropy B(k,k)"],
+            ["Bispectrum",       s.bispectrum, "Phase coupling entropy B(k,k) — low in reverb/hum environments"],
             ["CPP (ITU-T P.563)",s.cpp,        "Cepstral peak prominence"],
             ["Modulation 3-9Hz", s.modulation, "Syllabic rate FFT"],
           ].map(([label, val, detail]) => {
