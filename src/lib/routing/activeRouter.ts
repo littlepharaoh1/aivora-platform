@@ -315,7 +315,8 @@ export function routeTask(
   }
 
   // ── Priority 5: SINGLE_REVIEW ─────────────────────────────────────────────
-  const singleQC       = signals.qc_score < THRESHOLDS.SINGLE_QC_MIN;
+  // SINGLE: 70 <= qc < 85 (between DUAL ceiling and AUTO floor)
+  const singleQC       = signals.qc_score < THRESHOLDS.AUTO_QC_MIN;
   const singleVerdict  = signals.forensic_verdict !== "AUTHENTIC";
   const singleSynthetic= signals.synthetic_probability >= THRESHOLDS.SINGLE_SYNTHETIC_MAX;
 
