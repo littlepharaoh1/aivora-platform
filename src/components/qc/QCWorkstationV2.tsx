@@ -14,6 +14,7 @@ import React, { useState, useRef, useCallback } from "react";
 import { useQCWorkstation } from "../../hooks/useQCWorkstation";
 import AuditionWorkspace   from "../audio/AuditionWorkspace";
 import { drawSpectrogramPro } from "../../lib/audioQc/spectrogramPro";
+import RadarChart           from "../forensic/RadarChart";
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -506,45 +507,67 @@ function ForensicTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> })
         </div>
       )}
 
-      {/* Verdict */}
-      {agentResult.synthetic && (
-        <div style={{
-          background:T.panel, border:`1px solid ${T.border}`,
-          borderRadius:12, padding:16,
-          display:"flex", alignItems:"center", gap:16, flexWrap:"wrap",
-        }}>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:9, color:T.textDim, letterSpacing:1, marginBottom:4 }}>
-              PROVENANCE VERDICT
-            </div>
-            <div style={{ fontSize:9, color:T.textDim }}>
-              4 Web Workers · Bispectrum + CPP (ITU-T) + RT60 · Ensemble
-            </div>
-          </div>
+      {/* Radar + Verdict row */}
+      {agentResult.synthetic && (() => {
+        const s = agentResult.synthetic!.scores;
+        const radarScores = [
+          Math.max(0, Math.min(1, s.jitter     / 100)),
+          Math.max(0, Math.min(1, s.shimmer    / 100)),
+          Math.max(0, Math.min(1, s.bispectrum / 100)),
+          Math.max(0, Math.min(1, s.cpp        / 100)),
+          agentResult.artifact ? Math.max(0,1-agentResult.artifact.artifactScore) : 0,
+          Math.max(0, Math.min(1, s.modulation / 100)),
+        ];
+        return (
           <div style={{
-            padding:"10px 20px", borderRadius:8,
-            background:`${verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow}15`,
-            border:`1px solid ${verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow}44`,
-            display:"flex", flexDirection:"column", alignItems:"center", gap:4,
+            display:"flex", gap:12, flexWrap:"wrap",
+            background:T.panel, border:`1px solid ${T.border}`,
+            borderRadius:12, padding:14,
           }}>
-            <div style={{
-              fontSize:13, fontWeight:900,
-              color:verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow,
-              letterSpacing:2,
-            }}>
-              {verdict.label==="AUTHENTIC"?"✓":verdict.label==="SYNTHETIC"?"✗":"⚠"} {verdict.label}
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+              <div style={{ fontSize:9, color:T.textDim, letterSpacing:1 }}>NATURALNESS RADAR</div>
+              <RadarChart
+                scores={radarScores}
+                labels={["Jitter","Shimmer","Bispec","CPP","Clean","Mod"]}
+                colors={["#22d3ee","#10b981","#8b5cf6","#f59e0b","#10b981","#f97316"]}
+                size={200}
+              />
             </div>
-            <div style={{ fontSize:8, color:T.textDim }}>
-              Confidence: <span style={{
-                color:verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow,
-                fontWeight:700,
+            <div style={{ flex:1, minWidth:180 }}>
+              <div style={{ fontSize:9, color:T.textDim, letterSpacing:1, marginBottom:8 }}>
+                PROVENANCE VERDICT
+              </div>
+              <div style={{
+                padding:"10px 16px", borderRadius:8, marginBottom:8,
+                background:`${verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow}15`,
+                border:`1px solid ${verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow}44`,
+                display:"flex", flexDirection:"column", alignItems:"center", gap:4,
               }}>
-                {Math.round(verdict.confidence*100)}%
-              </span>
+                <div style={{
+                  fontSize:13, fontWeight:900, letterSpacing:2,
+                  color:verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow,
+                }}>
+                  {verdict.label==="AUTHENTIC"?"✓":verdict.label==="SYNTHETIC"?"✗":"⚠"} {verdict.label}
+                </div>
+                <div style={{ fontSize:8, color:T.textDim }}>
+                  Confidence:{" "}
+                  <span style={{
+                    color:verdict.label==="AUTHENTIC"?T.green:verdict.label==="SYNTHETIC"?T.red:T.yellow,
+                    fontWeight:700,
+                  }}>
+                    {Math.round(verdict.confidence*100)}%
+                  </span>
+                </div>
+              </div>
+              <div style={{ fontSize:8, color:T.textDim }}>
+                4 Web Workers · Bispectrum + CPP (ITU-T) + RT60 · Ensemble scoring
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* Verdict — now inside radar block above */}
 
       {/* Synthetic scores */}
       {s && (
