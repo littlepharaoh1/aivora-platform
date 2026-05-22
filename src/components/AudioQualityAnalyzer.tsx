@@ -205,12 +205,13 @@ export default function AudioQualityAnalyzer() {
 
   // Stop any running enhanced playback
   function stopEnhanced(): void {
+    // Cancel RAF first to prevent stale playhead updates
+    cancelAnimationFrame(rafRef.current);
     if(sourceNodeRef.current){
       try { sourceNodeRef.current.stop(); } catch {}
-      sourceNodeRef.current.disconnect();
+      try { sourceNodeRef.current.disconnect(); } catch {}
       sourceNodeRef.current = null;
     }
-    cancelAnimationFrame(rafRef.current);
     setEnhPlaying(false);
   }
 
@@ -255,8 +256,11 @@ export default function AudioQualityAnalyzer() {
     setEnhPlaying(true);
 
     src.onended = () => {
+      // Use setEnhPlaying directly — avoids stale closure on enhPlaying
       cancelAnimationFrame(rafRef.current);
-      if(enhPlaying) setEnhPlaying(false);
+      setEnhPlaying(false);
+      offsetRef.current = 0;
+      setPlayheadSec(0);
     };
 
     startPlayheadRAF(buf.duration);
@@ -316,7 +320,7 @@ export default function AudioQualityAnalyzer() {
 
   React.useEffect(()=>{
     if(currentFile&&!loading){
-      const ctx=new AudioContext();
+      // No AudioContext needed here — buffer already decoded
       const buf=currentFile.buffer;
       analyze(buf,currentFile.name,currentFile.profile||pk).then(r=>{
         setRep(r);setHist(prev=>[r,...prev.slice(0,9)]);
@@ -339,7 +343,7 @@ export default function AudioQualityAnalyzer() {
     const id = `wsf_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
     const entry: WorkspaceFile = { id, name, buffer: buf };
     setWsFiles(prev => {
-      const next = [...prev.filter(f => f.name !== name), entry].slice(-10);
+      const next = [...prev.filter(f => f.name !== name), entry].slice(-5); // max 5 buffers in memory
       return next;
     });
     setWsActiveId(id);
@@ -353,8 +357,9 @@ export default function AudioQualityAnalyzer() {
     setLoading(true);
     try{
       const ab=await file.arrayBuffer();
-      const ctx=new AudioContext();
-      const buf=await ctx.decodeAudioData(ab);
+      const decodeCtx=new AudioContext();
+      const buf=await decodeCtx.decodeAudioData(ab);
+      decodeCtx.close(); // close immediately after decode — prevent leak
       const r=await analyze(buf,file.name,pk);
       setRep(r);
       setAllReps(prev=>{
