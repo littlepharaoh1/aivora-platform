@@ -19,6 +19,7 @@ import VerdictBadge         from "../forensic/VerdictBadge";
 import EvidenceLedger       from "../forensic/EvidenceLedger";
 import { repairAudioBuffer } from "../../lib/audioQc/repair/repairPipeline";
 import { exportToWav, downloadWav } from "../../lib/audioQc/repair/wavExporter";
+import ForensicSilenceRepair from "../ForensicSilenceRepair";
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -167,6 +168,11 @@ function FileHeader({
           No file loaded — upload a WAV to begin analysis
         </div>
       )}
+      </div>
+      {/* Silence Reconstruction */}
+      <div style={{ display: activeRepairTab==="silence" ? "block" : "none" }}>
+        <ForensicSilenceRepair/>
+      </div>
     </div>
   );
 }
@@ -831,6 +837,8 @@ function RepairTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> }) {
   const [result,    setResult]    = React.useState<any>(null);
   const [error,     setError]     = React.useState("");
 
+  const [activeRepairTab, setActiveRepairTab] = React.useState<"general"|"silence">("general");
+
   if(!qc.file) return (
     <div style={{ padding:40, textAlign:"center", color:T.textDim, fontSize:11 }}>
       Load a WAV file to access repair tools
@@ -864,7 +872,35 @@ function RepairTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> }) {
   ];
 
   return (
-    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:12 }}>
+    <div style={{ display:"flex", flexDirection:"column" }}>
+
+      {/* Sub-tab bar */}
+      <div style={{
+        display:"flex", background:T.panel,
+        borderBottom:`1px solid ${T.border}`,
+      }}>
+        {[
+          { id:"general", label:"⚙ General Repair" },
+          { id:"silence", label:"🔇 Silence Reconstruction" },
+        ].map(tab => (
+          <button key={tab.id}
+            onClick={() => setActiveRepairTab(tab.id as "general"|"silence")}
+            style={{
+              padding:"8px 16px", cursor:"pointer",
+              background:activeRepairTab===tab.id?"#0a1a2a":"transparent",
+              border:"none",
+              borderBottom:activeRepairTab===tab.id?`2px solid ${T.accent}`:"2px solid transparent",
+              color:activeRepairTab===tab.id?T.accent:T.textDim,
+              fontSize:9, fontWeight:activeRepairTab===tab.id?700:400,
+              letterSpacing:1,
+            }}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* General Repair */}
+      <div style={{ display: activeRepairTab==="general" ? "flex" : "none", flexDirection:"column", gap:12, padding:16 }}>
 
       {/* Tools */}
       <div style={{
