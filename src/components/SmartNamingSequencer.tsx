@@ -47,46 +47,16 @@ export default function SmartNamingSequencer() {
         setDriveLoading(false); return;
       }
 
-      // Fetch folder contents via Google Drive API (public folders)
-      const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='audio/wav'&key=AIzaSyD-placeholder&fields=files(id,name,mimeType)`;
-
-      // Alternative: use public folder export
-      const exportUrl = `https://drive.google.com/drive/folders/${folderId}`;
-
-      // Fetch file list via Aivora Drive Proxy (Google Apps Script)
-      const PROXY_URL = "https://script.google.com/macros/s/AKfycbz1MC9q3fTd1xLj_ZikQmfEMa4RAAiAWas_ORtnImo2wmM4yIGBWRBvvSwXJKTttphoQA/exec";
-      const res = await fetch(`${PROXY_URL}?folderId=${folderId}`);
-
-      if(!res.ok) throw new Error("مش قادر يوصل للـ folder");
-
-      const data = await res.json();
-      if(data.error) throw new Error(data.error);
-
-      const wavFiles = (data.files ?? []).filter(
-        (f: any) => f.name?.toLowerCase().endsWith(".wav")
+      // Google Drive integration temporarily disabled
+      // Reason: COEP: require-corp isolation (Phase 6A.1)
+      // External cross-origin fetches incompatible with SharedArrayBuffer isolation
+      // Future: implement via Aivora backend proxy with CORP headers
+      setDriveError(
+        "Google Drive integration مؤقتاً معطلة — " +
+        "استخدم Upload مباشرة أو انتظر الـ backend proxy في الإصدار القادم"
       );
-
-      if(wavFiles.length === 0) {
-        setDriveError("مفيش ملفات WAV في الـ folder");
-        setDriveLoading(false); return;
-      }
-
-      // Download each WAV file
-      const downloaded: File[] = [];
-      for(const f of wavFiles) {
-        try {
-          const fileRes = await fetch(f.url ?? `https://drive.google.com/uc?export=download&id=${f.id}`);
-          if(!fileRes.ok) continue;
-          const blob = await fileRes.blob();
-          const file = new File([blob], f.name, { type: "audio/wav" });
-          downloaded.push(file);
-        } catch { continue; }
-      }
-
-      if(downloaded.length === 0) {
-        setDriveError("مش قادر يحمل الملفات — تأكد إن الـ folder Public");
-        setDriveLoading(false); return;
-      }
+      setDriveLoading(false);
+      return;
 
       handleFiles(downloaded as any);
       setDriveError("");
