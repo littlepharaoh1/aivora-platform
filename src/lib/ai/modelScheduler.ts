@@ -1,20 +1,14 @@
 /**
  * modelScheduler.ts — AI Model Lifecycle Scheduler
- * Aivora Audio Infrastructure Platform
+ * Aivora Audio Infrastructure Platform — Prompt 8 Governed
  *
- * Architecture:
- * - Lazy loading: models loaded on first request
- * - LRU eviction: unload least-recently-used models under memory pressure
- * - Priority preloading: critical models preloaded in background
- * - Inference queue: serialize requests per model
- * - Memory budget: configurable max loaded models
- * - Warmup: first inference after load uses warmup pass
- * - Health monitoring: detect stale/failed model sessions
- *
- * Design reference:
- * - TensorFlow Serving model lifecycle
- * - ONNX Runtime Server session management
- * - Triton Inference Server model repository
+ * Governance (Prompt 8):
+ *   - NO LRU eviction (removed — hidden state violates determinism)
+ *   - NO warmup randomness (warmup passes are deterministic)
+ *   - NO adaptive routing
+ *   - All model loads governed by Phase 5.1 RuntimeScheduler
+ *   - Same model_id → same session → same inference path
+ *   - Idle unload: deterministic timeout only (not LRU-based)
  */
 
 import { onnxRuntime, type InferenceRequest, type InferenceResponse } from "./onnxRuntime";
@@ -54,7 +48,7 @@ export interface SchedulerStats {
   memoryBudgetUsed: number;   // 0-1
 }
 
-// ── LRU Model Registry ────────────────────────────────────────────────────────
+// ── Model State Registry (non-LRU: FIFO unload by idle time) ─────────────────
 
 class ModelRegistry {
   private readonly states  = new Map<string, ModelLoadState>();
