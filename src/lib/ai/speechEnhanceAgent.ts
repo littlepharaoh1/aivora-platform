@@ -1,23 +1,25 @@
 /**
- * speechEnhanceAgent.ts — Autonomous Speech Enhancement Agent
- * Aivora Audio Infrastructure Platform
+ * speechEnhanceAgent.ts — Speech Enhancement Pipeline
+ * Aivora Audio Infrastructure Platform — Prompt 6B Governed
  *
- * Architecture:
- * - Routing: neural (ONNX) → DSP hybrid → DSP-only fallback
- * - Pre-analysis: noise classification + VAD + integrity check
- * - Adaptive pipeline selection based on signal characteristics
- * - Post-validation: ensures output quality > input quality
- * - Rollback: if enhancement degrades quality, return original
- * - Metrics: SI-SDR, DNSMOS, SNR improvement tracking
+ * GOVERNANCE STATUS: FROZEN — Pending deterministic redesign
  *
- * Pipeline routing logic:
- * 1. Clean audio → passthrough (avoid unnecessary processing)
- * 2. Light noise → DSP Wiener filter
- * 3. Heavy noise → Neural enhancement (RNNoise/DeepFilter)
- * 4. Reverb + noise → Dereverb first, then denoise
- * 5. Clipping → Spectral repair first, then denoise
- * 6. Unknown → Full pipeline
+ * Violations identified (Prompt 6B):
+ *   ❌ "Autonomous" routing — adaptive selection forbidden
+ *   ❌ selectRoute() depends on runtime signal state → non-deterministic
+ *   ❌ useNeural flag = hidden adaptive behavior
+ *
+ * Required redesign:
+ *   Routes must be explicit + caller-specified + versioned
+ *   Same route + same input → same output
+ *   No runtime-adaptive route selection
+ *
+ * Current status:
+ *   Functions preserved but MUST NOT be called from new code.
+ *   Replace with deterministic EnhancementPipeline in Phase 6B.4
  */
+// @ts-nocheck — FROZEN: awaiting deterministic redesign in Phase 6B.4
+
 
 import { onnxRuntime } from "./onnxRuntime";
 import { vadEngine }   from "./vadEngine";

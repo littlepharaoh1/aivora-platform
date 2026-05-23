@@ -49,7 +49,7 @@ export interface ModelLoadState {
 export interface SchedulerStats {
   loadedModels:    ModelId[];
   totalRequests:   number;
-  cacheHitRate:    number;
+  // cacheHitRate removed — Prompt 6B
   avgLatencyMs:    number;
   memoryBudgetUsed: number;   // 0-1
 }
@@ -280,13 +280,11 @@ export class ModelScheduler {
   getStats(): SchedulerStats {
     const ready     = this.registry.getReady();
     const runtimeStats = onnxRuntime.getStats();
-    const total     = runtimeStats.cacheHits + runtimeStats.cacheMisses;
-    const hitRate   = total > 0 ? runtimeStats.cacheHits / total : 0;
 
     return {
       loadedModels:     ready.map(s => s.modelId),
       totalRequests:    this.totalRequests,
-      cacheHitRate:     Math.round(hitRate * 1000) / 1000,
+        // hitRate removed — Prompt 6B
       avgLatencyMs:     runtimeStats.avgLatencyMs,
       memoryBudgetUsed: ready.length / (this.registry["maxSize"] as unknown as number),
     };

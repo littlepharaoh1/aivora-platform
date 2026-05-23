@@ -1,4 +1,26 @@
 /**
+ * planningEngine.ts — FROZEN: Autonomous Planning Engine
+ * Aivora Audio Infrastructure Platform
+ *
+ * GOVERNANCE STATUS: FROZEN — Prompt 6B violation
+ *
+ * Violations:
+ *   ❌ "Autonomous Agent Planning Engine"
+ *   ❌ goal-directed autonomous planning
+ *   ❌ dynamic replanning on failure
+ *   ❌ confidence-based decision making
+ *
+ * Required redesign → executionGraph.ts (Phase 6B.4):
+ *   ✅ static execution graph (DAG)
+ *   ✅ explicit task dependencies
+ *   ✅ versioned execution plans
+ *   ✅ replay-safe scheduling
+ *   ✅ deterministic: same graph → same order
+ *
+ * DO NOT USE — preserved for reference only.
+ */
+// @ts-nocheck — FROZEN: awaiting deterministic redesign
+/**
  * planningEngine.ts — Autonomous Agent Planning Engine v2
  * Aivora Audio Infrastructure Platform
  *

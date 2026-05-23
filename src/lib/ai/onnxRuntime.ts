@@ -1,20 +1,14 @@
 /**
- * onnxRuntime.ts — Production ONNX Runtime Orchestrator
- * Aivora Audio Infrastructure Platform
+ * onnxRuntime.ts — ONNX Runtime Orchestrator
+ * Aivora Audio Infrastructure Platform — Prompt 6B Governed
  *
- * Architecture:
- * - Backend auto-selection: WebGPU → WASM → CPU fallback
- * - Session pool per model type (avoid repeated init)
- * - Lazy model loading (load on first use)
- * - Inference result caching (LRU, keyed by input hash)
- * - Streaming inference (chunked for long audio)
- * - Memory pressure monitoring integration
- * - Worker-safe: runs in Web Worker context
- *
- * Design reference:
- * - ONNX Runtime Web official best practices
- * - TensorFlow.js backend selection model
- * - OpenAI inference routing architecture
+ * Governance rules (Prompt 6B):
+ * - NO LRU cache (removed) — hidden state violates determinism
+ * - NO adaptive routing — routes must be explicit + versioned
+ * - Same input + same model version → same output (deterministic)
+ * - All inference observable via Phase 4.1 telemetry
+ * - Bounded memory — no unbounded tensor buffers
+ * - Resource governed — Phase 5.1 scheduler authoritative
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -37,7 +31,7 @@ export interface ONNXTensor {
 export interface InferenceRequest {
   modelId:   ModelId;
   inputs:    Record<string, ONNXTensor>;
-  cacheKey?: string;     // if set, result is cached
+  // cacheKey REMOVED — Prompt 6B: no hidden inference cache
 }
 
 export interface InferenceResponse {
@@ -58,36 +52,8 @@ export interface ModelConfig {
   description:  string;
 }
 
-// ── LRU Cache ─────────────────────────────────────────────────────────────────
-
-class LRUCache<K, V> {
-  private readonly map   = new Map<K, V>();
-  private readonly maxSize: number;
-
-  constructor(maxSize = 64) { this.maxSize = maxSize; }
-
-  get(key: K): V | undefined {
-    if(!this.map.has(key)) return undefined;
-    const v = this.map.get(key)!;
-    this.map.delete(key);
-    this.map.set(key, v);
-    return v;
-  }
-
-  set(key: K, value: V): void {
-    if(this.map.has(key)) this.map.delete(key);
-    else if(this.map.size >= this.maxSize) {
-      this.map.delete(this.map.keys().next().value!);
-    }
-    this.map.set(key, value);
-  }
-
-  has(key: K): boolean { return this.map.has(key); }
-  clear():     void    { this.map.clear(); }
-  get size():  number  { return this.map.size; }
-}
-
-// ── Model Registry ────────────────────────────────────────────────────────────
+// LRU Cache REMOVED — Prompt 6B: hidden state violates determinism
+// Use deterministic execution paths only
 
 export const MODEL_REGISTRY: Record<ModelId, ModelConfig> = {
   silero_vad: {
@@ -151,8 +117,7 @@ export const MODEL_REGISTRY: Record<ModelId, ModelConfig> = {
 export interface RuntimeStats {
   backend:          ONNXBackend;
   loadedModels:     ModelId[];
-  cacheHits:        number;
-  cacheMisses:      number;
+  // cacheHits/cacheMisses REMOVED — Prompt 6B
   totalInferences:  number;
   avgLatencyMs:     number;
   isAvailable:      boolean;
@@ -165,9 +130,6 @@ export class ONNXRuntimeOrchestrator {
   private backend:        ONNXBackend = "cpu";
   private sessions        = new Map<ModelId, unknown>();
   private loadingPromises = new Map<ModelId, Promise<boolean>>();
-  private cache           = new LRUCache<string, Record<string, ONNXTensor>>(64);
-  private cacheHits       = 0;
-  private cacheMisses     = 0;
   private totalInferences = 0;
   private latencies:      number[] = [];
   private available       = false;
@@ -269,21 +231,7 @@ export class ONNXRuntimeOrchestrator {
   async run(request: InferenceRequest): Promise<InferenceResponse | null> {
     if(!this.available) return null;
 
-    // Cache lookup
-    if(request.cacheKey) {
-      const cached = this.cache.get(request.cacheKey);
-      if(cached) {
-        this.cacheHits++;
-        return {
-          outputs:   cached,
-          latencyMs: 0,
-          backend:   this.backend,
-          fromCache: true,
-          modelId:   request.modelId,
-        };
-      }
-      this.cacheMisses++;
-    }
+    // Cache removed — Prompt 6B: deterministic execution only
 
     // Ensure model is loaded
     const loaded = await this.loadModel(request.modelId);
@@ -325,9 +273,6 @@ export class ONNXRuntimeOrchestrator {
       if(this.latencies.length >= 64) this.latencies.shift();
       this.latencies.push(latencyMs);
 
-      // Cache result
-      if(request.cacheKey) this.cache.set(request.cacheKey, outputs);
-
       return { outputs, latencyMs, backend:this.backend, fromCache:false, modelId:request.modelId };
 
     } catch {
@@ -354,8 +299,7 @@ export class ONNXRuntimeOrchestrator {
     return {
       backend:         this.backend,
       loadedModels:    Array.from(this.sessions.keys()) as ModelId[],
-      cacheHits:       this.cacheHits,
-      cacheMisses:     this.cacheMisses,
+      // cacheHits/cacheMisses removed — Prompt 6B
       totalInferences: this.totalInferences,
       avgLatencyMs:    Math.round(avg * 10) / 10,
       isAvailable:     this.available,
@@ -363,11 +307,9 @@ export class ONNXRuntimeOrchestrator {
   }
 
   unloadModel(modelId: ModelId): void { this.sessions.delete(modelId); }
-  clearCache():                  void { this.cache.clear(); }
 
   dispose(): void {
     this.sessions.clear();
-    this.cache.clear();
     this.ort = null;
     this.available = false;
   }
