@@ -86,7 +86,15 @@ export class ONNXRuntimeOrchestrator {
   async initialize(): Promise<ONNXBackend> {
     try {
       // Dynamic import — ONNX Runtime Web
-      const ort = await (async () => { try { return await import("onnxruntime-web" as any); } catch { return null; } })();
+      // onnxruntime-web: loaded at runtime to avoid Vite bundling errors
+      let ort: any = null;
+      try {
+        // Use indirect import to bypass Vite static analysis
+        const modName = "onnxruntime-web";
+        ort = await import(modName).catch(() => null);
+      } catch {
+        ort = null;
+      }
       if(!ort) {
         console.warn("[ONNXRuntime] onnxruntime-web not available");
         return "cpu";

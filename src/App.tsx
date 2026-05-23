@@ -57,6 +57,7 @@ import ProfessionalAudioEditor     from "./components/ProfessionalAudioEditor";
 import DspValidationDashboard from "./components/DspValidationDashboard";
 import StorePanel           from "./components/StorePanel";
 import RuntimeControlCenter  from "./runtime-ui/RuntimeControlCenter";
+import AnalyticsDashboard     from "./analytics-ui/AnalyticsDashboard";
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
@@ -78,7 +79,8 @@ type Tab =
   | "documentation"
   | "conversations"
   | "observability"
-  | "runtime_center";
+  | "runtime_center"
+  | "analytics";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -455,6 +457,7 @@ function AppContent(){
           {tab==="documentation"   && <Documentation/>}
           {tab==="observability"   && <ObservabilityDashboard/>}
           {tab==="runtime_center"  && <RuntimeControlCenter/>}
+          {tab==="analytics"       && <AnalyticsDashboard/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"       && <ProfessionalAudioEditor/>}
         </div>
