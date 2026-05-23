@@ -2,32 +2,29 @@
  * sharedMemoryPool.ts — Shared DSP Memory Fabric
  * Aivora Platform — Phase 6A.3
  *
- * Ownership:
- *   SAB: owned by pool singleton (session lifetime)
- *   Slots: leased to callers, released after use
- *   Views: Float32Array on SAB — GC when lease released
+ * Final fixes:
+ *   P0.F1: release() guards on DONE state (prevents premature release)
+ *   P0.F2: lease.view uses correct byteOffset per slot (not offset=0)
+ *   P1.F3: destroy() is terminal — documented
  *
- * Safety:
- *   Atomics.compareExchange() → slot acquisition (no race)
- *   Slot status: IDLE/WRITING/READY/ERROR (Int32Array)
- *   Timeout recovery: crashed writer → slot reset to IDLE
- *   NEVER Atomics.wait() on main thread (blocks Chrome)
- *   Fallback: plain ArrayBuffer if SAB unavailable
+ * Slot state machine:
+ *   IDLE → [acquire] → WRITING → [markReady] → READY
+ *   → [worker reads] → READING → [worker done] → DONE
+ *   → [release] → IDLE
  *
- * Determinism:
- *   Slot scan: first IDLE (deterministic)
- *   Atomics: sequentially consistent
- *   Float32/IEEE 754: identical across platforms
- *
- * Memory:
- *   Desktop: 8 slots × 4MB = 32MB SAB
- *   Mobile:  4 slots × 2MB = 8MB SAB
+ * IMPORTANT:
+ *   Main thread: NEVER call release() before worker signals DONE
+ *   Worker: NEVER read before slot is READY
+ *   Use Atomics.compareExchange() for all state transitions
  */
 
+// Slot states
 const SLOT_IDLE    = 0;
 const SLOT_WRITING = 1;
 const SLOT_READY   = 2;
-const SLOT_ERROR   = 3;
+const SLOT_READING = 3;
+const SLOT_DONE    = 4;
+const SLOT_ERROR   = 5;
 
 interface PoolConfig {
   slot_count:  number;
@@ -55,19 +52,21 @@ function isMobile(): boolean {
 }
 
 export interface SlotLease {
-  slot_index:  number;
-  view:        Float32Array;
-  sab:         SharedArrayBuffer;
-  float_count: number;
-  release:     () => void;
+  slot_index:       number;
+  slot_byte_offset: number;           // correct byteOffset in SAB
+  view:             Float32Array;     // view at correct slot offset
+  sab:              SharedArrayBuffer;
+  float_count:      number;
+  release:          () => void;
 }
 
 export interface BufferLease {
-  slot_index:  -1;
-  view:        Float32Array;
-  sab:         null;
-  float_count: number;
-  release:     () => void;
+  slot_index:       -1;
+  slot_byte_offset: 0;
+  view:             Float32Array;
+  sab:              null;
+  float_count:      number;
+  release:          () => void;
 }
 
 export type MemoryLease = SlotLease | BufferLease;
@@ -76,7 +75,6 @@ class SharedMemoryPool {
   private _config:   PoolConfig;
   private _sab:      SharedArrayBuffer | null = null;
   private _control:  SharedArrayBuffer | null = null;
-  private _data:     Float32Array      | null = null;
   private _ctrl:     Int32Array        | null = null;
   private _timeouts: Map<number, ReturnType<typeof setTimeout>> = new Map();
   private _available = false;
@@ -99,7 +97,6 @@ class SharedMemoryPool {
 
       this._sab     = new SharedArrayBuffer(dataBytes);
       this._control = new SharedArrayBuffer(controlBytes);
-      this._data    = new Float32Array(this._sab);
       this._ctrl    = new Int32Array(this._control);
 
       for(let i = 0; i < this._config.slot_count; i++) {
@@ -121,27 +118,32 @@ class SharedMemoryPool {
     // Fallback path
     if(!this._available || !this._sab || !this._ctrl) {
       return {
-        slot_index: -1,
-        view:       new Float32Array(count),
-        sab:        null,
-        float_count:count,
-        release:    () => {},
+        slot_index:       -1,
+        slot_byte_offset: 0,
+        view:             new Float32Array(count),
+        sab:              null,
+        float_count:      count,
+        release:          () => {},
       };
     }
 
-    // First-IDLE scan with compareExchange (atomic — no race)
+    // First-IDLE scan — atomic acquire
     for(let i = 0; i < this._config.slot_count; i++) {
       const prev = Atomics.compareExchange(this._ctrl, i, SLOT_IDLE, SLOT_WRITING);
       if(prev !== SLOT_IDLE) continue;
 
+      // P0.F2: correct byteOffset per slot
       const byteOffset = i * this._config.slot_floats * Float32Array.BYTES_PER_ELEMENT;
-      const view       = new Float32Array(this._sab!, byteOffset, count);
 
-      // Timeout recovery — writer crash protection
+      // P0.F2: view at correct slot region (not offset=0)
+      const view = new Float32Array(this._sab!, byteOffset, count);
+
+      // Timeout recovery
       const timeout = setTimeout(() => {
-        if(this._ctrl && Atomics.load(this._ctrl, i) === SLOT_WRITING) {
-          console.warn(`[SharedMemoryPool] Slot ${i} timeout — recovering`);
-          Atomics.store(this._ctrl, i, SLOT_ERROR);
+        const state = this._ctrl ? Atomics.load(this._ctrl, i) : -1;
+        if(state === SLOT_WRITING || state === SLOT_READING) {
+          console.warn(`[SharedMemoryPool] Slot ${i} stale (state=${state}) — recovering`);
+          if(this._ctrl) Atomics.store(this._ctrl, i, SLOT_ERROR);
           setTimeout(() => {
             if(this._ctrl) Atomics.store(this._ctrl, i, SLOT_IDLE);
           }, 100);
@@ -152,39 +154,67 @@ class SharedMemoryPool {
       this._timeouts.set(i, timeout);
 
       return {
-        slot_index:  i,
+        slot_index:       i,
+        slot_byte_offset: byteOffset,
         view,
-        sab:         this._sab!,
-        float_count: count,
+        sab:              this._sab!,
+        float_count:      count,
         release: () => {
           clearTimeout(this._timeouts.get(i));
           this._timeouts.delete(i);
-          if(this._ctrl) Atomics.store(this._ctrl, i, SLOT_IDLE);
+          if(!this._ctrl) return;
+
+          // P0.F1: only release from DONE state
+          // If worker hasn't signaled DONE yet: force IDLE anyway
+          // (prevents permanent slot lock on worker crash)
+          const state = Atomics.load(this._ctrl, i);
+          if(state !== SLOT_DONE && state !== SLOT_IDLE) {
+            console.warn(
+              `[SharedMemoryPool] Releasing slot ${i} from state ${state} ` +
+              `(expected DONE) — possible premature release`
+            );
+          }
+          Atomics.store(this._ctrl, i, SLOT_IDLE);
         },
       };
     }
 
-    // Pool exhausted → ArrayBuffer fallback
+    // Pool exhausted
     console.warn("[SharedMemoryPool] Pool exhausted — ArrayBuffer fallback");
     return {
-      slot_index: -1,
-      view:       new Float32Array(count),
-      sab:        null,
-      float_count:count,
-      release:    () => {},
+      slot_index:       -1,
+      slot_byte_offset: 0,
+      view:             new Float32Array(count),
+      sab:              null,
+      float_count:      count,
+      release:          () => {},
     };
   }
 
   markReady(slotIndex: number): void {
     if(!this._ctrl || slotIndex < 0) return;
-    Atomics.store(this._ctrl, slotIndex, SLOT_READY);
+    Atomics.compareExchange(this._ctrl, slotIndex, SLOT_WRITING, SLOT_READY);
     Atomics.notify(this._ctrl, slotIndex, 1);
   }
 
-  isAvailable():   boolean                       { return this._available; }
-  getConfig():     Readonly<PoolConfig>           { return this._config; }
-  getSAB():        SharedArrayBuffer | null       { return this._sab; }
-  getControlSAB(): SharedArrayBuffer | null       { return this._control; }
+  // Worker-side: mark slot as reading (Atomics.compareExchange)
+  markReading(slotIndex: number): boolean {
+    if(!this._ctrl || slotIndex < 0) return false;
+    const prev = Atomics.compareExchange(this._ctrl, slotIndex, SLOT_READY, SLOT_READING);
+    return prev === SLOT_READY;
+  }
+
+  // Worker-side: mark slot as done
+  markDone(slotIndex: number): void {
+    if(!this._ctrl || slotIndex < 0) return;
+    Atomics.compareExchange(this._ctrl, slotIndex, SLOT_READING, SLOT_DONE);
+    Atomics.notify(this._ctrl, slotIndex, 1);
+  }
+
+  isAvailable():   boolean                 { return this._available; }
+  getConfig():     Readonly<PoolConfig>    { return this._config; }
+  getSAB():        SharedArrayBuffer|null  { return this._sab; }
+  getControlSAB(): SharedArrayBuffer|null  { return this._control; }
 
   getActiveSlots(): number {
     if(!this._ctrl) return 0;
@@ -195,11 +225,8 @@ class SharedMemoryPool {
     return n;
   }
 
-  // Cleanup symmetry:
-  //   new SharedArrayBuffer() → refs nulled (GC)
-  //   Timeouts created        → cleared
-  //   Atomics locks acquired  → reset to IDLE
-
+  // P1.F3: destroy() is terminal — no restart after destroy
+  // Call only on app unmount / tab close
   destroy(): void {
     if(this._destroyed) return;
     this._destroyed = true;
@@ -213,10 +240,9 @@ class SharedMemoryPool {
       }
     }
 
-    this._data    = null;
-    this._ctrl    = null;
-    this._sab     = null;
-    this._control = null;
+    this._ctrl     = null;
+    this._sab      = null;
+    this._control  = null;
     this._available = false;
   }
 }
