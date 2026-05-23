@@ -346,6 +346,7 @@ async function neuralVAD(
     const frame = data.slice(s, s + frameLen);
     const result = await onnxRuntime.run({
       modelId: "silero_vad",
+      correlationId: crypto.randomUUID(),
       inputs: {
         input: { data:frame, dims:[1, frameLen], type:"float32" },
         sr:    { data:new Int32Array([sr]), dims:[1], type:"int32" },

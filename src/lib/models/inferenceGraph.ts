@@ -53,8 +53,9 @@ export class InferenceGraphExecutor {
 
     try {
       const result=await onnxRuntime.run({
-        modelId: model.id as never,
-        inputs:  { input:{ data:input, dims:[1,input.length], type:"float32" } },
+        modelId:       model.id,
+        correlationId: crypto.randomUUID(),
+        inputs:        { input:{ data:input, dims:[1,input.length], type:"float32" } },
       });
 
       const ms=performance.now()-t0;

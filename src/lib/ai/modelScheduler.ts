@@ -17,7 +17,7 @@
  * - Triton Inference Server model repository
  */
 
-import { onnxRuntime, type ModelId, type InferenceRequest, type InferenceResponse } from "./onnxRuntime";
+import { onnxRuntime, type InferenceRequest, type InferenceResponse } from "./onnxRuntime";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ export interface ModelSchedulerOptions {
 }
 
 export interface ModelLoadState {
-  modelId:       ModelId;
+  modelId:       string;
   status:        "unloaded" | "loading" | "ready" | "warming" | "failed";
   loadedAt:      number;
   lastUsedAt:    number;
@@ -47,7 +47,7 @@ export interface ModelLoadState {
 }
 
 export interface SchedulerStats {
-  loadedModels:    ModelId[];
+  loadedModels:    string[];
   totalRequests:   number;
   // cacheHitRate removed — Prompt 6B
   avgLatencyMs:    number;
@@ -57,16 +57,16 @@ export interface SchedulerStats {
 // ── LRU Model Registry ────────────────────────────────────────────────────────
 
 class ModelRegistry {
-  private readonly states  = new Map<ModelId, ModelLoadState>();
+  private readonly states  = new Map<string, ModelLoadState>();
   private readonly maxSize: number;
 
   constructor(maxSize = DEFAULT_MAX_MODELS) {
     this.maxSize = maxSize;
   }
 
-  get(id: ModelId): ModelLoadState | undefined { return this.states.get(id); }
+  get(id: string): ModelLoadState | undefined { return this.states.get(id); }
 
-  upsert(id: ModelId, patch: Partial<ModelLoadState>): ModelLoadState {
+  upsert(id: string, patch: Partial<ModelLoadState>): ModelLoadState {
     const existing = this.states.get(id);
     const state: ModelLoadState = existing
       ? { ...existing, ...patch }
@@ -85,12 +85,12 @@ class ModelRegistry {
     return state;
   }
 
-  touch(id: ModelId): void {
+  touch(id: string): void {
     const s = this.states.get(id);
     if(s) this.states.set(id, { ...s, lastUsedAt: performance.now(), useCount: s.useCount+1 });
   }
 
-  recordLatency(id: ModelId, ms: number): void {
+  recordLatency(id: string, ms: number): void {
     const s = this.states.get(id);
     if(!s) return;
     const lats = [...s.latencies.slice(-31), ms];
@@ -102,7 +102,7 @@ class ModelRegistry {
    * Evict LRU model to make room.
    * Returns evicted model ID or null.
    */
-  evictLRU(): ModelId | null {
+  evictLRU(): string | null {
     const ready = Array.from(this.states.values())
       .filter(s => s.status === "ready")
       .sort((a,b) => a.lastUsedAt - b.lastUsedAt);
@@ -129,8 +129,8 @@ type QueueItem = {
 };
 
 class InferenceQueue {
-  private readonly queues = new Map<ModelId, QueueItem[]>();
-  private readonly running = new Set<ModelId>();
+  private readonly queues = new Map<string, QueueItem[]>();
+  private readonly running = new Set<string>();
 
   enqueue(req: InferenceRequest): Promise<InferenceResponse | null> {
     return new Promise((resolve, reject) => {
@@ -141,7 +141,7 @@ class InferenceQueue {
     });
   }
 
-  private async _drain(modelId: ModelId): Promise<void> {
+  private async _drain(modelId: string): Promise<void> {
     if(this.running.has(modelId)) return;
     const q = this.queues.get(modelId);
     if(!q?.length) return;
@@ -171,7 +171,7 @@ class InferenceQueue {
 export class ModelScheduler {
   private readonly registry:  ModelRegistry;
   private readonly queue:     InferenceQueue;
-  private readonly idleTimers = new Map<ModelId, ReturnType<typeof setTimeout>>();
+  private readonly idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly warmupMs:  number;
   private totalRequests = 0;
   private idleUnloadMs: number;
@@ -188,7 +188,7 @@ export class ModelScheduler {
   /**
    * Preload models in background. Non-blocking.
    */
-  preload(models: ModelId[]): void {
+  preload(models: string[]): void {
     for(const id of models) {
       this._ensureLoaded(id).catch(() => {});
     }
@@ -216,7 +216,7 @@ export class ModelScheduler {
 
   // ── Load Management ───────────────────────────────────────────────────────
 
-  private async _ensureLoaded(modelId: ModelId): Promise<void> {
+  private async _ensureLoaded(modelId: string): Promise<void> {
     const state = this.registry.get(modelId);
     if(state?.status === "ready") return;
     if(state?.status === "loading") {
@@ -250,7 +250,7 @@ export class ModelScheduler {
     this._resetIdleTimer(modelId);
   }
 
-  private async _waitForReady(modelId: ModelId, maxMs = 30000): Promise<void> {
+  private async _waitForReady(modelId: string, maxMs = 30000): Promise<void> {
     const start = performance.now();
     while(performance.now() - start < maxMs) {
       const s = this.registry.get(modelId);
@@ -259,7 +259,7 @@ export class ModelScheduler {
     }
   }
 
-  private _resetIdleTimer(modelId: ModelId): void {
+  private _resetIdleTimer(modelId: string): void {
     const existing = this.idleTimers.get(modelId);
     if(existing) clearTimeout(existing);
 
@@ -290,7 +290,7 @@ export class ModelScheduler {
     };
   }
 
-  getModelState(id: ModelId): ModelLoadState | undefined {
+  getModelState(id: string): ModelLoadState | undefined {
     return this.registry.get(id);
   }
 
