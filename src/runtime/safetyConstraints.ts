@@ -76,7 +76,7 @@ export function checkWorkerAllocation(): SafetyCheckResult {
 
 export const REPAIR_CONSTRAINTS = {
   MAX_FILE_MB_FOR_REPAIR: 100,           // 100MB max for repair
-  MAX_SIMULTANEOUS_REPAIRS: () => policyManager.getCurrent().max_parallel_repairs ?? 1,
+  MAX_SIMULTANEOUS_REPAIRS: () => policyManager.getCurrent().max_forensic_workers ?? 1,
 } as const;
 
 export function checkRepairAllowed(fileSizeMb: number): SafetyCheckResult {
