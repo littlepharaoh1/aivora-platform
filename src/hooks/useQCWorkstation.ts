@@ -509,28 +509,48 @@ export function useQCWorkstation() {
         const filtered = prev.filter(f => f.name !== rawFile.name);
         return [...filtered, sharedFile].slice(-5); // max 5 files
       });
-      setLoading(false);
 
       // ── Run QC Analysis ──────────────────────────────────────────────────
       setAnalysisLoading(true);
+      setLoading(false); // show UI before analysis starts
+
+      // Mix to mono in chunks to avoid blocking main thread
       const mono = new Float32Array(buf.length);
-      for(let ch = 0; ch < buf.numberOfChannels; ch++) {
-        const d = buf.getChannelData(ch);
-        for(let i = 0; i < buf.length; i++) mono[i] += d[i] / buf.numberOfChannels;
+      const CHUNK = 65536;
+      for(let start = 0; start < buf.length; start += CHUNK) {
+        const end = Math.min(start + CHUNK, buf.length);
+        for(let ch = 0; ch < buf.numberOfChannels; ch++) {
+          const d = buf.getChannelData(ch);
+          for(let i = start; i < end; i++) mono[i] += d[i] / buf.numberOfChannels;
+        }
+        // Yield to browser every chunk to prevent freezing
+        if(start % (CHUNK * 8) === 0) await new Promise(r => setTimeout(r, 0));
       }
 
-      const [rep, spec, gaps, vad, reverb, silence] = await Promise.all([
-        analyzeAudioQuality(mono, buf.sampleRate, profile as any),
-        computeSpectrogramOffThread(buf, {
-          fftSize:4096, minDb:-90, maxDb:-10,
-        }).catch(() => computeSpectrogramPro(buf, {
-          fftSize:4096, minDb:-90, maxDb:-10, gain:1.3, colorMap:"aivora"
-        })),
-        Promise.resolve(detectDigitalGaps(buf)),
-        Promise.resolve(analyzeAdvancedVAD(buf, profile as any)),
-        Promise.resolve(detectReverb(buf)),
-        Promise.resolve(analyzeForensicSilence(mono, buf.sampleRate) as any),
-      ]);
+      // Promise.all wrapped in try/catch — failure must not crash React tree
+      let rep: any = null, spec: any = null, gaps: any = null;
+      let vad: any = null, reverb: any = null, silence: any = null;
+      try {
+        [rep, spec, gaps, vad, reverb, silence] = await Promise.all([
+          analyzeAudioQuality(mono, buf.sampleRate, profile as any).catch(() => null),
+          computeSpectrogramOffThread(buf, {
+            fftSize:4096, minDb:-90, maxDb:-10,
+          }).catch(() => {
+            try {
+              return computeSpectrogramPro(buf, {
+                fftSize:4096, minDb:-90, maxDb:-10, gain:1.3, colorMap:"aivora"
+              });
+            } catch { return null; }
+          }),
+          Promise.resolve(detectDigitalGaps(buf)).catch(() => null),
+          Promise.resolve(analyzeAdvancedVAD(buf, profile as any)).catch(() => null),
+          Promise.resolve(detectReverb(buf)).catch(() => null),
+          Promise.resolve(analyzeForensicSilence(mono, buf.sampleRate)).catch(() => null),
+        ]);
+      } catch(analysisErr) {
+        console.warn("[useQCWorkstation] Analysis partial failure:", analysisErr);
+        // Continue with nulls — UI shows partial results
+      }
 
       let appenResult = null;
       if(rep) {

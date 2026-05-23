@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "../ErrorBoundary";
 /**
  * QCWorkstationV2.tsx — Unified QC Workstation
  * 4 tabs: QC Analysis | Audition Pro | Forensic Intel | Repair Suite
@@ -221,7 +222,8 @@ function TabBar({
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function QCWorkstationV2() {
+// Wrapped in ErrorBoundary — crashes don't produce white screen
+function QCWorkstationV2Inner() {
   const [activeTab, setActiveTab] = useState<TabId>("qc");
   const isVisibleRef = useRef<Record<TabId, boolean>>({
     qc: true, audition: false, forensic: false, repair: false,
@@ -1084,5 +1086,13 @@ function RepairTabContent({ qc }: { qc: ReturnType<typeof useQCWorkstation> }) {
       )}
 
     </div>
+  );
+}
+
+export default function QCWorkstationV2() {
+  return (
+    <ErrorBoundary label="QC Workstation">
+      <QCWorkstationV2Inner />
+    </ErrorBoundary>
   );
 }
