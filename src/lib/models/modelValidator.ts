@@ -155,7 +155,7 @@ export class ModelValidator {
 
     // 1. Integrity check
     const integrityOk=modelBuffer
-      ? await verifyIntegrity(modelBuffer,model.sha256)
+      ? await verifyIntegrity(modelBuffer, model.sha256 ?? undefined)
       : true;
     if(!integrityOk) issues.push("SHA-256 integrity check failed");
 

@@ -45,7 +45,7 @@ export class InferenceGraphExecutor {
     sr:     number
   ): Promise<Float32Array|null> {
     const available=["onnx_webgpu","onnx_wasm","js_fallback"] as const;
-    const model=modelRegistry.getBestForTask(task,Array.from(available));
+    const model=modelRegistry.getBestForTask(task,Array.from(available),"DESKTOP_BALANCED");
     if(!model) return null;
 
     const t0    = performance.now();
