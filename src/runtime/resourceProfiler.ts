@@ -57,7 +57,8 @@ export class ResourceProfiler {
   // ── GL Context Loss Listener ──────────────────────────────────────────────
 
   private _listenForGLContextLoss(): void {
-    // Track canvas context loss events globally
+    // Guard: document not available in Node.js test env
+    if(typeof document === "undefined") return;
     document.addEventListener("webglcontextlost", () => {
       this._glContextLost = true;
     }, { capture: true, passive: true });

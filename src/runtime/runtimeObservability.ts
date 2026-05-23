@@ -213,5 +213,7 @@ class RuntimeObservabilityBridge {
 
 export const runtimeObservability = new RuntimeObservabilityBridge();
 
-// Auto-start on import
-runtimeObservability.start();
+// Auto-start on import (browser only)
+if(typeof document !== "undefined") {
+  runtimeObservability.start();
+}

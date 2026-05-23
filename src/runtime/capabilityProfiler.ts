@@ -195,5 +195,7 @@ export function getCapabilityProfileSync(): CapabilityProfile | null {
   return _profile;
 }
 
-// Pre-warm on import
-getCapabilityProfile().catch(() => {});
+// Pre-warm on import (browser only)
+if(typeof document !== "undefined") {
+  getCapabilityProfile().catch(() => {});
+}
