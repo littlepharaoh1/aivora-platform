@@ -36,7 +36,7 @@ import {
 // ── SHA256 ────────────────────────────────────────────────────────────────────
 
 async function sha256Float32(arr: Float32Array): Promise<string> {
-  const buf  = arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
+  const buf  = arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength) as ArrayBuffer;
   const hash = await crypto.subtle.digest("SHA-256", buf);
   return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,"0")).join("");
 }
