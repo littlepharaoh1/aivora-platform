@@ -58,6 +58,8 @@ import DspValidationDashboard from "./components/DspValidationDashboard";
 import StorePanel           from "./components/StorePanel";
 import RuntimeControlCenter  from "./runtime-ui/RuntimeControlCenter";
 import AnalyticsDashboard     from "./analytics-ui/AnalyticsDashboard";
+import SpeechIntelligenceWorkstation from "./speech-ui/SpeechIntelligenceWorkstation";
+import DatasetFactoryWorkstation from "./dataset-ui/DatasetFactoryWorkstation";
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
@@ -80,7 +82,9 @@ type Tab =
   | "conversations"
   | "observability"
   | "runtime_center"
-  | "analytics";
+  | "analytics"
+  | "speech"
+  | "dataset_factory";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -458,6 +462,8 @@ function AppContent(){
           {tab==="observability"   && <ObservabilityDashboard/>}
           {tab==="runtime_center"  && <RuntimeControlCenter/>}
           {tab==="analytics"       && <AnalyticsDashboard/>}
+          {tab==="speech"          && <SpeechIntelligenceWorkstation/>}
+          {tab==="dataset_factory" && <DatasetFactoryWorkstation/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"       && <ProfessionalAudioEditor/>}
         </div>
