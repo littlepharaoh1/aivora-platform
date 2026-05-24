@@ -526,49 +526,49 @@ function AppContent(){
           {tab==="observability"   && <ObservabilityDashboard/>}
           {tab==="runtime_center"  && (
             <ErrorBoundary label="RuntimeCenter">
-              <React.Suspense fallback={<EnterpriseLoader label="Runtime Center" />}>
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>Runtime Center loading...</div>}>
                 <RuntimeControlCenter/>
               </React.Suspense>
             </ErrorBoundary>
           )}
           {tab==="analytics"       && (
             <ErrorBoundary label="Analytics">
-              <React.Suspense fallback={<EnterpriseLoader label="Analytics" />}>
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>Analytics loading...</div>}>
                 <AnalyticsDashboard/>
               </React.Suspense>
             </ErrorBoundary>
           )}
           {tab==="speech"          && (
             <ErrorBoundary label="Speech">
-              <React.Suspense fallback={<EnterpriseLoader label="Speech Intelligence" />}>
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>Speech Intelligence loading...</div>}>
                 <SpeechIntelligenceWorkstation/>
               </React.Suspense>
             </ErrorBoundary>
           )}
           {tab==="dataset_factory" && (
             <ErrorBoundary label="DatasetFactory">
-              <React.Suspense fallback={<EnterpriseLoader label="Dataset Factory" />}>
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>Dataset Factory loading...</div>}>
                 <DatasetFactoryWorkstation/>
               </React.Suspense>
             </ErrorBoundary>
           )}
           {tab==="qa_intel"        && (
             <ErrorBoundary label="QAIntel">
-              <React.Suspense fallback={<EnterpriseLoader label="QA Intelligence" />}>
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>QA Intelligence loading...</div>}>
                 <QAIntelligenceWorkstation/>
               </React.Suspense>
             </ErrorBoundary>
           )}
           {tab==="multimodal"      && (
             <ErrorBoundary label="Multimodal">
-              <React.Suspense fallback={<EnterpriseLoader label="Multimodal Intel" />}>
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>Multimodal Intel loading...</div>}>
                 <MultimodalWorkstation/>
               </React.Suspense>
             </ErrorBoundary>
           )}
           {tab==="ai_os"           && (
             <ErrorBoundary label="AIOperations">
-              <React.Suspense fallback={<EnterpriseLoader label="AI OS" />}>
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>AI OS loading...</div>}>
                 <AIOperationsCenter/>
               </React.Suspense>
             </ErrorBoundary>
