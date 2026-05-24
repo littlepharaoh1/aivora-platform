@@ -13,6 +13,8 @@ import ObservabilityDashboard from "./components/ObservabilityDashboard";
 import Contributors from "./components/Contributors";
 import ConversationRooms from "./components/ConversationRooms";
 import { supabase } from "./lib/supabase";
+import { useRuntimeState } from "./runtime-ui/hooks/useRuntimeState";
+import { useQASummary }    from "./qa-ui/hooks/useQAIntelligence";
 import "./styles.css";
 
 // Layout
@@ -299,101 +301,116 @@ function TopBar({ title, subtitle }:{ title:string; subtitle:string }){
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
-  const { user } = useAuth();
+  const { user }  = useAuth();
+  const snap      = useRuntimeState(2000);
+  const { summary } = useQASummary();
 
-  const cards=[
-    { icon:"qc", label:"Audio Workspace",   sub:"Task-linked processing",    tab:"audio_workspace"as Tab, color:colors.accent.sky    },
-    { icon:"qc", label:"QC Workstation",    sub:"Analyze audio quality",     tab:"qc"             as Tab, color:colors.accent.cyan   },
-    { icon:"batch", label:"Batch Analyzer",    sub:"Process 200+ files",        tab:"batch"          as Tab, color:colors.accent.purple },
-    { icon:"naming", label:"Smart Naming",      sub:"Smart Seq S0001–S0200",  tab:"naming"         as Tab, color:colors.accent.cyan   },
-    { icon:"enhancement", label:"Enhancement Lab",   sub:"Audio repair & enhancement",tab:"enhancement"    as Tab, color:colors.accent.amber  },
-    { icon:"pipeline", label:"Audio Pipeline",    sub:"End-to-end processing",     tab:"pipeline"       as Tab, color:colors.accent.green  },
-    { icon:"audition", label:"Audition Editor",   sub:"Professional workstation",  tab:"audition"       as Tab, color:colors.accent.sky    },
-    { icon:"monitor", label:"Activity Monitor",  sub:"Real-time tracking",        tab:"monitor"        as Tab, color:colors.accent.purple },
-    { icon:"dsp", label:"DSP Management",     sub:"Global hardware config",    tab:"dsp_management" as Tab, color:colors.accent.sky    },
+  // Enterprise quick-access cards — real tabs
+  const productionCards = [
+    { icon:"qc",          label:"QC Workstation",   sub:"Analyze audio quality",       tab:"qc"             as Tab, color:colors.accent.cyan   },
+    { icon:"batch",       label:"Batch Analyzer",   sub:"Process 200+ files",          tab:"batch"          as Tab, color:colors.accent.purple },
+    { icon:"pipeline",    label:"Audio Pipeline",   sub:"End-to-end processing",       tab:"pipeline"       as Tab, color:colors.accent.green  },
+    { icon:"proeditor",   label:"Pro Editor",       sub:"Professional workstation",    tab:"proeditor"      as Tab, color:colors.accent.sky    },
   ];
 
+  const enterpriseCards = [
+    { icon:"dsp",  label:"AI OS",           sub:"Unified operations center",   tab:"ai_os"          as Tab, color:"#22d3ee" },
+    { icon:"dsp",  label:"Runtime Center",  sub:"GPU · Memory · Workers",      tab:"runtime_center" as Tab, color:"#3b82f6" },
+    { icon:"dsp",  label:"Analytics",       sub:"6 materialized views",        tab:"analytics"      as Tab, color:"#8b5cf6" },
+    { icon:"dsp",  label:"Speech Intel",    sub:"Deterministic ASR",           tab:"speech"         as Tab, color:"#22c55e" },
+    { icon:"dsp",  label:"Dataset Factory", sub:"Enterprise exports",          tab:"dataset_factory"as Tab, color:"#f59e0b" },
+    { icon:"qc",   label:"QA Intelligence", sub:"Workforce + fraud intel",     tab:"qa_intel"       as Tab, color:"#f97316" },
+    { icon:"dsp",  label:"Multimodal",      sub:"Image · Video · OCR",         tab:"multimodal"     as Tab, color:"#ec4899" },
+  ];
+
+  const healthColor = snap.session_health > 0.7 ? "#22c55e"
+                    : snap.session_health > 0.4 ? "#f59e0b" : "#ef4444";
+
   return(
-    <div style={{padding:24,animation:"fadeIn 0.3s ease"}}>
+    <div style={{ padding:16, fontFamily:"'JetBrains Mono', monospace" }}>
 
-      {/* Welcome */}
-      <div style={{
-        background:`linear-gradient(135deg,${colors.bg.elevated},${colors.bg.surface})`,
-        border:`1px solid ${colors.bg.border}`,
-        borderRadius:16,padding:"20px 24px",marginBottom:24,
-        display:"flex",alignItems:"center",gap:16}}>
-        <img src="/aivora-logo.svg" alt="Aivora Logo"
-          style={{width:52,height:52,flexShrink:0,objectFit:"contain"}}/>
-        <div>
-          <div style={{fontSize:18,fontWeight:700,color:colors.text.primary}}>
-            Welcome to Aivora
-          </div>
-          <div style={{fontSize:11,color:colors.text.secondary,marginTop:2}}>
-            {user?.email} · AI Audio Data Production Platform
-          </div>
-        </div>
-        <div style={{marginLeft:"auto",textAlign:"right"}}>
-          <div style={{fontSize:9,color:colors.text.muted,letterSpacing:1}}>VERSION</div>
-          <div style={{fontSize:13,color:colors.accent.sky,fontWeight:700}}>2.5</div>
-        </div>
-      </div>
-
-      {/* Quick Access */}
-      <div style={{fontSize:10,color:colors.text.muted,letterSpacing:2,marginBottom:12}}>
-        QUICK ACCESS
-      </div>
-      <div style={{display:"grid",
-        gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
-        {cards.map(card=>(
-          <div key={card.tab} onClick={()=>onNavigate(card.tab)}
-            style={{background:colors.bg.surface,
-              border:`1px solid ${colors.bg.border}`,
-              borderTop:`2px solid ${card.color}`,
-              borderRadius:12,padding:"14px 16px",
-              cursor:"pointer",transition:"all 0.15s"}}
-            onMouseEnter={e=>{
-              const el=e.currentTarget as HTMLElement;
-              el.style.background=colors.bg.elevated;
-              el.style.transform="translateY(-2px)";
-              el.style.boxShadow=`0 4px 16px ${card.color}22`;
-            }}
-            onMouseLeave={e=>{
-              const el=e.currentTarget as HTMLElement;
-              el.style.background=colors.bg.surface;
-              el.style.transform="translateY(0)";
-              el.style.boxShadow="none";
-            }}>
-            <div style={{width:44,height:44,marginBottom:12,display:"flex",
-              alignItems:"center",justifyContent:"center",borderRadius:10,
-              background:`${card.color}18`,border:`1px solid ${card.color}40`}}>
-              <NavIcon name={card.icon} size={22} color={card.color}/>
-            </div>
-            <div style={{fontSize:12,fontWeight:600,
-              color:colors.text.primary,marginBottom:3}}>{card.label}</div>
-            <div style={{fontSize:10,color:colors.text.secondary}}>{card.sub}</div>
+      {/* OS Status Strip — real telemetry */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)",
+        gap:8, marginBottom:16 }}>
+        {[
+          { label:"Session Health",
+            value:`${Math.round(snap.session_health*100)}%`,
+            color:healthColor },
+          { label:"GPU Backend",
+            value:snap.gpu_backend,
+            color:snap.gpu_context_lost?"#ef4444":"#22c55e" },
+          { label:"Workers",
+            value:`${snap.active_workers}/${snap.max_workers}`,
+            color:"#22d3ee" },
+          { label:"Pending Reviews",
+            value:String(summary?.pending_tasks ?? "—"),
+            color:(summary?.pending_tasks ?? 0) > 50 ? "#f59e0b" : "#9ca3af" },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ background:"#0d1117",
+            border:"1px solid #1f2937", borderRadius:8,
+            padding:"10px 14px" }}>
+            <div style={{ fontSize:18, fontWeight:700, color }}>{value}</div>
+            <div style={{ fontSize:9, color:"#4b5563" }}>{label}</div>
           </div>
         ))}
       </div>
 
-      {/* Stats */}
-      <div style={{fontSize:10,color:colors.text.muted,
-        letterSpacing:2,margin:"20px 0 10px"}}>PLATFORM CAPABILITIES</div>
-      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-        {[
-          ["32+","DSP Modules",     colors.accent.sky],
-          ["92%+","VAD Accuracy", colors.accent.green],
-          ["94%","RT60 Accuracy", colors.accent.purple],
-          ["200","Batch Files",   colors.accent.amber],
-          ["32-bit","Float WAV",  colors.accent.cyan],
-          ["14","Repair Tools",    colors.accent.green],
-          ["100%","Hardware Fit", colors.accent.sky],
-        ].map(([v,l,c])=>(
-          <div key={l} style={{background:colors.bg.surface,
-            border:`1px solid ${colors.bg.border}`,
-            borderRadius:10,padding:"10px 14px",
-            flex:1,minWidth:90,textAlign:"center"}}>
-            <div style={{fontSize:16,fontWeight:700,color:c as string}}>{v}</div>
-            <div style={{fontSize:8,color:colors.text.muted,marginTop:2}}>{l}</div>
+      {/* Welcome */}
+      <div style={{ background:`linear-gradient(135deg,${colors.bg.elevated},${colors.bg.surface})`,
+        border:`1px solid ${colors.bg.border}`,
+        borderRadius:12, padding:"14px 18px", marginBottom:16,
+        display:"flex", alignItems:"center", gap:12 }}>
+        <img src="/aivora-logo.svg" alt="Aivora"
+          style={{ width:40, height:40, flexShrink:0, objectFit:"contain" }} />
+        <div>
+          <div style={{ fontSize:15, fontWeight:700, color:colors.text.primary }}>
+            AIVORA AI OS
+          </div>
+          <div style={{ fontSize:10, color:colors.text.secondary, marginTop:1 }}>
+            {user?.email} · Enterprise AI Infrastructure
+          </div>
+        </div>
+        <div style={{ marginLeft:"auto", textAlign:"right" }}>
+          <div style={{ fontSize:9, color:"#4b5563", letterSpacing:1 }}>TIERS</div>
+          <div style={{ fontSize:13, color:"#22d3ee", fontWeight:700 }}>0–15</div>
+        </div>
+      </div>
+
+      {/* Enterprise Surfaces */}
+      <div style={{ fontSize:9, color:"#4b5563", letterSpacing:2, marginBottom:8 }}>
+        ENTERPRISE INTELLIGENCE
+      </div>
+      <div style={{ display:"grid",
+        gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:8,
+        marginBottom:16 }}>
+        {enterpriseCards.map(card => (
+          <div key={card.tab} onClick={() => onNavigate(card.tab)}
+            style={{ background:"#0d1117",
+              border:`1px solid #1f2937`,
+              borderTop:`2px solid ${card.color}`,
+              borderRadius:10, padding:"12px 14px", cursor:"pointer" }}>
+            <div style={{ fontSize:11, fontWeight:700,
+              color:card.color, marginBottom:2 }}>{card.label}</div>
+            <div style={{ fontSize:9, color:"#4b5563" }}>{card.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Production Workflows */}
+      <div style={{ fontSize:9, color:"#4b5563", letterSpacing:2, marginBottom:8 }}>
+        PRODUCTION WORKFLOWS
+      </div>
+      <div style={{ display:"grid",
+        gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:8 }}>
+        {productionCards.map(card => (
+          <div key={card.tab} onClick={() => onNavigate(card.tab)}
+            style={{ background:colors.bg.surface,
+              border:`1px solid ${colors.bg.border}`,
+              borderTop:`2px solid ${card.color}`,
+              borderRadius:10, padding:"12px 14px", cursor:"pointer" }}>
+            <div style={{ fontSize:11, fontWeight:600,
+              color:colors.text.primary, marginBottom:2 }}>{card.label}</div>
+            <div style={{ fontSize:9, color:colors.text.secondary }}>{card.sub}</div>
           </div>
         ))}
       </div>
