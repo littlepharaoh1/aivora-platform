@@ -4,7 +4,7 @@ import { extractFrames, VIDEO_LIMITS, VIDEO_RUNTIME_VERSION } from "../video/vid
 import { processOCRDocument, OCR_RUNTIME_VERSION, OCR_DECODER_STRATEGY, OCR_TEMPERATURE } from "../document-ai/ocrRuntime";
 import { generateVisionQAReport, VISION_QA_VERSION } from "../vision-qa/visionQA";
 import { adaptMultimodalRecords, MULTIMODAL_ADAPTER_VERSION } from "../lib/dataset/multimodalAdapters";
-import { IMAGE_GOVERNANCE_VERSION, IMAGE_LIMITS } from "../vision/imageGovernance";
+import { IMAGE_GOVERNANCE_VERSION, IMAGE_LIMITS, sha256Bytes, extractTiles } from "../vision/imageGovernance";
 import type { ImageLoadResult } from "../vision/imageRuntime";
 import type { VideoExtractionResult } from "../video/videoRuntime";
 import type { OCRDocumentResult } from "../document-ai/ocrRuntime";
@@ -85,13 +85,45 @@ function ImagePanel() {
 
   const handleFile = useCallback(async (file: File) => {
     setLoading(true); setError(null); setResult(null);
+    let bitmap: ImageBitmap | null = null;
     try {
-      const r = await loadAndGovernImage(file, crypto.randomUUID());
-      if(!r) { setError("Image governance rejected"); return; }
+      // Direct processing — no scheduler dependency
+      if(file.size > IMAGE_LIMITS.MAX_IMAGE_BYTES) {
+        setError(`File too large: ${(file.size/1024/1024).toFixed(1)}MB > 32MB`);
+        return;
+      }
+      bitmap = await createImageBitmap(file);
+      const { width, height } = bitmap;
+      let targetW = width, targetH = height;
+      if(width > IMAGE_LIMITS.MAX_DIM || height > IMAGE_LIMITS.MAX_DIM) {
+        const ratio = IMAGE_LIMITS.MAX_DIM / Math.max(width, height);
+        targetW = Math.floor(width * ratio);
+        targetH = Math.floor(height * ratio);
+      }
+      const canvas = new OffscreenCanvas(targetW, targetH);
+      const ctx    = canvas.getContext("2d");
+      if(!ctx) { setError("Canvas unavailable"); return; }
+      ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+      const imageData = ctx.getImageData(0, 0, targetW, targetH);
+      const checksum  = await sha256Bytes(imageData.data);
+      const tiles     = extractTiles(imageData);
+      const r = {
+        imageData,
+        metadata: { width:targetW, height:targetH, channels:4, format:"rgba" as const,
+          byte_size:imageData.data.length, checksum, tile_count:tiles.length,
+          created_at:new Date().toISOString(),
+          governance_version:IMAGE_GOVERNANCE_VERSION },
+        tiles,
+        governance: { image_checksum:checksum, width:targetW, height:targetH,
+          tile_count:tiles.length, resize_applied:width!==targetW,
+          exif_stripped:true, governance_version:IMAGE_GOVERNANCE_VERSION,
+          protocol:"14.1.0" },
+        correlation_id: crypto.randomUUID(),
+      };
       setResult(r);
       if(canvasRef.current) renderImageToCanvas(r.imageData, canvasRef.current);
     } catch(e) { setError(e instanceof Error ? e.message : "Failed"); }
-    finally { setLoading(false); }
+    finally { bitmap?.close(); setLoading(false); }
   }, []);
 
   return (
