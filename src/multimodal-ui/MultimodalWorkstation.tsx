@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import { loadAndGovernImage, renderImageToCanvas } from "../vision/imageRuntime";
-import { extractFrames, VIDEO_LIMITS, VIDEO_RUNTIME_VERSION } from "../video/videoRuntime";
+import { VIDEO_LIMITS, VIDEO_RUNTIME_VERSION } from "../video/videoRuntime";
 import { processOCRDocument, OCR_RUNTIME_VERSION, OCR_DECODER_STRATEGY, OCR_TEMPERATURE } from "../document-ai/ocrRuntime";
 import { generateVisionQAReport, VISION_QA_VERSION } from "../vision-qa/visionQA";
 import { adaptMultimodalRecords, MULTIMODAL_ADAPTER_VERSION } from "../lib/dataset/multimodalAdapters";
@@ -190,13 +190,54 @@ function VideoPanel() {
 
   const handleFile = useCallback(async (file: File) => {
     setLoading(true); setError(null); setResult(null);
+    let videoEl: HTMLVideoElement | null = null;
+    let objectUrl: string | null = null;
     try {
-      const r = await extractFrames(file,
-        { fps, max_frames:VIDEO_LIMITS.MAX_ACTIVE_FRAMES }, crypto.randomUUID());
-      if(!r) { setError("Frame extraction failed"); return; }
-      setResult(r);
+      objectUrl = URL.createObjectURL(file);
+      videoEl   = document.createElement("video");
+      videoEl.preload = "metadata"; videoEl.muted = true;
+      await new Promise<void>((res,rej) => {
+        videoEl!.onloadedmetadata = ()=>res();
+        videoEl!.onerror = ()=>rej(new Error("Video load failed"));
+        videoEl!.src = objectUrl!;
+      });
+      const duration = videoEl.duration;
+      if(!isFinite(duration)||duration<=0) throw new Error("Invalid video duration");
+      const timestamps: number[] = [];
+      const interval = 1/fps;
+      for(let t=0; t<duration && timestamps.length<VIDEO_LIMITS.MAX_ACTIVE_FRAMES; t+=interval)
+        timestamps.push(Math.round(t*1000)/1000);
+      const frames: any[] = [];
+      const canvas = document.createElement("canvas");
+      const ctx    = canvas.getContext("2d");
+      if(!ctx) throw new Error("Canvas unavailable");
+      for(let i=0; i<timestamps.length; i++) {
+        const ts = timestamps[i];
+        await new Promise<void>((res,rej) => {
+          videoEl!.onseeked = ()=>res();
+          videoEl!.onerror  = ()=>rej(new Error(`Seek failed`));
+          videoEl!.currentTime = ts;
+        });
+        let w=videoEl.videoWidth, h=videoEl.videoHeight;
+        if(w>VIDEO_LIMITS.MAX_FRAME_DIM||h>VIDEO_LIMITS.MAX_FRAME_DIM) {
+          const ratio=VIDEO_LIMITS.MAX_FRAME_DIM/Math.max(w,h);
+          w=Math.floor(w*ratio); h=Math.floor(h*ratio);
+        }
+        canvas.width=w; canvas.height=h;
+        ctx.drawImage(videoEl,0,0,w,h);
+        frames.push({ index:i, timestamp_s:ts, width:w, height:h,
+          data:ctx.getImageData(0,0,w,h), checksum:null });
+      }
+      setResult({ frames, total_frames:frames.length, duration_s:duration,
+        config:{ fps, max_frames:VIDEO_LIMITS.MAX_ACTIVE_FRAMES },
+        manifest_checksum:null, correlation_id:crypto.randomUUID(),
+        protocol:"14.2.0" } as any);
     } catch(e) { setError(e instanceof Error ? e.message : "Failed"); }
-    finally { setLoading(false); }
+    finally {
+      if(videoEl){ videoEl.pause(); videoEl.src=""; }
+      if(objectUrl) URL.revokeObjectURL(objectUrl);
+      setLoading(false);
+    }
   }, [fps]);
 
   return (
