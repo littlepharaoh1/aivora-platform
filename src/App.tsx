@@ -116,6 +116,13 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   documentation:   { title:"Documentation",             subtitle:"PLATFORM REFERENCE & GUIDES" },
   conversations:   { title:"Conversation Rooms",         subtitle:"DUAL-TRACK PODCAST MIXER" },
   observability:   { title:"Observability",              subtitle:"DSP RUNTIME TELEMETRY" },
+  runtime_center:  { title:"Runtime Center",            subtitle:"GPU · MEMORY · WORKERS · SCHEDULER" },
+  analytics:       { title:"Analytics Dashboard",       subtitle:"ENTERPRISE TELEMETRY & MATERIALIZED VIEWS" },
+  speech:          { title:"Speech Intelligence",       subtitle:"DETERMINISTIC ASR · RTL · ARABIC" },
+  dataset_factory: { title:"Dataset Factory",           subtitle:"ENTERPRISE DATASET PRODUCTION SYSTEM" },
+  qa_intel:        { title:"QA Intelligence",           subtitle:"WORKFORCE · CONSENSUS · FRAUD INTEL" },
+  multimodal:      { title:"Multimodal Intelligence",   subtitle:"IMAGE · VIDEO · OCR · VISION QA" },
+  ai_os:           { title:"AI Operating System",       subtitle:"UNIFIED ENTERPRISE AI INFRASTRUCTURE" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
