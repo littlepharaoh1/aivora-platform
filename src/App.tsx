@@ -60,6 +60,7 @@ import RuntimeControlCenter  from "./runtime-ui/RuntimeControlCenter";
 import AnalyticsDashboard     from "./analytics-ui/AnalyticsDashboard";
 import SpeechIntelligenceWorkstation from "./speech-ui/SpeechIntelligenceWorkstation";
 import DatasetFactoryWorkstation from "./dataset-ui/DatasetFactoryWorkstation";
+import QAIntelligenceWorkstation from "./qa-ui/QAIntelligenceWorkstation";
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,8 @@ type Tab =
   | "runtime_center"
   | "analytics"
   | "speech"
-  | "dataset_factory";
+  | "dataset_factory"
+  | "qa_intel";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -464,6 +466,7 @@ function AppContent(){
           {tab==="analytics"       && <AnalyticsDashboard/>}
           {tab==="speech"          && <SpeechIntelligenceWorkstation/>}
           {tab==="dataset_factory" && <DatasetFactoryWorkstation/>}
+          {tab==="qa_intel"        && <QAIntelligenceWorkstation/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"       && <ProfessionalAudioEditor/>}
         </div>
