@@ -15,6 +15,8 @@ import ConversationRooms from "./components/ConversationRooms";
 import { supabase } from "./lib/supabase";
 import { useRuntimeState } from "./runtime-ui/hooks/useRuntimeState";
 import { useQASummary }    from "./qa-ui/hooks/useQAIntelligence";
+import { ErrorBoundary }   from "./components/ErrorBoundary";
+import React, { Suspense } from "react";
 import "./styles.css";
 
 // Layout
@@ -490,13 +492,55 @@ function AppContent(){
           {tab==="monitor"         && <ActivityMonitor/>}
           {tab==="documentation"   && <Documentation/>}
           {tab==="observability"   && <ObservabilityDashboard/>}
-          {tab==="runtime_center"  && <RuntimeControlCenter/>}
-          {tab==="analytics"       && <AnalyticsDashboard/>}
-          {tab==="speech"          && <SpeechIntelligenceWorkstation/>}
-          {tab==="dataset_factory" && <DatasetFactoryWorkstation/>}
-          {tab==="qa_intel"        && <QAIntelligenceWorkstation/>}
-          {tab==="multimodal"       && <MultimodalWorkstation/>}
-          {tab==="ai_os"           && <AIOperationsCenter/>}
+          {tab==="runtime_center"  && (
+            <ErrorBoundary label="RuntimeCenter">
+              <React.Suspense fallback={<EnterpriseLoader label="Runtime Center" />}>
+                <RuntimeControlCenter/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="analytics"       && (
+            <ErrorBoundary label="Analytics">
+              <React.Suspense fallback={<EnterpriseLoader label="Analytics" />}>
+                <AnalyticsDashboard/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="speech"          && (
+            <ErrorBoundary label="Speech">
+              <React.Suspense fallback={<EnterpriseLoader label="Speech Intelligence" />}>
+                <SpeechIntelligenceWorkstation/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="dataset_factory" && (
+            <ErrorBoundary label="DatasetFactory">
+              <React.Suspense fallback={<EnterpriseLoader label="Dataset Factory" />}>
+                <DatasetFactoryWorkstation/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="qa_intel"        && (
+            <ErrorBoundary label="QAIntel">
+              <React.Suspense fallback={<EnterpriseLoader label="QA Intelligence" />}>
+                <QAIntelligenceWorkstation/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="multimodal"      && (
+            <ErrorBoundary label="Multimodal">
+              <React.Suspense fallback={<EnterpriseLoader label="Multimodal Intel" />}>
+                <MultimodalWorkstation/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="ai_os"           && (
+            <ErrorBoundary label="AIOperations">
+              <React.Suspense fallback={<EnterpriseLoader label="AI OS" />}>
+                <AIOperationsCenter/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="conversations"   && <ConversationRooms/>}
           {tab==="proeditor"       && <ProfessionalAudioEditor/>}
