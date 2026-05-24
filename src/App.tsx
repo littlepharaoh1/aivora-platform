@@ -60,13 +60,14 @@ import ProfessionalAudioEditor     from "./components/ProfessionalAudioEditor";
 // Components — Manage
 import DspValidationDashboard from "./components/DspValidationDashboard";
 import StorePanel           from "./components/StorePanel";
-import RuntimeControlCenter  from "./runtime-ui/RuntimeControlCenter";
-import AnalyticsDashboard     from "./analytics-ui/AnalyticsDashboard";
-import SpeechIntelligenceWorkstation from "./speech-ui/SpeechIntelligenceWorkstation";
-import DatasetFactoryWorkstation from "./dataset-ui/DatasetFactoryWorkstation";
-import QAIntelligenceWorkstation from "./qa-ui/QAIntelligenceWorkstation";
-import MultimodalWorkstation from "./multimodal-ui/MultimodalWorkstation";
-import AIOperationsCenter from "./os-ui/AIOperationsCenter";
+// Enterprise modules — lazy loaded to prevent module-init crashes
+const RuntimeControlCenter          = React.lazy(() => import("./runtime-ui/RuntimeControlCenter").catch(e => { console.error("RuntimeCenter load failed:", e); return { default: () => <EnterpriseError label="Runtime Center" /> }; }));
+const AnalyticsDashboard            = React.lazy(() => import("./analytics-ui/AnalyticsDashboard").catch(e => { console.error("Analytics load failed:", e); return { default: () => <EnterpriseError label="Analytics" /> }; }));
+const SpeechIntelligenceWorkstation = React.lazy(() => import("./speech-ui/SpeechIntelligenceWorkstation").catch(e => { console.error("Speech load failed:", e); return { default: () => <EnterpriseError label="Speech Intel" /> }; }));
+const DatasetFactoryWorkstation     = React.lazy(() => import("./dataset-ui/DatasetFactoryWorkstation").catch(e => { console.error("Dataset load failed:", e); return { default: () => <EnterpriseError label="Dataset Factory" /> }; }));
+const QAIntelligenceWorkstation     = React.lazy(() => import("./qa-ui/QAIntelligenceWorkstation").catch(e => { console.error("QA load failed:", e); return { default: () => <EnterpriseError label="QA Intelligence" /> }; }));
+const MultimodalWorkstation         = React.lazy(() => import("./multimodal-ui/MultimodalWorkstation").catch(e => { console.error("Multimodal load failed:", e); return { default: () => <EnterpriseError label="Multimodal" /> }; }));
+const AIOperationsCenter            = React.lazy(() => import("./os-ui/AIOperationsCenter").catch(e => { console.error("AIOperations load failed:", e); return { default: () => <EnterpriseError label="AI OS" /> }; }));
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
