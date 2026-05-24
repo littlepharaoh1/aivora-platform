@@ -20,10 +20,11 @@ export const NAV_ICON_MAP: Record<string, React.ElementType> = {
 };
 
 export const GROUP_COLORS: Record<string,string> = {
-  production: "#0EA5E9",
-  repair:     "#8B5CF6",
-  manage:     "#10B981",
-  system:     "#F59E0B",
+  production:  "#0EA5E9",
+  repair:      "#8B5CF6",
+  manage:      "#10B981",
+  system:      "#F59E0B",
+  enterprise:  "#22D3EE",
 };
 
 interface NavIconProps {

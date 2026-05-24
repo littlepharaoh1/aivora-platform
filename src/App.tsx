@@ -141,6 +141,13 @@ const NAV_ITEMS = [
   { id:"observability",   icon:"dsp",          label:"Observability",       group:"system"     },
   { id:"store",           icon:"store",        label:"Store",               group:"system"     },
   { id:"documentation",   icon:"info",         label:"Documentation",       group:"system"     },
+  { id:"ai_os",           icon:"dsp",          label:"AI OS",               group:"enterprise" },
+  { id:"runtime_center",  icon:"dsp",          label:"Runtime Center",      group:"enterprise" },
+  { id:"analytics",       icon:"dsp",          label:"Analytics",           group:"enterprise" },
+  { id:"speech",          icon:"dsp",          label:"Speech Intel",        group:"enterprise" },
+  { id:"dataset_factory", icon:"dsp",          label:"Dataset Factory",     group:"enterprise" },
+  { id:"qa_intel",        icon:"qc",           label:"QA Intelligence",     group:"enterprise" },
+  { id:"multimodal",      icon:"dsp",          label:"Multimodal Intel",    group:"enterprise" },
 ];
 
 const GROUP_LABELS = {
@@ -474,6 +481,7 @@ function AppContent(){
           {tab==="multimodal"       && <MultimodalWorkstation/>}
           {tab==="ai_os"           && <AIOperationsCenter/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
+          {tab==="conversations"   && <ConversationRooms/>}
           {tab==="proeditor"       && <ProfessionalAudioEditor/>}
         </div>
       </div>
