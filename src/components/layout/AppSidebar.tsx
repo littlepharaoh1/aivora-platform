@@ -35,8 +35,9 @@ interface Props { activeTab: AppTab; onTabChange: (t: AppTab) => void; }
 export default function AppSidebar({ activeTab, onTabChange }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [tooltip,  setTooltip]  = useState<{label:string;y:number}|null>(null);
-  const W = expanded ? 200 : 56;
-  const groups = ["production","repair","manage","system"] as const;
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const W = isMobile ? 44 : expanded ? 200 : 56;
+  const groups = ["production","repair","manage","system","enterprise"] as const;
 
   return (
     <div style={{width:W,minWidth:W,height:"100%",
