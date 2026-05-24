@@ -23,6 +23,9 @@ export const TASK_TIMEOUT_MS: Record<RuntimeTaskType, number> = {
   ANALYTICS:   30_000,
   SIMILARITY:  45_000,
   BATCH:       90_000,
+  IMAGE:       30_000,
+  VIDEO:       60_000,
+  OCR:         20_000,
 } as const;
 
 // ── Priority Order (lower = higher priority) ──────────────────────────────────

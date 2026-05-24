@@ -12,7 +12,10 @@ export type RuntimeTaskType =
   | "EXPORT"
   | "ANALYTICS"
   | "SIMILARITY"
-  | "BATCH";
+  | "BATCH"
+  | "IMAGE"
+  | "VIDEO"
+  | "OCR";
 
 export type RuntimePriority =
   | "CRITICAL"
