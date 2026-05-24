@@ -16,6 +16,24 @@
     <title>Aivora AI — Audio Intelligence Platform</title>
   </head>
   <body>
+    <script>
+      window.onerror = function(msg, src, line, col, err) {
+        document.body.innerHTML = '<div style="background:#080c14;color:#ef4444;padding:24px;font-family:monospace;min-height:100vh">' +
+          '<h2 style="color:#22d3ee">AIVORA — Init Error</h2>' +
+          '<p><b>Message:</b> ' + msg + '</p>' +
+          '<p><b>Source:</b> ' + src + '</p>' +
+          '<p><b>Line:</b> ' + line + ':' + col + '</p>' +
+          '<p><b>Error:</b> ' + (err ? err.stack : 'N/A') + '</p>' +
+          '</div>';
+      };
+      window.onunhandledrejection = function(e) {
+        document.body.innerHTML = '<div style="background:#080c14;color:#ef4444;padding:24px;font-family:monospace;min-height:100vh">' +
+          '<h2 style="color:#22d3ee">AIVORA — Unhandled Promise Rejection</h2>' +
+          '<p>' + (e.reason ? e.reason.toString() : 'Unknown') + '</p>' +
+          '<pre style="color:#f59e0b;font-size:11px">' + (e.reason && e.reason.stack ? e.reason.stack : '') + '</pre>' +
+          '</div>';
+      };
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
