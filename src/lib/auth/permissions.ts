@@ -29,18 +29,39 @@ export type AivoraModule =
   | "pipeline"
   | "store"
   | "sequencer"
-  | "monitor";
+  | "monitor"
+  // Phase 15.3 — New platform modules
+  | "runtime_center"
+  | "analytics"
+  | "speech_intel"
+  | "dataset_factory"
+  | "qa_intel"
+  | "multimodal"
+  | "observability"
+  | "dsp_management"
+  | "dsp_validation"
+  | "audiobench"
+  | "proeditor"
+  | "documentation";
 
 export const ROLE_PERMISSIONS: Record<AivoraRole, AivoraModule[]> = {
   owner: [
     "dashboard","upload","qc","contributors","naming","control",
     "export","rooms","enhancement","readiness","analyzer","batch",
-    "pipeline","store","sequencer","monitor"
+    "pipeline","store","sequencer","monitor",
+    // Phase 15.3
+    "runtime_center","analytics","speech_intel","dataset_factory",
+    "qa_intel","multimodal","observability","dsp_management",
+    "dsp_validation","audiobench","proeditor","documentation"
   ],
   admin: [
     "dashboard","upload","qc","contributors","naming","control",
     "export","rooms","enhancement","readiness","analyzer","batch",
-    "pipeline","store","sequencer","monitor"
+    "pipeline","store","sequencer","monitor",
+    // Phase 15.3
+    "runtime_center","analytics","speech_intel","dataset_factory",
+    "qa_intel","multimodal","observability","dsp_management",
+    "dsp_validation","audiobench","proeditor","documentation"
   ],
   manager: [
     "dashboard","batch","analyzer","naming","export","readiness","contributors"
@@ -73,22 +94,34 @@ export function getAllowedTabs(role: AivoraRole): AivoraModule[] {
 }
 
 export const MODULE_LABELS: Record<AivoraModule, string> = {
-  dashboard:   "Dashboard",
-  upload:      "Upload Center",
-  qc:          "QC Workstation",
-  contributors:"Contributors",
-  naming:      "German Naming",
-  control:     "Control Center",
-  export:      "Export Package",
-  rooms:       "Conversation Rooms",
-  enhancement: "Enhancement Lab",
-  readiness:   "Readiness Score",
-  analyzer:    "Quality Analyzer",
-  batch:       "Batch Analyzer",
-  pipeline:    "Audio Pipeline",
-  store:       "Aivora Store",
-  sequencer:   "Smart Naming",
-  monitor:     "Activity Monitor",
+  dashboard:       "Dashboard",
+  upload:          "Upload Center",
+  qc:              "QC Workstation",
+  contributors:    "Contributors",
+  naming:          "German Naming",
+  control:         "Control Center",
+  export:          "Export Package",
+  rooms:           "Conversation Rooms",
+  enhancement:     "Enhancement Lab",
+  readiness:       "Readiness Score",
+  analyzer:        "Quality Analyzer",
+  batch:           "Batch Analyzer",
+  pipeline:        "Audio Pipeline",
+  store:           "Aivora Store",
+  sequencer:       "Smart Naming",
+  monitor:         "Activity Monitor",
+  runtime_center:  "Runtime Center",
+  analytics:       "Analytics",
+  speech_intel:    "Speech Intel",
+  dataset_factory: "Dataset Factory",
+  qa_intel:        "QA Intelligence",
+  multimodal:      "Multimodal Intel",
+  observability:   "Observability",
+  dsp_management:  "DSP Management",
+  dsp_validation:  "DSP Validation",
+  audiobench:      "Audio Bench",
+  proeditor:       "Pro Editor",
+  documentation:   "Documentation",
 };
 
 export const ROLE_COLORS: Record<AivoraRole, string> = {

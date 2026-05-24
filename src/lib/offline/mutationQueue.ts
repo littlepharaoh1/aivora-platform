@@ -32,7 +32,13 @@ export type MutationType =
   | "processing_job_insert"
   | "qc_review_update"
   | "activity_log_insert"
-  | "consensus_log_insert";
+  | "consensus_log_insert"
+  | "dataset_version_insert"
+  | "pipeline_run_insert"
+  | "image_evidence_insert"
+  | "video_evidence_insert"
+  | "ocr_evidence_insert"
+  | "speech_transcript_insert";
 
 export type MutationStatus =
   | "pending"     // waiting for sync

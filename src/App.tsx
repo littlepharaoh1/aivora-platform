@@ -62,6 +62,7 @@ import SpeechIntelligenceWorkstation from "./speech-ui/SpeechIntelligenceWorksta
 import DatasetFactoryWorkstation from "./dataset-ui/DatasetFactoryWorkstation";
 import QAIntelligenceWorkstation from "./qa-ui/QAIntelligenceWorkstation";
 import MultimodalWorkstation from "./multimodal-ui/MultimodalWorkstation";
+import AIOperationsCenter from "./os-ui/AIOperationsCenter";
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
@@ -88,7 +89,8 @@ type Tab =
   | "speech"
   | "dataset_factory"
   | "qa_intel"
-  | "multimodal";
+  | "multimodal"
+  | "ai_os";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -470,6 +472,7 @@ function AppContent(){
           {tab==="dataset_factory" && <DatasetFactoryWorkstation/>}
           {tab==="qa_intel"        && <QAIntelligenceWorkstation/>}
           {tab==="multimodal"       && <MultimodalWorkstation/>}
+          {tab==="ai_os"           && <AIOperationsCenter/>}
           {tab==="audiobench"      && <AivoraAudioBench/>}
           {tab==="proeditor"       && <ProfessionalAudioEditor/>}
         </div>
