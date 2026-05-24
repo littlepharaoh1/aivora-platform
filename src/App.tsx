@@ -152,9 +152,9 @@ const NAV_ITEMS = [
   { id:"multimodal",      icon:"dsp",          label:"Multimodal Intel",    group:"enterprise" },
 ];
 
-const GROUP_LABELS = {
+const GROUP_LABELS: Record<string,string> = {
   production:"PRODUCTION", repair:"REPAIR",
-  manage:"MANAGE", system:"SYSTEM",
+  manage:"MANAGE", system:"SYSTEM", enterprise:"ENTERPRISE",
 };
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ function Sidebar({ activeTab, onTabChange }:{ activeTab:Tab; onTabChange:(t:Tab)
   const [expanded,setExpanded]=useState(false);
   const [tooltip,setTooltip]=useState<{label:string;y:number}|null>(null);
   const W=expanded?200:56;
-  const groups=["production","repair","manage","system"] as const;
+  const groups=["production","repair","manage","system","enterprise"] as const;
 
   return(
     <div style={{width:W,minWidth:W,height:"100%",
