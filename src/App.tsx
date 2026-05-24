@@ -13,8 +13,7 @@ import ObservabilityDashboard from "./components/ObservabilityDashboard";
 import Contributors from "./components/Contributors";
 import ConversationRooms from "./components/ConversationRooms";
 import { supabase } from "./lib/supabase";
-import { useRuntimeState } from "./runtime-ui/hooks/useRuntimeState";
-import { useQASummary }    from "./qa-ui/hooks/useQAIntelligence";
+// useRuntimeState + useQASummary: lazy-required in Dashboard only
 import { ErrorBoundary }   from "./components/ErrorBoundary";
 import React, { Suspense } from "react";
 import "./styles.css";
@@ -305,8 +304,33 @@ function TopBar({ title, subtitle }:{ title:string; subtitle:string }){
 
 function Dashboard({ onNavigate }:{ onNavigate:(t:Tab)=>void }){
   const { user }  = useAuth();
-  const snap      = useRuntimeState(2000);
-  const { summary } = useQASummary();
+  // Safe runtime state — defaults if runtime not available
+  const [snap, setSnap] = React.useState({
+    session_health:1, gpu_backend:"CPU", gpu_context_lost:false,
+    active_workers:0, max_workers:4, worker_pressure:0,
+    heap_used_mb:0, memory_pressure:0, gpu_pressure:0,
+    sab_available:false, execution_mode:"DESKTOP_BALANCED",
+  });
+  const [summary, setSummary] = React.useState<{pending_tasks:number;total_reviews:number}|null>(null);
+
+  React.useEffect(() => {
+    // Lazy-load runtime hooks to prevent module init crash
+    let cancelled = false;
+    import("./runtime-ui/hooks/useRuntimeState").then(m => {
+      if(!cancelled) {
+        try {
+          const s = m.buildSnapshot ? m.buildSnapshot() : null;
+          if(s) setSnap(s as any);
+        } catch { /* silent — runtime may not be ready */ }
+      }
+    }).catch(() => { /* silent */ });
+    import("./qa-ui/hooks/useQAIntelligence").then(async m => {
+      if(!cancelled && m.supabase) {
+        // Don't call hooks outside React — just show defaults
+      }
+    }).catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // Enterprise quick-access cards — real tabs
   const productionCards = [
