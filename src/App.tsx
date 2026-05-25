@@ -502,8 +502,7 @@ function AppContent(){
   },[tab]);
 
   // Landing page
-  const showShowcase=!sessionStorage.getItem('skip_showcase');
-  if(showShowcase && !sessionStorage.getItem('skip_showcase')) {
+  if(!sessionStorage.getItem('skip_showcase')) {
     window.location.replace('/showcase.html');
     return null;
   }
