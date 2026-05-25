@@ -505,18 +505,11 @@ function AppContent(){
 
   // Landing page
   const [showShowcase,setShowShowcase]=useState(true);
-  if(showShowcase) return (
-    <div style={{position:"fixed",inset:0,zIndex:9999}}>
-      <iframe
-        src="/showcase.html"
-        style={{width:"100%",height:"100%",border:"none"}}
-        title="AIVORA Showcase"
-      />
-      <div style={{position:"absolute",bottom:0,left:0,right:0,
-        display:"flex",justifyContent:"center",padding:20}}>
-      </div>
-    </div>
-  );
+  if(showShowcase) {
+    // Redirect to showcase page directly
+    window.location.replace('/showcase.html');
+    return null;
+  }
   if(showLanding) return <LandingPage onEnter={()=>setShowLanding(false)}/>;
 
   // Audition = full screen
