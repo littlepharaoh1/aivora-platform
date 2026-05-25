@@ -15,6 +15,7 @@ import ConversationRooms from "./components/ConversationRooms";
 import { supabase } from "./lib/supabase";
 // useRuntimeState + useQASummary: lazy-required in Dashboard only
 import { ErrorBoundary }   from "./components/ErrorBoundary";
+import AIVORAShowcase      from "./components/showcase/AIVORAShowcase";
 import React, { Suspense } from "react";
 import "./styles.css";
 
@@ -477,6 +478,7 @@ function ComingSoon({ title }:{ title:string }){
 
 function AppContent(){
   const [showLanding,setShowLanding]=useState(true);
+  const [showShowcase,setShowShowcase]=useState(true);
   const [tab,setTab]=useState<Tab>("dashboard");
 
   // Clear Supabase auth params from URL
@@ -503,6 +505,7 @@ function AppContent(){
   },[tab]);
 
   // Landing page
+  if(showShowcase) return <AIVORAShowcase onEnter={()=>setShowShowcase(false)}/>;
   if(showLanding) return <LandingPage onEnter={()=>setShowLanding(false)}/>;
 
   // Audition = full screen
