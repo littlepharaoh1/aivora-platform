@@ -67,6 +67,7 @@ const DatasetFactoryWorkstation     = React.lazy(() => import("./dataset-ui/Data
 const QAIntelligenceWorkstation     = React.lazy(() => import("./qa-ui/QAIntelligenceWorkstation"));
 const MultimodalWorkstation         = React.lazy(() => import("./multimodal-ui/MultimodalWorkstation"));
 const AIOperationsCenter            = React.lazy(() => import("./os-ui/AIOperationsCenter"));
+const ImageAnnotationWorkstation    = React.lazy(() => import("./annotation/ImageAnnotationWorkstation"));
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
@@ -94,7 +95,8 @@ type Tab =
   | "dataset_factory"
   | "qa_intel"
   | "multimodal"
-  | "ai_os";
+  | "ai_os"
+  | "annotation";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +125,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   qa_intel:        { title:"QA Intelligence",           subtitle:"WORKFORCE · CONSENSUS · FRAUD INTEL" },
   multimodal:      { title:"Multimodal Intelligence",   subtitle:"IMAGE · VIDEO · OCR · VISION QA" },
   ai_os:           { title:"AI Operating System",       subtitle:"UNIFIED ENTERPRISE AI INFRASTRUCTURE" },
+  annotation:      { title:"Image Annotation",          subtitle:"PRODUCTION ANNOTATION WORKSTATION" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
@@ -159,6 +162,7 @@ const NAV_ITEMS = [
   { id:"dataset_factory", icon:"dsp",          label:"Dataset Factory",     group:"enterprise" },
   { id:"qa_intel",        icon:"qc",           label:"QA Intelligence",     group:"enterprise" },
   { id:"multimodal",      icon:"dsp",          label:"Multimodal Intel",    group:"enterprise" },
+  { id:"annotation",     icon:"qc",           label:"Image Annotator",     group:"enterprise" },
 ];
 
 const GROUP_LABELS: Record<string,string> = {
@@ -563,6 +567,13 @@ function AppContent(){
             <ErrorBoundary label="Multimodal">
               <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>Multimodal Intel loading...</div>}>
                 <MultimodalWorkstation/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="annotation"      && (
+            <ErrorBoundary label="Annotation">
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontSize:12}}>Loading annotator...</div>}>
+                <ImageAnnotationWorkstation />
               </React.Suspense>
             </ErrorBoundary>
           )}
