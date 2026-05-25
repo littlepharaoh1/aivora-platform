@@ -17,7 +17,7 @@ import React, {
 import {
   createAnnotationState, addAnnotation, updateAnnotation,
   deleteAnnotation, undoAnnotation, redoAnnotation,
-  isBBoxValid, normalizeBBox, toYOLOLines,
+  normalizeBBox, toYOLOLines,
   ANNOTATION_LIMITS,
 } from "./annotationState";
 import type { AnnotationState, Annotation, BBox } from "./annotationState";
@@ -362,12 +362,12 @@ export default function ImageAnnotationWorkstation({
       // Convert screen coords to normalized
       const { nx:nx1, ny:ny1 } = screenToNorm(
         drawing.sx, drawing.sy, transform,
-        canvasRef.current!.width, canvasRef.current!.height,
+        0, 0,
         img.naturalWidth, img.naturalHeight,
       );
       const { nx:nx2, ny:ny2 } = screenToNorm(
         sx, sy, transform,
-        canvasRef.current!.width, canvasRef.current!.height,
+        0, 0,
         img.naturalWidth, img.naturalHeight,
       );
       const bbox: BBox = {
@@ -376,7 +376,8 @@ export default function ImageAnnotationWorkstation({
         height: ny2 - ny1,
       };
       const normalized = normalizeBBox(bbox);
-      if(isBBoxValid(normalized)) {
+      const isValid = normalized.width > 0.001 && normalized.height > 0.001;
+      if(isValid) {
         setAnnState(s => addAnnotation(
           s, normalized,
           activeClass.id, activeClass.name, activeClass.color,
