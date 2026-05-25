@@ -26,7 +26,6 @@ import { colors }  from "./lib/design/tokens";
 
 // Auth
 import AuthGate        from "./components/AuthGate";
-import LandingPage     from "./components/LandingPage";
 import ForensicIntelPanel from "./components/ForensicIntelPanel";
 import QCWorkstationV2    from "./components/qc/QCWorkstationV2";
 import { useAuth }     from "./lib/auth/AuthContext";
@@ -477,7 +476,6 @@ function ComingSoon({ title }:{ title:string }){
 // ── App Content ───────────────────────────────────────────────────────────────
 
 function AppContent(){
-  const [showLanding,setShowLanding]=useState(true);
   const [tab,setTab]=useState<Tab>("dashboard");
 
   // Clear Supabase auth params from URL
@@ -509,7 +507,6 @@ function AppContent(){
     window.location.replace('/showcase.html');
     return null;
   }
-  if(showLanding) return <LandingPage onEnter={()=>setShowLanding(false)}/>;
 
   // Audition = full screen
 
