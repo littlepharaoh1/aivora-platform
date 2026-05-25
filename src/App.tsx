@@ -68,6 +68,7 @@ const QAIntelligenceWorkstation     = React.lazy(() => import("./qa-ui/QAIntelli
 const MultimodalWorkstation         = React.lazy(() => import("./multimodal-ui/MultimodalWorkstation"));
 const AIOperationsCenter            = React.lazy(() => import("./os-ui/AIOperationsCenter"));
 const ImageAnnotationWorkstation    = React.lazy(() => import("./annotation/ImageAnnotationWorkstation"));
+const VideoAnnotationWorkstation    = React.lazy(() => import("./annotation/VideoAnnotationWorkstation"));
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,8 @@ type Tab =
   | "qa_intel"
   | "multimodal"
   | "ai_os"
-  | "annotation";
+  | "annotation"
+  | "video_annotation";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -126,6 +128,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   multimodal:      { title:"Multimodal Intelligence",   subtitle:"IMAGE · VIDEO · OCR · VISION QA" },
   ai_os:           { title:"AI Operating System",       subtitle:"UNIFIED ENTERPRISE AI INFRASTRUCTURE" },
   annotation:      { title:"Image Annotation",          subtitle:"PRODUCTION ANNOTATION WORKSTATION" },
+  video_annotation:{ title:"Video Annotation",          subtitle:"FRAME-BY-FRAME VIDEO LABELING TIMELINE" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
@@ -163,6 +166,7 @@ const NAV_ITEMS = [
   { id:"qa_intel",        icon:"qc",           label:"QA Intelligence",     group:"enterprise" },
   { id:"multimodal",      icon:"dsp",          label:"Multimodal Intel",    group:"enterprise" },
   { id:"annotation",     icon:"qc",           label:"Image Annotator",     group:"enterprise" },
+  { id:"video_annotation",icon:"qc",          label:"Video Annotator",     group:"enterprise" },
 ];
 
 const GROUP_LABELS: Record<string,string> = {
@@ -567,6 +571,13 @@ function AppContent(){
             <ErrorBoundary label="Multimodal">
               <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontFamily:"monospace",fontSize:12}}>Multimodal Intel loading...</div>}>
                 <MultimodalWorkstation/>
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="video_annotation" && (
+            <ErrorBoundary label="VideoAnnotation">
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontSize:12}}>Loading video annotator...</div>}>
+                <VideoAnnotationWorkstation />
               </React.Suspense>
             </ErrorBoundary>
           )}
