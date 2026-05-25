@@ -260,27 +260,40 @@ export default function VideoAnnotationWorkstation() {
     ctx.setLineDash([]);
   }, [currentFrame, annState, selected, activeClass]);
 
+  // Refs to avoid stale closure in pointerUp
+  const frameIdxRef    = useRef(frameIdx);
+  const activeClassRef = useRef(activeClass);
+  const toolRef        = useRef(tool);
+  const currentFrameRef= useRef(currentFrame);
+  useEffect(() => { frameIdxRef.current    = frameIdx;    }, [frameIdx]);
+  useEffect(() => { activeClassRef.current = activeClass; }, [activeClass]);
+  useEffect(() => { toolRef.current        = tool;        }, [tool]);
+  useEffect(() => { currentFrameRef.current= currentFrame;}, [currentFrame]);
+
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if(!currentFrame || !drawingRef.current || tool !== "bbox") return;
-    const { sx, sy } = getPos(e);
+    const cf = currentFrameRef.current;
     const dr = drawingRef.current;
+    if(!cf || !dr || toolRef.current !== "bbox") return;
+    const { sx, sy } = getPos(e);
     drawingRef.current = null;
 
     const bbox: BBox = {
-      x:      Math.min(dr.sx, sx) / currentFrame.width,
-      y:      Math.min(dr.sy, sy) / currentFrame.height,
-      width:  Math.abs(sx - dr.sx) / currentFrame.width,
-      height: Math.abs(sy - dr.sy) / currentFrame.height,
+      x:      Math.min(dr.sx, sx) / cf.width,
+      y:      Math.min(dr.sy, sy) / cf.height,
+      width:  Math.abs(sx - dr.sx) / cf.width,
+      height: Math.abs(sy - dr.sy) / cf.height,
     };
     const normalized = normalizeBBox(bbox);
     if(normalized.width > 0.001 && normalized.height > 0.001) {
+      const ac = activeClassRef.current;
+      const fi = frameIdxRef.current;
       setAnnState(s => addAnnotation(
         s, normalized,
-        activeClass.id, activeClass.name, activeClass.color,
-        frameIdx,
+        ac.id, ac.name, ac.color,
+        fi,
       ));
     }
-  }, [tool, currentFrame, frameIdx, activeClass]);
+  }, [getPos]);
 
   // ── Export ────────────────────────────────────────────────────────────────
   const handleExport = useCallback(() => {
