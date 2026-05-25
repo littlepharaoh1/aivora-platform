@@ -505,8 +505,7 @@ function AppContent(){
 
   // Landing page
   const [showShowcase,setShowShowcase]=useState(true);
-  if(showShowcase) {
-    // Redirect to showcase page directly
+  if(showShowcase && !sessionStorage.getItem('skip_showcase')) {
     window.location.replace('/showcase.html');
     return null;
   }
