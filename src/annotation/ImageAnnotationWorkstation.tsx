@@ -205,6 +205,7 @@ export default function ImageAnnotationWorkstation({
   const [drawing,   setDrawing]   = useState<{
     sx:number; sy:number; ex:number; ey:number
   } | null>(null);
+  const drawingRef = useRef<{ sx:number; sy:number; ex:number; ey:number } | null>(null);
   const [panStart,  setPanStart]  = useState<{
     sx:number; sy:number; tx:number; ty:number
   } | null>(null);
@@ -329,7 +330,9 @@ export default function ImageAnnotationWorkstation({
       return;
     }
     if(tool === "bbox") {
-      setDrawing({ sx, sy, ex:sx, ey:sy });
+      const d = { sx, sy, ex:sx, ey:sy };
+      drawingRef.current = d;
+      setDrawing(d);
       setSelected(null);
     }
   }, [tool, transform, annState, imageLoaded]);
@@ -347,7 +350,11 @@ export default function ImageAnnotationWorkstation({
       return;
     }
     if(drawing) {
-      setDrawing(d => d ? { ...d, ex:sx, ey:sy } : null);
+      if(drawingRef.current) {
+        const upd = { ...drawingRef.current, ex:sx, ey:sy };
+        drawingRef.current = upd;
+        setDrawing(upd);
+      }
     }
   }, [panStart, drawing, imageLoaded]);
 
@@ -357,17 +364,15 @@ export default function ImageAnnotationWorkstation({
 
     setPanStart(null);
 
-    if(drawing && tool === "bbox") {
-      const img = imgRef.current;
-      // Convert screen coords to normalized
+    const dr = drawingRef.current;
+    if(dr && tool === "bbox") {
+      const img = imgRef.current!;
       const { nx:nx1, ny:ny1 } = screenToNorm(
-        drawing.sx, drawing.sy, transform,
-        0, 0,
+        dr.sx, dr.sy, transform, 0, 0,
         img.naturalWidth, img.naturalHeight,
       );
       const { nx:nx2, ny:ny2 } = screenToNorm(
-        sx, sy, transform,
-        0, 0,
+        sx, sy, transform, 0, 0,
         img.naturalWidth, img.naturalHeight,
       );
       const bbox: BBox = {
@@ -376,17 +381,17 @@ export default function ImageAnnotationWorkstation({
         height: ny2 - ny1,
       };
       const normalized = normalizeBBox(bbox);
-      const isValid = normalized.width > 0.001 && normalized.height > 0.001;
-      if(isValid) {
+      if(normalized.width > 0.001 && normalized.height > 0.001) {
         setAnnState(s => addAnnotation(
           s, normalized,
           activeClass.id, activeClass.name, activeClass.color,
           frameIndex,
         ));
       }
+      drawingRef.current = null;
       setDrawing(null);
     }
-  }, [drawing, tool, transform, activeClass, frameIndex, imageLoaded]);
+  }, [tool, transform, activeClass, frameIndex, imageLoaded]);
 
   // ── Wheel zoom ───────────────────────────────────────────────────────────────
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
