@@ -224,7 +224,18 @@ export default function ImageAnnotationWorkstation({
       imgRef.current = img;
       setImageSize({ w:img.naturalWidth, h:img.naturalHeight });
       setImageLoaded(true);
-      setTransform(DEFAULT_TRANSFORM);
+      // Fit image to canvas
+      const canvas = canvasRef.current;
+      if(canvas && canvas.width > 0 && canvas.height > 0) {
+        const scaleX = canvas.width  / img.naturalWidth;
+        const scaleY = canvas.height / img.naturalHeight;
+        const scale  = Math.min(scaleX, scaleY) * 0.95;
+        const tx = (canvas.width  - img.naturalWidth  * scale) / 2;
+        const ty = (canvas.height - img.naturalHeight * scale) / 2;
+        setTransform({ scale, tx, ty });
+      } else {
+        setTransform(DEFAULT_TRANSFORM);
+      }
       setAnnState(createAnnotationState(crypto.randomUUID()));
       setSelected(null);
     };
@@ -244,19 +255,25 @@ export default function ImageAnnotationWorkstation({
     if(!canvas || !img || !imageLoaded) return;
     renderCanvas(canvas, img, annState, transform,
       selected, drawing, activeClass.color);
-  }, [annState, transform, selected, drawing, imageLoaded, activeClass]);
+  }, [annState, transform, selected, drawing, imageLoaded, activeClass, canvasSize]);
 
-  // ── Resize canvas ────────────────────────────────────────────────────────────
+  // ── Canvas size state ────────────────────────────────────────────────────────
+  const [canvasSize, setCanvasSize] = React.useState({ w:0, h:0 });
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if(!canvas) return;
     const ro = new ResizeObserver(entries => {
       for(const e of entries) {
-        canvas.width  = e.contentRect.width;
-        canvas.height = e.contentRect.height;
+        const w = Math.floor(e.contentRect.width);
+        const h = Math.floor(e.contentRect.height);
+        canvas.width  = w;
+        canvas.height = h;
+        setCanvasSize({ w, h }); // triggers re-render
       }
     });
-    ro.observe(canvas.parentElement!);
+    const parent = canvas.parentElement;
+    if(parent) ro.observe(parent);
     return () => ro.disconnect();
   }, []);
 
