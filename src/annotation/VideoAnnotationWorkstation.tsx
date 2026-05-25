@@ -96,9 +96,12 @@ export default function VideoAnnotationWorkstation() {
   const [error,       setError]       = useState<string | null>(null);
   const [tool,        setTool]        = useState<"bbox"|"select">("bbox");
 
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const drawingRef = useRef<{ sx:number; sy:number; ex:number; ey:number }|null>(null);
-  const fileRef    = useRef<HTMLInputElement>(null);
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
+  const drawingRef    = useRef<{ sx:number; sy:number; ex:number; ey:number }|null>(null);
+  const fileRef       = useRef<HTMLInputElement>(null);
+  const dragStartRef  = useRef<{ nx:number; ny:number }|null>(null);
+  const overlayRef    = useRef<HTMLDivElement>(null);
+  const [drawingBox,  setDrawingBox] = useState<{x:number;y:number;w:number;h:number}|null>(null);
 
   const currentFrame = frames[frameIdx] ?? null;
 
@@ -210,6 +213,58 @@ export default function VideoAnnotationWorkstation() {
       sy: (e.clientY - rect.top)  * scaleY,
     };
   }, [currentFrame]);
+
+  // Div overlay mouse handlers
+  const getNorm = useCallback((e: React.MouseEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    return {
+      nx: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+      ny: Math.max(0, Math.min(1, (e.clientY - rect.top)  / rect.height)),
+    };
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if(e.button !== 0 || tool !== "bbox") return;
+    e.preventDefault();
+    const { nx, ny } = getNorm(e);
+    dragStartRef.current = { nx, ny };
+    setDrawingBox({ x:nx, y:ny, w:0, h:0 });
+    setSelected(null);
+  }, [tool, getNorm]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if(!dragStartRef.current) return;
+    const { nx, ny } = getNorm(e);
+    const ds = dragStartRef.current;
+    setDrawingBox({
+      x: Math.min(ds.nx, nx),
+      y: Math.min(ds.ny, ny),
+      w: Math.abs(nx - ds.nx),
+      h: Math.abs(ny - ds.ny),
+    });
+  }, [getNorm]);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if(!dragStartRef.current) return;
+    const { nx, ny } = getNorm(e);
+    const ds = dragStartRef.current;
+    dragStartRef.current = null;
+    setDrawingBox(null);
+    const bbox: BBox = {
+      x:      Math.min(ds.nx, nx),
+      y:      Math.min(ds.ny, ny),
+      width:  Math.abs(nx - ds.nx),
+      height: Math.abs(ny - ds.ny),
+    };
+    if(bbox.width > 0.005 && bbox.height > 0.005) {
+      const fi = frameIdxRef.current;
+      const ac = activeClassRef.current;
+      setAnnState(prev => addAnnotation(
+        prev, bbox, ac.id, ac.name, ac.color, fi,
+      ));
+    }
+  }, [getNorm]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if(!currentFrame) return;
@@ -473,14 +528,53 @@ export default function VideoAnnotationWorkstation() {
             <>
               {/* Frame canvas */}
               <div style={{ flex:1, background:"#111827",
-                position:"relative", overflow:"hidden" }}>
-                <canvas ref={canvasRef}
-                  style={{ width:"100%", height:"100%",
-                    objectFit:"contain",
-                    cursor:tool==="bbox"?"crosshair":"default" }}
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp} />
+                position:"relative", overflow:"hidden",
+                display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ position:"relative", display:"inline-block" }}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={()=>{ dragStartRef.current=null; setDrawingBox(null); }}>
+                  <canvas ref={canvasRef}
+                    style={{ display:"block", maxWidth:"100%",
+                      maxHeight:"calc(100vh - 200px)",
+                      cursor:tool==="bbox"?"crosshair":"default",
+                      pointerEvents:"none" }} />
+                  {/* Annotation overlays */}
+                  {currentFrame && annState.annotations
+                    .filter(a => a.frame_index === frameIdx)
+                    .map(ann => (
+                    <div key={ann.id}
+                      onClick={e=>{e.stopPropagation();setSelected(ann.id);}}
+                      style={{ position:"absolute",
+                        left:  `${ann.bbox.x*100}%`,
+                        top:   `${ann.bbox.y*100}%`,
+                        width: `${ann.bbox.width*100}%`,
+                        height:`${ann.bbox.height*100}%`,
+                        border:`2px solid ${ann.class_color}`,
+                        background:`${ann.class_color}22`,
+                        boxSizing:"border-box", cursor:"pointer",
+                        outline:selected===ann.id?"2px solid #fff":"none" }}>
+                      <span style={{ position:"absolute", top:-16, left:0,
+                        background:ann.class_color, color:"#fff",
+                        fontSize:9, padding:"1px 4px", borderRadius:2,
+                        whiteSpace:"nowrap", pointerEvents:"none" }}>
+                        {ann.class_name}
+                      </span>
+                    </div>
+                  ))}
+                  {/* Drawing box */}
+                  {drawingBox && drawingBox.w > 0.002 && drawingBox.h > 0.002 && (
+                    <div style={{ position:"absolute",
+                      left:  `${drawingBox.x*100}%`,
+                      top:   `${drawingBox.y*100}%`,
+                      width: `${drawingBox.w*100}%`,
+                      height:`${drawingBox.h*100}%`,
+                      border:`2px dashed ${activeClass.color}`,
+                      background:`${activeClass.color}18`,
+                      boxSizing:"border-box", pointerEvents:"none" }} />
+                  )}
+                </div>
 
                 {/* Frame info overlay */}
                 <div style={{ position:"absolute", top:8, left:8,
