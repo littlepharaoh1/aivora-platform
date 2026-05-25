@@ -202,6 +202,8 @@ export default function ImageAnnotationWorkstation({
   );
   const [selected,  setSelected]  = useState<string | null>(null);
   const [transform, setTransform] = useState<Transform>(DEFAULT_TRANSFORM);
+
+
   const [drawing,   setDrawing]   = useState<{
     sx:number; sy:number; ex:number; ey:number
   } | null>(null);
@@ -248,6 +250,13 @@ export default function ImageAnnotationWorkstation({
       setImageLoaded(false);
     };
   }, [activeFile]);
+
+  const activeClassRef  = useRef(activeClass);
+  const transformRef    = useRef(transform);
+  const toolRef         = useRef(tool);
+  useEffect(() => { activeClassRef.current = activeClass; }, [activeClass]);
+  useEffect(() => { transformRef.current   = transform;   }, [transform]);
+  useEffect(() => { toolRef.current        = tool;        }, [tool]);
 
   const [canvasSize, setCanvasSize] = React.useState({ w:0, h:0 });
 
@@ -364,15 +373,19 @@ export default function ImageAnnotationWorkstation({
 
     setPanStart(null);
 
-    const dr = drawingRef.current;
-    if(dr && tool === "bbox") {
+    const dr  = drawingRef.current;
+    const t   = toolRef.current;
+    const tf  = transformRef.current;
+    const ac  = activeClassRef.current;
+
+    if(dr && t === "bbox") {
       const img = imgRef.current!;
       const { nx:nx1, ny:ny1 } = screenToNorm(
-        dr.sx, dr.sy, transform, 0, 0,
+        dr.sx, dr.sy, tf, 0, 0,
         img.naturalWidth, img.naturalHeight,
       );
       const { nx:nx2, ny:ny2 } = screenToNorm(
-        sx, sy, transform, 0, 0,
+        sx, sy, tf, 0, 0,
         img.naturalWidth, img.naturalHeight,
       );
       const bbox: BBox = {
@@ -384,14 +397,14 @@ export default function ImageAnnotationWorkstation({
       if(normalized.width > 0.001 && normalized.height > 0.001) {
         setAnnState(s => addAnnotation(
           s, normalized,
-          activeClass.id, activeClass.name, activeClass.color,
+          ac.id, ac.name, ac.color,
           frameIndex,
         ));
       }
       drawingRef.current = null;
       setDrawing(null);
     }
-  }, [tool, transform, activeClass, frameIndex, imageLoaded]);
+  }, [imageLoaded, frameIndex, getPos]);
 
   // ── Wheel zoom ───────────────────────────────────────────────────────────────
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
