@@ -248,6 +248,8 @@ export default function ImageAnnotationWorkstation({
     };
   }, [activeFile]);
 
+  const [canvasSize, setCanvasSize] = React.useState({ w:0, h:0 });
+
   // ── Render loop ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -256,9 +258,6 @@ export default function ImageAnnotationWorkstation({
     renderCanvas(canvas, img, annState, transform,
       selected, drawing, activeClass.color);
   }, [annState, transform, selected, drawing, imageLoaded, activeClass, canvasSize]);
-
-  // ── Canvas size state ────────────────────────────────────────────────────────
-  const [canvasSize, setCanvasSize] = React.useState({ w:0, h:0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
