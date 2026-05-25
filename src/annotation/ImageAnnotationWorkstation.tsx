@@ -208,14 +208,16 @@ export default function ImageAnnotationWorkstation({
   const [panStart,  setPanStart]  = useState<{
     sx:number; sy:number; tx:number; ty:number
   } | null>(null);
+  const [internalFile, setInternalFile] = useState<File | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageSize,   setImageSize]   = useState({ w:0, h:0 });
   const [checksum,    setChecksum]    = useState<string | null>(null);
+  const activeFile = imageFile ?? internalFile;
 
   // ── Load image ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if(!imageFile) return;
-    const url = URL.createObjectURL(imageFile);
+    if(!activeFile) return;
+    const url = URL.createObjectURL(activeFile);
     imgUrlRef.current = url;
     const img = new Image();
     img.onload = () => {
@@ -233,7 +235,7 @@ export default function ImageAnnotationWorkstation({
       imgRef.current = null;
       setImageLoaded(false);
     };
-  }, [imageFile]);
+  }, [activeFile]);
 
   // ── Render loop ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -431,13 +433,36 @@ export default function ImageAnnotationWorkstation({
 
       {/* Canvas area */}
       <div style={{ flex:1, position:"relative", overflow:"hidden",
-        background:"#111827" }}>
+        background:"#111827" }}
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => {
+          e.preventDefault();
+          const f = e.dataTransfer.files[0];
+          if(f && f.type.startsWith("image/")) setInternalFile(f);
+        }}>
         {!imageLoaded && (
           <div style={{ position:"absolute", inset:0, display:"flex",
             alignItems:"center", justifyContent:"center",
-            flexDirection:"column", gap:12, color:"#4b5563" }}>
+            flexDirection:"column", gap:16, color:"#4b5563" }}>
             <div style={{ fontSize:48 }}>🖼️</div>
-            <div style={{ fontSize:12 }}>Load an image to start annotating</div>
+            <div style={{ fontSize:13, color:"#6b7280" }}>
+              Load an image to start annotating
+            </div>
+            <label style={{ padding:"10px 24px", background:"#22d3ee22",
+              border:"1px solid #22d3ee", borderRadius:8,
+              color:"#22d3ee", fontSize:12, cursor:"pointer",
+              fontFamily:"'JetBrains Mono', monospace" }}>
+              📂 Open Image
+              <input type="file" accept="image/*"
+                style={{ display:"none" }}
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if(f) setInternalFile(f);
+                }} />
+            </label>
+            <div style={{ fontSize:10, color:"#374151" }}>
+              JPG · PNG · WebP · or drag & drop
+            </div>
           </div>
         )}
         <canvas ref={canvasRef}
