@@ -81,6 +81,7 @@ function renderFrameCanvas(
 
 export default function VideoAnnotationWorkstation() {
   const [frames,      setFrames]      = useState<VideoFrame[]>([]);
+  const [frameUrls,   setFrameUrls]   = useState<string[]>([]);
   const [frameIdx,    setFrameIdx]    = useState(0);
   const [annState,    setAnnState]    = useState<AnnotationState>(
     createAnnotationState(crypto.randomUUID())
@@ -160,6 +161,17 @@ export default function VideoAnnotationWorkstation() {
         setLoadProgress(Math.round((i + 1) / timestamps.length * 100));
       }
 
+      // Generate img URLs for display
+      const offscreen = document.createElement("canvas");
+      const offCtx    = offscreen.getContext("2d")!;
+      const urls: string[] = [];
+      for(const f of extracted) {
+        offscreen.width  = f.width;
+        offscreen.height = f.height;
+        offCtx.drawImage(f.bitmap, 0, 0);
+        urls.push(offscreen.toDataURL("image/jpeg", 0.7));
+      }
+      setFrameUrls(urls);
       setFrames(extracted);
       setFrameIdx(0);
 
@@ -174,8 +186,11 @@ export default function VideoAnnotationWorkstation() {
 
   // ── Cleanup bitmaps on unmount ─────────────────────────────────────────────
   useEffect(() => {
-    return () => { frames.forEach(f => f.bitmap.close()); };
-  }, [frames]);
+    return () => {
+      frames.forEach(f => f.bitmap.close());
+      frameUrls.forEach(u => URL.revokeObjectURL(u));
+    };
+  }, [frames, frameUrls]);
 
   // ── Render frame ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -535,11 +550,14 @@ export default function VideoAnnotationWorkstation() {
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
                   onMouseLeave={()=>{ dragStartRef.current=null; setDrawingBox(null); }}>
-                  <canvas ref={canvasRef}
-                    style={{ display:"block", maxWidth:"100%",
-                      maxHeight:"calc(100vh - 200px)",
-                      cursor:tool==="bbox"?"crosshair":"default",
-                      pointerEvents:"none" }} />
+                  {frameUrls[frameIdx] && (
+                    <img src={frameUrls[frameIdx]} alt={`frame-${frameIdx}`}
+                      style={{ display:"block", maxWidth:"100%",
+                        maxHeight:"calc(100vh - 200px)",
+                        cursor:tool==="bbox"?"crosshair":"default",
+                        pointerEvents:"none", userSelect:"none" }}
+                      draggable={false} />
+                  )}
                   {/* Annotation overlays */}
                   {currentFrame && annState.annotations
                     .filter(a => a.frame_index === frameIdx)
