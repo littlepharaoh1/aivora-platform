@@ -41,11 +41,8 @@ export async function runWhisperBrowser(
 ): Promise<WhisperResult> {
   const startMs = Date.now();
 
-  // Dynamic import — only loads in browser
-  const { pipeline, env } = await import(
-    // @ts-ignore
-    "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js"
-  );
+  // Direct package import
+  const { pipeline, env } = await import("@huggingface/transformers");
 
   // Use CDN — no local model files needed
   env.allowLocalModels  = false;
