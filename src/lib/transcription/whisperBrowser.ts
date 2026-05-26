@@ -1,7 +1,10 @@
 /**
- * whisperBrowser.ts — Web Speech API Implementation
- * Browser-native speech recognition — zero dependencies
- * Chrome/Edge: full support | Firefox: limited
+ * whisperBrowser.ts — Groq Whisper API Implementation
+ * Aivora Platform — Production ASR
+ *
+ * Uses Groq's Whisper large-v3 — fastest + most accurate
+ * Free tier: 28,800 audio seconds/day
+ * Arabic RTL: full support
  */
 
 import type { ASRModelId, ASRLanguage } from "./asrTypes";
@@ -20,10 +23,13 @@ export interface WhisperResult {
   duration_ms: number;
 }
 
-const LANG_MAP: Record<ASRLanguage, string> = {
-  auto: "ar-SA",
-  ar:   "ar-SA",
-  en:   "en-US",
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY ?? "";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/audio/transcriptions";
+
+const LANG_MAP: Record<ASRLanguage, string | null> = {
+  auto: null,
+  ar:   "ar",
+  en:   "en",
 };
 
 export async function runWhisperBrowser(
@@ -33,94 +39,73 @@ export async function runWhisperBrowser(
   onProgress?: (pct: number) => void,
 ): Promise<WhisperResult> {
   const startMs = Date.now();
-  onProgress?.(0.1);
 
-  // Check Web Speech API support
-  const SpeechRecognition =
-    (window as any).SpeechRecognition ||
-    (window as any).webkitSpeechRecognition;
-
-  if (!SpeechRecognition) {
-    // Fallback: return placeholder indicating browser limitation
+  if (!GROQ_API_KEY) {
+    console.error("[Groq] VITE_GROQ_API_KEY not set");
     return {
-      full_text:   "[Speech recognition not supported in this browser. Please use Chrome or Edge.]",
+      full_text:   "[Groq API key not configured]",
       segments:    [],
-      language:    language,
+      language,
       duration_ms: Date.now() - startMs,
     };
   }
 
-  // Convert AudioBuffer to WAV blob for playback
-  const wavBlob = audioBufferToWav(audioBuffer);
-  const audioUrl = URL.createObjectURL(wavBlob);
-  const audio = new Audio(audioUrl);
+  onProgress?.(0.1);
 
+  // Convert AudioBuffer → WAV blob
+  const wavBlob = audioBufferToWav(audioBuffer);
   onProgress?.(0.2);
 
-  return new Promise((resolve) => {
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = LANG_MAP[language] ?? "ar-SA";
-    recognition.maxAlternatives = 1;
+  // Build multipart form
+  const form = new FormData();
+  form.append("file", wavBlob, "audio.wav");
+  form.append("model", "whisper-large-v3");
+  form.append("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "segment");
 
-    const segments: WhisperSegment[] = [];
-    let fullText = "";
-    let startTime = 0;
+  const lang = LANG_MAP[language];
+  if (lang) form.append("language", lang);
 
-    recognition.onstart = () => {
-      startTime = Date.now();
-      onProgress?.(0.3);
-    };
+  onProgress?.(0.3);
 
-    recognition.onresult = (event: any) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          const text = result[0].transcript.trim();
-          const conf = result[0].confidence ?? 0.85;
-          const elapsed = (Date.now() - startTime) / 1000;
-          segments.push({ text, start: elapsed, end: elapsed + 1, confidence: conf });
-          fullText += (fullText ? " " : "") + text;
-        }
-      }
-      onProgress?.(0.6 + segments.length * 0.05);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error("[SpeechAPI] error:", event.error);
-      resolve({
-        full_text:   fullText || `[Recognition error: ${event.error}]`,
-        segments,
-        language,
-        duration_ms: Date.now() - startMs,
-      });
-    };
-
-    recognition.onend = () => {
-      onProgress?.(1.0);
-      URL.revokeObjectURL(audioUrl);
-      resolve({
-        full_text:   fullText || "[No speech detected]",
-        segments,
-        language,
-        duration_ms: Date.now() - startMs,
-      });
-    };
-
-    // Play audio and recognize simultaneously
-    audio.play().catch(() => {
-      // If autoplay blocked, try recognition directly on mic
-      recognition.start();
-    });
-    recognition.start();
-
-    // Stop after audio duration + buffer
-    const durationMs = (audioBuffer.duration * 1000) + 2000;
-    setTimeout(() => {
-      try { recognition.stop(); } catch(_) {}
-    }, durationMs);
+  // Call Groq API
+  const res = await fetch(GROQ_ENDPOINT, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
+    body: form,
   });
+
+  onProgress?.(0.9);
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("[Groq] API error:", err);
+    return {
+      full_text:   `[Groq API error: ${res.status}]`,
+      segments:    [],
+      language,
+      duration_ms: Date.now() - startMs,
+    };
+  }
+
+  const data = await res.json();
+  console.log("[Groq] response:", JSON.stringify(data).slice(0, 300));
+
+  onProgress?.(1.0);
+
+  const segments: WhisperSegment[] = (data.segments ?? []).map((s: any) => ({
+    text:       s.text?.trim() ?? "",
+    start:      s.start ?? 0,
+    end:        s.end ?? 0,
+    confidence: s.avg_logprob ? Math.exp(s.avg_logprob) : 0.9,
+  }));
+
+  return {
+    full_text:   (data.text ?? "").trim(),
+    segments,
+    language:    data.language ?? language,
+    duration_ms: Date.now() - startMs,
+  };
 }
 
 // ── AudioBuffer → WAV ─────────────────────────────────────────────────────────
@@ -136,24 +121,27 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
     for (let i = 0; i < str.length; i++)
       view.setUint8(offset + i, str.charCodeAt(i));
   }
-  writeStr(0, "RIFF");
-  view.setUint32(4, 36 + len * 2, true);
-  writeStr(8, "WAVE");
+
+  writeStr(0,  "RIFF");
+  view.setUint32(4,  36 + len * 2, true);
+  writeStr(8,  "WAVE");
   writeStr(12, "fmt ");
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
+  view.setUint16(20, 1,     true);
   view.setUint16(22, numCh, true);
-  view.setUint32(24, sr, true);
+  view.setUint32(24, sr,    true);
   view.setUint32(28, sr * numCh * 2, true);
   view.setUint16(32, numCh * 2, true);
-  view.setUint16(34, 16, true);
+  view.setUint16(34, 16,    true);
   writeStr(36, "data");
   view.setUint32(40, len * 2, true);
+
   let offset = 44;
   for (let i = 0; i < len; i++) {
     const s = Math.max(-1, Math.min(1, samples[i]));
     view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
     offset += 2;
   }
+
   return new Blob([wavBuf], { type: "audio/wav" });
 }
