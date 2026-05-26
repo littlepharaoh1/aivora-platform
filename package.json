@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
-    "@rollup/rollup-android-arm64": "^4.60.4",
     "@supabase/supabase-js": "^2.104.1",
     "esbuild": "^0.28.0",
     "lucide-react": "^0.468.0",
