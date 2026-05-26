@@ -102,31 +102,26 @@ export function useASRState() {
           correlation_id: corrId,
           execute: async () => {
             try {
-              // Inline the core ASR logic (model binary pending)
-              // When Whisper ONNX binary available → replace with runASR()
-              const { chunkAudio } = await import(
-                "../../lib/transcription/audioChunker"
+              // ── Groq Whisper large-v3 via whisperBrowser ──────────────────
+              const { runWhisperBrowser } = await import(
+                "../../lib/transcription/whisperBrowser"
               );
-              const { greedyArgmax, computeTokenConfidence, DECODER_GOVERNANCE }
-                = await import("../../lib/transcription/greedyDecoder");
-              const { postProcessToken, WHISPER_TOKENIZER_CONFIG, detectTextDirection }
-                = await import("../../lib/transcription/tokenizerGovernance");
+              const { WHISPER_TOKENIZER_CONFIG } = await import(
+                "../../lib/transcription/tokenizerGovernance"
+              );
 
-              const chunks = chunkAudio(audio16k);
-
-              // Build stub transcript (real inference when ONNX model loaded)
-              const segments = chunks.map((chunk, i) => ({
-                id:          i,
-                text:        "",  // populated by ONNX inference
-                tokens:      [],
-                start_sec:   chunk.start_sec,
-                end_sec:     chunk.end_sec,
-                language:    state.language === "auto" ? "en" as const : state.language,
-                is_rtl:      false,
-                chunk_index: chunk.index,
-              }));
+              const result = await runWhisperBrowser(
+                audioBuffer,
+                state.model_id,
+                state.language,
+                (pct) => setState(s => ({ ...s, progress: 0.2 + pct * 0.7 })),
+              );
 
               const now = new Date().toISOString();
+              const isRTL = state.language === "ar" ||
+                result.language === "ar" ||
+                result.language === "arabic";
+
               transcriptRef.current = {
                 id:                 corrId,
                 audio_file_id:      null,
@@ -138,11 +133,23 @@ export function useASRState() {
                 backend:            "cpu_worker",
                 decoder_strategy:   DECODER_STRATEGY,
                 inference_protocol: INFERENCE_PROTOCOL_VERSION,
-                language_detected:  state.language === "auto" ? "en" : state.language,
-                segments,
-                full_text:          segments.map(s => s.text).join(" ").trim(),
+                language_detected:  result.language as any,
+                segments:           result.segments.map((s, i) => ({
+                  id:          crypto.randomUUID(),
+                  segment_idx: i,
+                  text:        s.text,
+                  tokens:      [],
+                  start_sec:   s.start,
+                  end_sec:     s.end,
+                  duration_sec:s.end - s.start,
+                  language:    result.language as any,
+                  is_rtl:      isRTL,
+                  confidence:  s.confidence,
+                  checksum:    "",
+                } as any)),
+                full_text:          result.full_text,
                 duration_sec:       audioBuffer.duration,
-                chunk_count:        chunks.length,
+                chunk_count:        result.segments.length || 1,
                 generated_at:       now,
                 input_checksum:     null,
                 output_checksum:    null,
