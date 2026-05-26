@@ -29,6 +29,7 @@ import type {
   ASRInferenceRequest, ASRTranscript, ASRSegment,
   ASRToken, ASRBackend, AudioChunk,
 } from "./asrTypes";
+import { runWhisperBrowser } from "./whisperBrowser";
 import {
   INFERENCE_PROTOCOL_VERSION, SAMPLE_RATE, DECODER_STRATEGY,
 } from "./asrTypes";
@@ -84,6 +85,62 @@ export async function runASR(
   });
 
   try {
+    // ── Browser-native fallback via Transformers.js ──────────────────────────
+    // ONNX binaries not bundled — use HuggingFace CDN (cached after first load)
+    const audioCtx = new AudioContext({ sampleRate: req.sample_rate });
+    const audioBuffer = audioCtx.createBuffer(
+      1, req.audio.length, req.sample_rate
+    );
+    audioBuffer.getChannelData(0).set(req.audio);
+
+    const whisperResult = await runWhisperBrowser(
+      audioBuffer,
+      req.model_id,
+      req.language,
+      undefined,
+    );
+
+    const transcriptId2 = crypto.randomUUID();
+    const inputChecksum2 = await sha256Float32(req.audio);
+    const outputChecksum2 = await sha256Str(whisperResult.full_text);
+
+    const browserTranscript: ASRTranscript = {
+      id:                 transcriptId2,
+      audio_file_id:      req.audio_file_id ?? null,
+      correlation_id:     req.correlation_id,
+      model_id:           req.model_id,
+      model_checksum:     null,
+      tokenizer_version:  WHISPER_TOKENIZER_CONFIG.version,
+      quantization:       "fp32",
+      backend:            "cpu_worker",
+      decoder_strategy:   DECODER_STRATEGY,
+      inference_protocol: INFERENCE_PROTOCOL_VERSION,
+      language_detected:  whisperResult.language as any,
+      segments:           (whisperResult.segments.map((s, i) => ({
+        id:          crypto.randomUUID(),
+        segment_idx: i,
+        text:        s.text,
+        start_sec:   s.start,
+        end_sec:     s.end,
+        duration_sec:s.end - s.start,
+        language:    whisperResult.language,
+        is_rtl:      req.language === "ar",
+        tokens:      [],
+        confidence:  s.confidence,
+        checksum:    "",
+      })) as any[]) as ASRSegment[],
+      full_text:          whisperResult.full_text,
+      duration_sec:       req.audio.length / req.sample_rate,
+      chunk_count:        1,
+      generated_at:       new Date().toISOString(),
+      input_checksum:     inputChecksum2,
+      output_checksum:    outputChecksum2,
+    };
+
+    await persistTranscriptEvidence(browserTranscript, req.correlation_id);
+    return browserTranscript;
+
+    // ── Original ONNX path (kept for future binary support) ──────────────────
     // Resample to 16kHz if needed
     const audio16k = resampleTo16k(req.audio, req.sample_rate);
 
@@ -101,8 +158,8 @@ export async function runASR(
       const segment = await processChunk(
         chunk, req, backend, segmentId, req.correlation_id
       );
-      if(segment) {
-        allSegments.push(segment);
+      if(segment != null) {
+        allSegments.push(segment as ASRSegment);
         segmentId++;
       }
     }
