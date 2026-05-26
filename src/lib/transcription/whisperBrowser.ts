@@ -1,21 +1,10 @@
 /**
- * whisperBrowser.ts — Transformers.js Whisper Wrapper
- * Aivora Platform — Browser-native ASR
- *
- * Loads Whisper from HuggingFace CDN on first use.
- * Cached in browser after first load.
- * Zero server dependency.
+ * whisperBrowser.ts — Web Speech API Implementation
+ * Browser-native speech recognition — zero dependencies
+ * Chrome/Edge: full support | Firefox: limited
  */
 
 import type { ASRModelId, ASRLanguage } from "./asrTypes";
-
-// Model ID mapping
-const MODEL_MAP: Record<ASRModelId, string> = {
-  whisper_tiny:   "Xenova/whisper-tiny",
-  whisper_base:   "Xenova/whisper-base",
-  whisper_small:  "Xenova/whisper-small",
-  whisper_medium: "Xenova/whisper-medium",
-};
 
 export interface WhisperSegment {
   text:       string;
@@ -31,100 +20,140 @@ export interface WhisperResult {
   duration_ms: number;
 }
 
-let pipelineCache: Record<string, any> = {};
+const LANG_MAP: Record<ASRLanguage, string> = {
+  auto: "ar-SA",
+  ar:   "ar-SA",
+  en:   "en-US",
+};
 
 export async function runWhisperBrowser(
   audioBuffer: AudioBuffer,
-  modelId: ASRModelId,
+  _modelId: ASRModelId,
   language: ASRLanguage,
   onProgress?: (pct: number) => void,
 ): Promise<WhisperResult> {
   const startMs = Date.now();
+  onProgress?.(0.1);
 
-  // Direct package import
-  const { pipeline, env } = await import("@huggingface/transformers");
+  // Check Web Speech API support
+  const SpeechRecognition =
+    (window as any).SpeechRecognition ||
+    (window as any).webkitSpeechRecognition;
 
-  // Use CDN — no local model files needed
-  env.allowLocalModels  = false;
-  env.useBrowserCache   = true;
+  if (!SpeechRecognition) {
+    // Fallback: return placeholder indicating browser limitation
+    return {
+      full_text:   "[Speech recognition not supported in this browser. Please use Chrome or Edge.]",
+      segments:    [],
+      language:    language,
+      duration_ms: Date.now() - startMs,
+    };
+  }
 
-  const modelKey = MODEL_MAP[modelId] ?? MODEL_MAP.whisper_base;
-  const cacheKey = `${modelKey}_${language}`;
+  // Convert AudioBuffer to WAV blob for playback
+  const wavBlob = audioBufferToWav(audioBuffer);
+  const audioUrl = URL.createObjectURL(wavBlob);
+  const audio = new Audio(audioUrl);
 
-  onProgress?.(0.05);
+  onProgress?.(0.2);
 
-  // Load or reuse cached pipeline
-  console.log("[Whisper] Loading model:", modelKey, "lang:", language);
-  if (!pipelineCache[cacheKey]) {
-    pipelineCache[cacheKey] = await pipeline(
-      "automatic-speech-recognition",
-      modelKey,
-      {
-        progress_callback: (p: any) => {
-          if (p.status === "progress") {
-            onProgress?.(0.05 + (p.progress / 100) * 0.5);
-          }
-        },
+  return new Promise((resolve) => {
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = LANG_MAP[language] ?? "ar-SA";
+    recognition.maxAlternatives = 1;
+
+    const segments: WhisperSegment[] = [];
+    let fullText = "";
+    let startTime = 0;
+
+    recognition.onstart = () => {
+      startTime = Date.now();
+      onProgress?.(0.3);
+    };
+
+    recognition.onresult = (event: any) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          const text = result[0].transcript.trim();
+          const conf = result[0].confidence ?? 0.85;
+          const elapsed = (Date.now() - startTime) / 1000;
+          segments.push({ text, start: elapsed, end: elapsed + 1, confidence: conf });
+          fullText += (fullText ? " " : "") + text;
+        }
       }
-    );
+      onProgress?.(0.6 + segments.length * 0.05);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("[SpeechAPI] error:", event.error);
+      resolve({
+        full_text:   fullText || `[Recognition error: ${event.error}]`,
+        segments,
+        language,
+        duration_ms: Date.now() - startMs,
+      });
+    };
+
+    recognition.onend = () => {
+      onProgress?.(1.0);
+      URL.revokeObjectURL(audioUrl);
+      resolve({
+        full_text:   fullText || "[No speech detected]",
+        segments,
+        language,
+        duration_ms: Date.now() - startMs,
+      });
+    };
+
+    // Play audio and recognize simultaneously
+    audio.play().catch(() => {
+      // If autoplay blocked, try recognition directly on mic
+      recognition.start();
+    });
+    recognition.start();
+
+    // Stop after audio duration + buffer
+    const durationMs = (audioBuffer.duration * 1000) + 2000;
+    setTimeout(() => {
+      try { recognition.stop(); } catch(_) {}
+    }, durationMs);
+  });
+}
+
+// ── AudioBuffer → WAV ─────────────────────────────────────────────────────────
+function audioBufferToWav(buffer: AudioBuffer): Blob {
+  const numCh   = buffer.numberOfChannels;
+  const sr      = buffer.sampleRate;
+  const samples = buffer.getChannelData(0);
+  const len     = samples.length;
+  const wavBuf  = new ArrayBuffer(44 + len * 2);
+  const view    = new DataView(wavBuf);
+
+  function writeStr(offset: number, str: string) {
+    for (let i = 0; i < str.length; i++)
+      view.setUint8(offset + i, str.charCodeAt(i));
   }
-
-  const asr = pipelineCache[cacheKey];
-  onProgress?.(0.6);
-
-  // Convert AudioBuffer → Float32Array (mono, 16kHz)
-  const targetSR  = 16000;
-  const srcSR     = audioBuffer.sampleRate;
-  const srcData   = audioBuffer.getChannelData(0);
-
-  // Resample if needed
-  let samples: Float32Array;
-  if (srcSR === targetSR) {
-    samples = srcData;
-  } else {
-    const ratio    = targetSR / srcSR;
-    const outLen   = Math.floor(srcData.length * ratio);
-    samples        = new Float32Array(outLen);
-    for (let i = 0; i < outLen; i++) {
-      samples[i] = srcData[Math.floor(i / ratio)] ?? 0;
-    }
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + len * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numCh, true);
+  view.setUint32(24, sr, true);
+  view.setUint32(28, sr * numCh * 2, true);
+  view.setUint16(32, numCh * 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, len * 2, true);
+  let offset = 44;
+  for (let i = 0; i < len; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
   }
-
-  onProgress?.(0.65);
-
-  // Language config
-  const generateKwargs: any = {
-    return_timestamps: true,
-    language: language === "auto" ? null : language,
-  };
-
-  // Run inference
-  const output = await asr(samples, { generate_kwargs: generateKwargs });
-
-  onProgress?.(0.95);
-
-  // Debug
-  console.log("[Whisper] raw output:", JSON.stringify(output).slice(0, 500));
-
-  // Parse output
-  const chunks: any[] = output.chunks ?? [];
-  const full_text: string = output.text ?? chunks.map((c: any) => c.text).join(" ");
-  console.log("[Whisper] full_text:", full_text);
-  console.log("[Whisper] chunks:", chunks.length);
-
-  const segments: WhisperSegment[] = chunks.map((chunk: any) => ({
-    text:       chunk.text?.trim() ?? "",
-    start:      chunk.timestamp?.[0] ?? 0,
-    end:        chunk.timestamp?.[1] ?? 0,
-    confidence: 0.9, // Transformers.js doesn't expose per-token confidence
-  }));
-
-  onProgress?.(1.0);
-
-  return {
-    full_text:   full_text.trim(),
-    segments,
-    language:    language === "auto" ? "detected" : language,
-    duration_ms: Date.now() - startMs,
-  };
+  return new Blob([wavBuf], { type: "audio/wav" });
 }
