@@ -16,10 +16,24 @@ const MODELS: { value:ASRModelId; label:string; size:string }[] = [
   { value:"whisper_medium", label:"Whisper Medium", size:"769M" },
 ];
 
-const LANGUAGES: { value:ASRLanguage; label:string }[] = [
-  { value:"auto", label:"Auto-detect" },
-  { value:"ar",   label:"العربية (Arabic)" },
-  { value:"en",   label:"English" },
+const LANGUAGES: { value:string; label:string }[] = [
+  { value:"auto", label:"🔍 Auto-detect" },
+  { value:"ar",   label:"🇸🇦 العربية (Arabic)" },
+  { value:"en",   label:"🇺🇸 English" },
+  { value:"de",   label:"🇩🇪 Deutsch (German)" },
+  { value:"fr",   label:"🇫🇷 Français (French)" },
+  { value:"es",   label:"🇪🇸 Español (Spanish)" },
+  { value:"tr",   label:"🇹🇷 Türkçe (Turkish)" },
+  { value:"zh",   label:"🇨🇳 中文 (Chinese)" },
+  { value:"ru",   label:"🇷🇺 Русский (Russian)" },
+  { value:"it",   label:"🇮🇹 Italiano (Italian)" },
+  { value:"pt",   label:"🇧🇷 Português (Portuguese)" },
+  { value:"nl",   label:"🇳🇱 Nederlands (Dutch)" },
+  { value:"ja",   label:"🇯🇵 日本語 (Japanese)" },
+  { value:"ko",   label:"🇰🇷 한국어 (Korean)" },
+  { value:"fa",   label:"🇮🇷 فارسی (Persian)" },
+  { value:"ur",   label:"🇵🇰 اردو (Urdu)" },
+  { value:"hi",   label:"🇮🇳 हिन्दी (Hindi)" },
 ];
 
 function Section({ title, children, source }:
@@ -106,9 +120,13 @@ export default function SpeechIntelligenceWorkstation() {
   const fileInputRef  = useRef<HTMLInputElement>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [fileName,    setFileName]    = useState<string>("");
+  const [audioUrl,    setAudioUrl]    = useState<string>("");
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const handleFile = useCallback(async (file: File) => {
     try {
+      const url = URL.createObjectURL(file);
+      setAudioUrl(url);
       const ab  = await file.arrayBuffer();
       const ctx = new AudioContext();
       const buf = await ctx.decodeAudioData(ab);
@@ -116,6 +134,53 @@ export default function SpeechIntelligenceWorkstation() {
       setAudioBuffer(buf); setFileName(file.name);
     } catch(e) { console.error("Audio decode failed:", e); }
   }, []);
+
+  // Export helpers
+  const exportTXT = () => {
+    if(!state.transcript) return;
+    const blob = new Blob([state.transcript.full_text], { type:"text/plain" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = fileName.replace(/\.[^.]+$/, "") + "_transcript.txt"; a.click();
+  };
+
+  const exportJSONL = () => {
+    if(!state.transcript) return;
+    const lines = state.transcript.segments.map((s:any) => JSON.stringify({
+      text: s.text, start: s.start_sec, end: s.end_sec,
+      language: s.language, is_rtl: s.is_rtl,
+      model: state.transcript!.model_id,
+      generated_at: state.transcript!.generated_at,
+    }));
+    const blob = new Blob([lines.join("\n")], { type:"application/jsonl" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = fileName.replace(/\.[^.]+$/, "") + "_transcript.jsonl"; a.click();
+  };
+
+  const exportSRT = () => {
+    if(!state.transcript) return;
+    const toSRT = (sec: number) => {
+      const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60),
+            s = Math.floor(sec%60), ms = Math.floor((sec%1)*1000);
+      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")},${String(ms).padStart(3,"0")}`;
+    };
+    const lines = state.transcript.segments.map((s:any, i:number) =>
+      `${i+1}\n${toSRT(s.start_sec)} --> ${toSRT(s.end_sec)}\n${s.text}\n`
+    );
+    const blob = new Blob([lines.join("\n")], { type:"text/srt" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = fileName.replace(/\.[^.]+$/, "") + "_transcript.srt"; a.click();
+  };
+
+  const exportCSV = () => {
+    if(!state.transcript) return;
+    const rows = ["start_sec,end_sec,text,language,is_rtl,confidence",
+      ...state.transcript.segments.map((s:any) =>
+        `${s.start_sec},${s.end_sec},"${s.text.replace(/"/g,"")}",${s.language},${s.is_rtl},${s.confidence ?? ""}`
+      )];
+    const blob = new Blob([rows.join("\n")], { type:"text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = fileName.replace(/\.[^.]+$/, "") + "_transcript.csv"; a.click();
+  };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -209,6 +274,13 @@ export default function SpeechIntelligenceWorkstation() {
               <input ref={fileInputRef} type="file" accept="audio/*"
                 style={{ display:"none" }}
                 onChange={e => { const f=e.target.files?.[0]; if(f) handleFile(f); }} />
+              {audioUrl && (
+                <div style={{ marginTop:10 }}>
+                  <audio ref={audioRef} controls src={audioUrl}
+                    style={{ width:"100%", height:36,
+                      filter:"invert(1) hue-rotate(180deg)" }} />
+                </div>
+              )}
             </Section>
 
             <div style={{ display:"flex", gap:8 }}>
@@ -273,10 +345,12 @@ export default function SpeechIntelligenceWorkstation() {
               {state.transcript ? (
                 <div>
                   <div style={{ padding:12, background:"#111827", borderRadius:6,
-                    fontSize:14, lineHeight:1.8,
-                    direction: state.rtlTranscript?.primary_lang==="ar"?"rtl":"ltr",
+                    direction: (["ar","fa","ur"].includes(state.transcript.language_detected as string))?"rtl":"ltr",
+                    textAlign: (["ar","fa","ur"].includes(state.transcript.language_detected as string))?"right":"left" as const,
+                    fontFamily: "system-ui, sans-serif",
+                    fontSize: 15, letterSpacing: 0.3,
                     marginBottom:8 }}>
-                    {state.transcript.full_text || "(empty — model binary required)"}
+                    {state.transcript.full_text || "(No speech detected — try Auto-detect language)"}
                   </div>
                   {state.rtlTranscript && (
                     <div style={{ display:"flex", gap:12, fontSize:10,
@@ -297,6 +371,30 @@ export default function SpeechIntelligenceWorkstation() {
                 </div>
               )}
             </Section>
+
+            {state.transcript && state.transcript.full_text && (
+              <Section title="Export">
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                  {[
+                    { label:"TXT",   fn: exportTXT,   color:"#22d3ee" },
+                    { label:"JSONL", fn: exportJSONL, color:"#a855f7" },
+                    { label:"SRT",   fn: exportSRT,   color:"#f59e0b" },
+                    { label:"CSV",   fn: exportCSV,   color:"#22c55e" },
+                  ].map(({label, fn, color}) => (
+                    <button key={label} onClick={fn}
+                      style={{ padding:"8px 16px", borderRadius:6,
+                        border:`1px solid ${color}44`,
+                        background:`${color}11`, color,
+                        fontSize:11, fontWeight:700, cursor:"pointer",
+                        transition:"all 0.2s" }}
+                      onMouseOver={e=>(e.currentTarget.style.background=`${color}22`)}
+                      onMouseOut={e=>(e.currentTarget.style.background=`${color}11`)}>
+                      ⬇ {label}
+                    </button>
+                  ))}
+                </div>
+              </Section>
+            )}
 
             {state.qaReport && (
               <Section title="Speech QA" source="speechQA.ts">
