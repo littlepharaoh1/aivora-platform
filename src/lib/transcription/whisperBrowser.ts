@@ -54,6 +54,7 @@ export async function runWhisperBrowser(
   onProgress?.(0.05);
 
   // Load or reuse cached pipeline
+  console.log("[Whisper] Loading model:", modelKey, "lang:", language);
   if (!pipelineCache[cacheKey]) {
     pipelineCache[cacheKey] = await pipeline(
       "automatic-speech-recognition",
@@ -102,9 +103,14 @@ export async function runWhisperBrowser(
 
   onProgress?.(0.95);
 
+  // Debug
+  console.log("[Whisper] raw output:", JSON.stringify(output).slice(0, 500));
+
   // Parse output
   const chunks: any[] = output.chunks ?? [];
   const full_text: string = output.text ?? chunks.map((c: any) => c.text).join(" ");
+  console.log("[Whisper] full_text:", full_text);
+  console.log("[Whisper] chunks:", chunks.length);
 
   const segments: WhisperSegment[] = chunks.map((chunk: any) => ({
     text:       chunk.text?.trim() ?? "",
