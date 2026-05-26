@@ -59,12 +59,18 @@ export async function runWhisperBrowser(
   // Build multipart form
   const form = new FormData();
   form.append("file", wavBlob, "audio.wav");
-  form.append("model", "whisper-large-v3");
+  form.append("model", "whisper-large-v3-turbo");
   form.append("response_format", "verbose_json");
   form.append("timestamp_granularities[]", "segment");
+  form.append("temperature", "0");
 
   const lang = LANG_MAP[language];
   if (lang) form.append("language", lang);
+
+  // Prompt improves Arabic accuracy significantly
+  if (language === "ar" || language === "auto") {
+    form.append("prompt", "هذا تسجيل صوتي باللغة العربية. يرجى النسخ الحرفي الدقيق.");
+  }
 
   onProgress?.(0.3);
 
