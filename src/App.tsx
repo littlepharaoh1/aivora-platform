@@ -502,8 +502,7 @@ function AppContent(){
   },[tab]);
 
   // Landing page
-  window.location.replace('/showcase.html');
-  return null;
+  // Showcase handled in App root
 
   // Audition = full screen
 
@@ -609,6 +608,11 @@ function AppContent(){
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function App(){
+  // Show showcase before any auth check
+  if(window.location.pathname !== "/showcase.html") {
+    window.location.replace("/showcase.html");
+    return null;
+  }
   return(
     <AivoraProvider>
       <GlobalAudioProvider>
