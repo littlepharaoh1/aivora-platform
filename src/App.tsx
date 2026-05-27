@@ -502,7 +502,7 @@ function AppContent(){
   },[tab]);
 
   // Landing page
-  if(!sessionStorage.getItem('skip_showcase')) {
+  if(!localStorage.getItem('skip_showcase')) {
     window.location.replace('/showcase.html');
     return null;
   }

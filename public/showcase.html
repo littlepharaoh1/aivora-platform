@@ -381,7 +381,7 @@ switchTab('audio');
 
 ['enter-btn','nav-enter'].forEach(id=>{
   const el=document.getElementById(id);
-  if(el)el.onclick=()=>{sessionStorage.setItem('skip_showcase','1');window.location.href='/';};
+  if(el)el.onclick=()=>{localStorage.setItem('skip_showcase','1');window.location.href='/';};
 });
 </script>
 </body>
