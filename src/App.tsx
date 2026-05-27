@@ -502,10 +502,8 @@ function AppContent(){
   },[tab]);
 
   // Landing page
-  if(!localStorage.getItem('skip_showcase')) {
-    window.location.replace('/showcase.html');
-    return null;
-  }
+  window.location.replace('/showcase.html');
+  return null;
 
   // Audition = full screen
 
