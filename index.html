@@ -36,8 +36,11 @@
     </script>
     <div id="root"></div>
     <script>
-      // Show showcase on every visit before React loads
-      if(window.location.pathname === "/" || window.location.pathname === "/index.html") {
+      // Show showcase unless coming from Enter Platform button
+      const params = new URLSearchParams(window.location.search);
+      const skip = localStorage.getItem('skip_showcase') === '1' && params.get('enter') === '1';
+      if(!skip && (window.location.pathname === "/" || window.location.pathname === "/index.html")) {
+        localStorage.removeItem('skip_showcase');
         window.location.replace("/showcase.html");
       }
     </script>
