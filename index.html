@@ -36,12 +36,11 @@
     </script>
     <div id="root"></div>
     <script>
-      // Never redirect if OAuth token present in URL
-      const hasOAuth = window.location.hash.includes("access_token") ||
-                       window.location.hash.includes("refresh_token") ||
-                       window.location.search.includes("code=");
-      const params = new URLSearchParams(window.location.search);
-      const enterFlag = params.get('enter') === '1' || params.get('platform') === '1';
+      var hasOAuth = window.location.hash.includes("access_token") ||
+                    window.location.hash.includes("refresh_token") ||
+                    window.location.search.includes("code=");
+      var params = new URLSearchParams(window.location.search);
+      var enterFlag = params.get('enter') === '1' || params.get('platform') === '1';
       if(!hasOAuth && !enterFlag && window.location.pathname === "/") {
         window.location.replace("/showcase.html");
       }
