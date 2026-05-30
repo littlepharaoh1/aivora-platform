@@ -10,9 +10,9 @@ import {
   rebuildFullText,
   searchSegments,
   replaceInSegments,
-} from "../transcriptWorkstationService";
-import type { ASRTranscript } from "../asrTypes";
-import type { WorkstationSegment } from "../transcriptWorkstationTypes";
+} from "../src/lib/transcription/transcriptWorkstationService";
+import type { ASRTranscript } from "../src/lib/transcription/asrTypes";
+import type { WorkstationSegment } from "../src/lib/transcription/transcriptWorkstationTypes";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -302,7 +302,10 @@ describe("replaceInSegments", () => {
     const ws = fromASRTranscript(mockASR);
     const { segments, count } = replaceInSegments(ws.segments, "مرحبا", "أهلا");
     expect(count).toBeGreaterThan(0);
-    const hasReplaced = segments.some(s => s.words.some(w => w.text.includes("أهلا")));
+    // Replace lands in words if word-level data exists, else in seg.text (fallback)
+    const hasReplaced = segments.some(s =>
+      s.text.includes("أهلا") || s.words.some(w => w.text.includes("أهلا"))
+    );
     expect(hasReplaced).toBe(true);
   });
 

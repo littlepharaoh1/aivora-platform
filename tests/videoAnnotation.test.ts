@@ -210,13 +210,16 @@ describe("interpolateTrack", () => {
 
   it("does not overwrite manual keyframes", () => {
     let { state, trackId } = withTrack();
+    // Note: x must satisfy x + width <= 1 to survive normalizeBBoxV clamping.
     state = addKeyframe(state, trackId, 0,  { x:0.0, y:0.0, width:0.2, height:0.2 });
-    state = addKeyframe(state, trackId, 5,  { x:0.9, y:0.0, width:0.2, height:0.2 });
+    state = addKeyframe(state, trackId, 5,  { x:0.7, y:0.0, width:0.2, height:0.2 });
     state = addKeyframe(state, trackId, 10, { x:0.5, y:0.5, width:0.2, height:0.2 });
     state = interpolateTrack(state, trackId);
     const manual5 = state.keyframes.find(k=>k.frame_index===5 && !k.is_interpolated);
     expect(manual5).toBeDefined();
-    expect(manual5!.bbox.x).toBeCloseTo(0.9);
+    // 0.7 is preserved exactly — proves interpolation did not overwrite it
+    // (linear interpolation between 0.0 and 0.5 at frame 5 would give ~0.25)
+    expect(manual5!.bbox.x).toBeCloseTo(0.7);
   });
 });
 

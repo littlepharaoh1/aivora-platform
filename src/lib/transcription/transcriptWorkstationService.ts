@@ -300,11 +300,16 @@ export function searchSegments(
   const q = query.toLowerCase();
   const results: { segment_idx: number; word_idx: number; match_text: string }[] = [];
   segments.forEach((seg, si) => {
-    seg.words.forEach((w, wi) => {
-      if(w.text.toLowerCase().includes(q)) {
-        results.push({ segment_idx: si, word_idx: wi, match_text: w.text });
-      }
-    });
+    if(seg.words.length > 0) {
+      seg.words.forEach((w, wi) => {
+        if(w.text.toLowerCase().includes(q)) {
+          results.push({ segment_idx: si, word_idx: wi, match_text: w.text });
+        }
+      });
+    } else if(seg.text.toLowerCase().includes(q)) {
+      // Fallback: segment-level match when no word-level data
+      results.push({ segment_idx: si, word_idx: -1, match_text: seg.text });
+    }
   });
   return results;
 }
@@ -319,6 +324,13 @@ export function replaceInSegments(
   const now = new Date().toISOString();
   let count = 0;
   const updated = segments.map(seg => {
+    if(seg.words.length === 0) {
+      // Fallback: replace directly in seg.text when no word-level data
+      if(!seg.text.toLowerCase().includes(find.toLowerCase())) return seg;
+      count++;
+      const newText = seg.text.replace(new RegExp(find, "gi"), replace);
+      return { ...seg, text: newText, is_edited: true, updated_at: now };
+    }
     const words = seg.words.map(w => {
       if(!w.text.toLowerCase().includes(find.toLowerCase())) return w;
       count++;

@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.2.0",
     "@supabase/supabase-js": "^2.104.1",
     "esbuild": "^0.28.0",
     "lucide-react": "^0.468.0",
@@ -22,8 +23,10 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "@webgpu/types": "^0.1.70",
+    "jsdom": "^29.1.1",
     "prettier": "^3.8.3",
     "typescript": "^5.6.3",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "vitest": "^4.1.7"
   }
 }
