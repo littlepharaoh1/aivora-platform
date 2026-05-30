@@ -67,7 +67,7 @@ const DatasetFactoryWorkstation     = React.lazy(() => import("./dataset-ui/Data
 const QAIntelligenceWorkstation     = React.lazy(() => import("./qa-ui/QAIntelligenceWorkstation"));
 const MultimodalWorkstation         = React.lazy(() => import("./multimodal-ui/MultimodalWorkstation"));
 const AIOperationsCenter            = React.lazy(() => import("./os-ui/AIOperationsCenter"));
-const ImageAnnotationWorkstation    = React.lazy(() => import("./annotation/ImageAnnotationWorkstation"));
+const ImageAnnotationWorkstation    = React.lazy(() => import("./annotation/EnterpriseImageAnnotation"));
 const VideoAnnotationWorkstation    = React.lazy(() => import("./annotation/VideoAnnotationWorkstation"));
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
