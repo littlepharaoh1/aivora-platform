@@ -68,7 +68,7 @@ const QAIntelligenceWorkstation     = React.lazy(() => import("./qa-ui/QAIntelli
 const MultimodalWorkstation         = React.lazy(() => import("./multimodal-ui/MultimodalWorkstation"));
 const AIOperationsCenter            = React.lazy(() => import("./os-ui/AIOperationsCenter"));
 const ImageAnnotationWorkstation    = React.lazy(() => import("./annotation/EnterpriseImageAnnotation"));
-const VideoAnnotationWorkstation    = React.lazy(() => import("./annotation/VideoAnnotationWorkstation"));
+const VideoAnnotationWorkstation    = React.lazy(() => import("./annotation/EnterpriseVideoAnnotation"));
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
 
