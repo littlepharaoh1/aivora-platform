@@ -608,11 +608,7 @@ function AppContent(){
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function App(){
-  // Show showcase before any auth check
-  if(window.location.pathname !== "/showcase.html") {
-    window.location.replace("/showcase.html");
-    return null;
-  }
+  // Showcase redirect handled in index.html only
   return(
     <AivoraProvider>
       <GlobalAudioProvider>
