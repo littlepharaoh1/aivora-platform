@@ -41,7 +41,7 @@
                        window.location.hash.includes("refresh_token") ||
                        window.location.search.includes("code=");
       const params = new URLSearchParams(window.location.search);
-      const enterFlag = params.get('enter') === '1';
+      const enterFlag = params.get('enter') === '1' || params.get('platform') === '1';
       if(!hasOAuth && !enterFlag && window.location.pathname === "/") {
         window.location.replace("/showcase.html");
       }
