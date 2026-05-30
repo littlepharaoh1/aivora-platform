@@ -36,11 +36,13 @@
     </script>
     <div id="root"></div>
     <script>
-      // Show showcase unless coming from Enter Platform button
+      // Never redirect if OAuth token present in URL
+      const hasOAuth = window.location.hash.includes("access_token") ||
+                       window.location.hash.includes("refresh_token") ||
+                       window.location.search.includes("code=");
       const params = new URLSearchParams(window.location.search);
-      const skip = localStorage.getItem('skip_showcase') === '1' && params.get('enter') === '1';
-      if(!skip && (window.location.pathname === "/" || window.location.pathname === "/index.html")) {
-        localStorage.removeItem('skip_showcase');
+      const enterFlag = params.get('enter') === '1';
+      if(!hasOAuth && !enterFlag && window.location.pathname === "/") {
         window.location.replace("/showcase.html");
       }
     </script>
