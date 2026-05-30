@@ -37,7 +37,7 @@ const QA_COLORS: Record<QAFlag, string> = {
 const SegmentRow = memo(function SegmentRow({
   segment, speaker, isSelected, playhead,
   onSelect, onEditWord, onEditText, onAssignSpeaker,
-  onSetFlag, onMerge, onSplit, onDelete, speakers,
+  onSetFlag, onMerge, onSplit, onDelete, onWordClick, speakers,
 }: {
   segment:        WorkstationSegment;
   speaker:        Speaker | undefined;
@@ -51,6 +51,7 @@ const SegmentRow = memo(function SegmentRow({
   onMerge:        (segId: string) => void;
   onSplit:        (segId: string, wordIdx: number) => void;
   onDelete:       (segId: string) => void;
+  onWordClick:    (startSec: number) => void;
   speakers:       Speaker[];
 }) {
   const [editing, setEditing]         = useState(false);
@@ -199,21 +200,66 @@ const SegmentRow = memo(function SegmentRow({
           }}
         />
       ) : (
-        <div
-          onDoubleClick={startEdit}
-          style={{
-            fontSize:14, lineHeight:1.75,
-            direction: segment.is_rtl ? "rtl" : "ltr",
-            textAlign: segment.is_rtl ? "right" : "left",
-            fontFamily: segment.is_rtl ? "system-ui, sans-serif" : "inherit",
-            background: CONF_COLOR(segment.confidence),
-            borderRadius:4, padding:"2px 0",
-            letterSpacing: segment.is_rtl ? 0.3 : 0,
-            userSelect:"text",
-          }}
-        >
-          {segment.text || <span style={{ color:"#4b5563", fontStyle:"italic" }}>(empty)</span>}
-        </div>
+        <>{/* Word-level display — click to jump, highlight on playhead */}
+        {segment.words && segment.words.length > 0 ? (
+          <div
+            onDoubleClick={startEdit}
+            style={{
+              fontSize:14, lineHeight:2,
+              direction: segment.is_rtl ? "rtl" : "ltr",
+              textAlign: segment.is_rtl ? "right" : "left",
+              fontFamily: segment.is_rtl ? "system-ui, sans-serif" : "inherit",
+              letterSpacing: segment.is_rtl ? 0.3 : 0,
+              userSelect:"text",
+              display:"flex", flexWrap:"wrap", gap:2,
+            }}
+          >
+            {segment.words.map((w, wi) => {
+              const isActive = playhead >= (w.start_sec ?? w.word_start_sec ?? 0) &&
+                               playhead <  (w.end_sec   ?? w.word_end_sec   ?? 0);
+              const conf = w.confidence ?? 1;
+              return (
+                <span
+                  key={wi}
+                  onClick={e => { e.stopPropagation(); onWordClick(w.start_sec ?? w.word_start_sec ?? 0); }}
+                  title={`${(conf*100).toFixed(0)}% · ${(w.start_sec ?? 0).toFixed(3)}s → ${(w.end_sec ?? 0).toFixed(3)}s`}
+                  style={{
+                    cursor:"pointer",
+                    borderRadius:3,
+                    padding:"1px 3px",
+                    background: isActive
+                      ? "rgba(34,211,238,0.25)"
+                      : conf >= 0.9 ? "transparent"
+                      : conf >= 0.7 ? "rgba(251,191,36,0.12)"
+                      : "rgba(239,68,68,0.15)",
+                    color: isActive ? "#22d3ee" : "#e5e7eb",
+                    borderBottom: isActive ? "2px solid #22d3ee" : "2px solid transparent",
+                    fontSize: 14,
+                    transition:"all 0.15s",
+                  }}
+                >
+                  {w.word ?? w.text}
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            onDoubleClick={startEdit}
+            style={{
+              fontSize:14, lineHeight:1.75,
+              direction: segment.is_rtl ? "rtl" : "ltr",
+              textAlign: segment.is_rtl ? "right" : "left",
+              fontFamily: segment.is_rtl ? "system-ui, sans-serif" : "inherit",
+              background: CONF_COLOR(segment.confidence),
+              borderRadius:4, padding:"2px 0",
+              letterSpacing: segment.is_rtl ? 0.3 : 0,
+              userSelect:"text",
+            }}
+          >
+            {segment.text || <span style={{ color:"#4b5563", fontStyle:"italic" }}>(empty)</span>}
+          </div>
+        )}</>
       )}
     </div>
   );
@@ -489,6 +535,13 @@ export default function TranscriptWorkstationPro({
                     }}
                     onSplit={(segId, wordIdx) =>
                       editor.applyEdit({ type:"SPLIT_SEGMENT", segment_id:segId, split_word_idx:wordIdx })}
+                    onWordClick={(startSec) => {
+                      if(audioRef.current) {
+                        audioRef.current.currentTime = startSec;
+                        audioRef.current.play().catch(()=>{});
+                        editor.setPlayhead(startSec);
+                      }
+                    }}
                     onDelete={segId =>
                       editor.applyEdit({ type:"DELETE_SEGMENT", segment_id:segId, snapshot:seg })}
                   />

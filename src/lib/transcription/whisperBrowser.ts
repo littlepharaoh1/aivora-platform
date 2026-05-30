@@ -9,11 +9,19 @@
 
 import type { ASRModelId, ASRLanguage } from "./asrTypes";
 
+export interface WhisperWord {
+  word:       string;
+  start:      number;
+  end:        number;
+  confidence: number;
+}
+
 export interface WhisperSegment {
   text:       string;
   start:      number;
   end:        number;
   confidence: number;
+  words:      WhisperWord[];
 }
 
 export interface WhisperResult {
@@ -62,12 +70,13 @@ export async function runWhisperBrowser(
   form.append("model", "whisper-large-v3-turbo");
   form.append("response_format", "verbose_json");
   form.append("timestamp_granularities[]", "segment");
+  form.append("timestamp_granularities[]", "word");
   form.append("temperature", "0");
 
   const lang = LANG_MAP[language];
   if (lang) form.append("language", lang);
 
-  // Prompt improves Arabic accuracy significantly
+  // Prompt improves accuracy for Arabic and other RTL languages
   if (language === "ar" || language === "auto") {
     form.append("prompt", "هذا تسجيل صوتي باللغة العربية. يرجى النسخ الحرفي الدقيق.");
   }

@@ -19,10 +19,14 @@ export interface Speaker {
 // ── Word (extends ASRToken with editing) ──────────────────────────────────────
 
 export interface WorkstationWord extends ASRToken {
-  speaker_id:   string;
-  is_edited:    boolean;
-  original_text:string;
-  qa_flag:      QAFlag | null;
+  speaker_id:    string;
+  is_edited:     boolean;
+  original_text: string;
+  qa_flag:       QAFlag | null;
+  // Word-level fields from Groq
+  word:          string;       // actual word text (may differ from token text)
+  start_sec:     number;       // word start time
+  end_sec:       number;       // word end time
 }
 
 // ── QA Flags ─────────────────────────────────────────────────────────────────

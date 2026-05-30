@@ -44,6 +44,10 @@ export interface ASRToken {
   end_sec:      number;
   confidence:   number;    // 0→1 (from logit, not stochastic)
   is_rtl:       boolean;
+  // Word-level timestamp fields (populated by Groq Whisper)
+  word_start_sec?: number;
+  word_end_sec?:   number;
+  word_text?:      string;
 }
 
 // ── Segment ───────────────────────────────────────────────────────────────────
