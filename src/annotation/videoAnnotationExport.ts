@@ -11,6 +11,7 @@ import type {
   VideoAnnotationState, VideoExportFormat,
 } from "./videoAnnotationTypes";
 import { emitEvent } from "../lib/telemetry/emitter";
+import { supabase } from "../lib/supabase";
 
 // ── SHA-256 ───────────────────────────────────────────────────────────────────
 
@@ -250,4 +251,24 @@ export async function exportVideoAnnotations(
       checksum,
     },
   });
+
+  // Register the export as a pipeline_run so the Dataset Factory can see and
+  // include it in a dataset version. Best-effort: export already succeeded.
+  try {
+    const now = new Date().toISOString();
+    await supabase.from("pipeline_runs").insert({
+      pipeline_name:    `video_annotation_export_${format}`,
+      pipeline_version: state.version,
+      project_name:     state.filename.replace(/\.[^.]+$/, ""),
+      status:           "completed",
+      started_at:       now,
+      completed_at:     now,
+      files_processed:  state.keyframes.length,
+      files_rejected:   0,
+      input_checksum:   null,
+      output_checksum:  checksum,
+    });
+  } catch {
+    // Offline or no-auth — export file already downloaded; run registration is optional
+  }
 }
