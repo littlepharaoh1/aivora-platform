@@ -36,24 +36,8 @@
     </script>
     <div id="root"></div>
     <script>
-      var hasOAuth = window.location.hash.includes("access_token") ||
-                    window.location.hash.includes("refresh_token") ||
-                    window.location.search.includes("code=");
-      var params = new URLSearchParams(window.location.search);
-      var enterFlag = params.get('enter') === '1' || params.get('platform') === '1';
-      // Check if user has a Supabase session in localStorage
-      var hasSession = false;
-      try {
-        var keys = Object.keys(localStorage);
-        for(var i=0;i<keys.length;i++){
-          if(keys[i].includes('supabase') || keys[i].includes('sb-')){
-            var val = localStorage.getItem(keys[i]);
-            if(val && val.includes('access_token')){ hasSession=true; break; }
-          }
-        }
-      } catch(e){}
-      if(!hasOAuth && !enterFlag && !hasSession && window.location.pathname === "/") {
-        window.location.replace("/showcase.html");
+      if(!localStorage.getItem('aivora_entered') && window.location.pathname === '/') {
+        window.location.replace('/showcase.html');
       }
     </script>
     <script type="module" src="/src/main.tsx"></script>
