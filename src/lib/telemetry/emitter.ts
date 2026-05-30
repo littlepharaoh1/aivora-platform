@@ -56,7 +56,8 @@ export type EventSource =
   | "offline_queue"
   | "audio_context"
   | "admin_panel"
-  | "forensic_worker";
+  | "forensic_worker"
+  | "transcript_workstation";
 
 export type Severity = "debug" | "info" | "warn" | "error" | "critical";
 

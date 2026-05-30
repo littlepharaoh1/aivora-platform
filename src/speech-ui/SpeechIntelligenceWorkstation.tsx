@@ -8,6 +8,7 @@ import { useASRState } from "./hooks/useASRState";
 import type { ASRModelId, ASRLanguage } from "../lib/transcription/asrTypes";
 import { DECODER_GOVERNANCE } from "../lib/transcription/greedyDecoder";
 import { WHISPER_TOKENIZER_CONFIG } from "../lib/transcription/tokenizerGovernance";
+import TranscriptWorkstationPro from "./TranscriptWorkstationPro";
 
 const MODELS: { value:ASRModelId; label:string; size:string }[] = [
   { value:"whisper_tiny",   label:"Whisper Tiny",   size:"39M"  },
@@ -163,6 +164,7 @@ export default function SpeechIntelligenceWorkstation() {
   const [fileName,    setFileName]    = useState<string>("");
   const [audioUrl,    setAudioUrl]    = useState<string>("");
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [showWS, setShowWS] = React.useState(false);
 
   const handleFile = useCallback(async (file: File) => {
     try {
@@ -231,7 +233,7 @@ export default function SpeechIntelligenceWorkstation() {
 
   const isRunning = ["loading","chunking","inferring","aligning"].includes(state.status);
 
-  return (
+  return (<>
     <div style={{ background:"#080c14", minHeight:"100%", color:"#e5e7eb",
       fontFamily:"'JetBrains Mono', monospace" }}>
 
@@ -413,6 +415,11 @@ export default function SpeechIntelligenceWorkstation() {
               )}
             </Section>
 
+            {state.transcript && (
+              <div style={{padding:'4px 0 8px'}}>
+                <button onClick={()=>setShowWS(true)} style={{width:'100%',padding:'10px',borderRadius:8,cursor:'pointer',background:'#0d1117',border:'1px solid #22d3ee55',color:'#22d3ee',fontSize:11,fontWeight:700,letterSpacing:1}}>⚡ OPEN TRANSCRIPT WORKSTATION PRO</button>
+              </div>
+            )}
             {state.transcript && state.transcript.full_text && (
               <Section title="Export">
                 <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -484,5 +491,14 @@ export default function SpeechIntelligenceWorkstation() {
         </div>
       </div>
     </div>
-  );
+    {showWS && state.transcript && (
+      <div style={{position:'fixed',inset:0,zIndex:500,background:'#080c14'}}>
+        <TranscriptWorkstationPro
+          asrTranscript={state.transcript as any}
+          audioUrl={audioUrl}
+          onClose={() => setShowWS(false)}
+        />
+      </div>
+    )}
+  </>);
 }
