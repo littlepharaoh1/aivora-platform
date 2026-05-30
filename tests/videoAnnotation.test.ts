@@ -331,3 +331,136 @@ describe("computeVideoStats", () => {
     expect(stats.mean_confidence).toBe(0);
   });
 });
+
+// ── Windowing ─────────────────────────────────────────────────────────────────
+
+import {
+  getWindowBounds, windowToAbsolute, frameToWindow,
+  goToWindow, applyWindowFramesMeta,
+} from "../src/annotation/videoAnnotationState";
+
+function longVideoState() {
+  // 2 hours @ 2fps = 14,400 frames → 120 windows of 120 frames
+  return createVideoState({
+    video_id:"long-001", filename:"long.mp4",
+    duration_s:7200, fps:2, width:1920, height:1080, total_frames:14400,
+  });
+}
+
+describe("window_count calculation", () => {
+  it("computes correct window count for 2h video", () => {
+    const s = longVideoState();
+    expect(s.window_count).toBe(120); // 14400 / 120
+    expect(s.window_size).toBe(120);
+    expect(s.current_window).toBe(0);
+  });
+
+  it("rounds up partial final window", () => {
+    const s = createVideoState({
+      video_id:"x", filename:"x.mp4", duration_s:65, fps:2,
+      width:100, height:100, total_frames:130, // 130/120 = 1.08 → 2 windows
+    });
+    expect(s.window_count).toBe(2);
+  });
+
+  it("minimum 1 window even for tiny video", () => {
+    const s = createVideoState({
+      video_id:"x", filename:"x.mp4", duration_s:5, fps:2,
+      width:100, height:100, total_frames:10,
+    });
+    expect(s.window_count).toBe(1);
+  });
+});
+
+describe("getWindowBounds", () => {
+  it("window 0 starts at frame 0", () => {
+    const b = getWindowBounds(longVideoState(), 0);
+    expect(b.start_frame).toBe(0);
+    expect(b.end_frame).toBe(120);
+    expect(b.start_s).toBe(0);
+    expect(b.end_s).toBe(60); // 120 frames / 2fps
+  });
+
+  it("window 1 starts at frame 120", () => {
+    const b = getWindowBounds(longVideoState(), 1);
+    expect(b.start_frame).toBe(120);
+    expect(b.end_frame).toBe(240);
+    expect(b.start_s).toBe(60);
+    expect(b.end_s).toBe(120);
+  });
+
+  it("last window clamps end_frame to total_frames", () => {
+    const s = createVideoState({
+      video_id:"x", filename:"x.mp4", duration_s:65, fps:2,
+      width:100, height:100, total_frames:130,
+    });
+    const b = getWindowBounds(s, 1); // window 1: 120..130
+    expect(b.start_frame).toBe(120);
+    expect(b.end_frame).toBe(130); // clamped, not 240
+  });
+
+  it("clamps out-of-range window index", () => {
+    const s = longVideoState();
+    expect(getWindowBounds(s, 999).window).toBe(119);
+    expect(getWindowBounds(s, -5).window).toBe(0);
+  });
+});
+
+describe("windowToAbsolute", () => {
+  it("converts relative index to absolute", () => {
+    const s = longVideoState();
+    expect(windowToAbsolute(s, 0, 0)).toBe(0);
+    expect(windowToAbsolute(s, 0, 50)).toBe(50);
+    expect(windowToAbsolute(s, 1, 0)).toBe(120);
+    expect(windowToAbsolute(s, 3, 45)).toBe(3*120 + 45);
+  });
+});
+
+describe("frameToWindow", () => {
+  it("maps absolute frame to its window", () => {
+    const s = longVideoState();
+    expect(frameToWindow(s, 0)).toBe(0);
+    expect(frameToWindow(s, 119)).toBe(0);
+    expect(frameToWindow(s, 120)).toBe(1);
+    expect(frameToWindow(s, 5000)).toBe(Math.floor(5000/120));
+  });
+});
+
+describe("goToWindow", () => {
+  it("switches window and resets current_frame to window start", () => {
+    let s = longVideoState();
+    s = goToWindow(s, 2);
+    expect(s.current_window).toBe(2);
+    expect(s.current_frame).toBe(240);
+  });
+
+  it("clamps to valid range", () => {
+    let s = longVideoState();
+    expect(goToWindow(s, 999).current_window).toBe(119);
+    expect(goToWindow(s, -1).current_window).toBe(0);
+  });
+
+  it("preserves tracks and keyframes across window switch", () => {
+    let s = longVideoState();
+    s = createTrack(s, "car", 1);
+    const tid = s.tracks[0].id;
+    s = addKeyframe(s, tid, 5, { x:0.1, y:0.1, width:0.2, height:0.2 });
+    s = goToWindow(s, 5);
+    expect(s.tracks).toHaveLength(1);
+    expect(s.keyframes).toHaveLength(1);
+  });
+});
+
+describe("applyWindowFramesMeta", () => {
+  it("converts relative frame indices to absolute", () => {
+    const s = longVideoState();
+    const relMeta = [
+      { index:0, timestamp_s:60.0, width:1920, height:1080, checksum:"a" },
+      { index:1, timestamp_s:60.5, width:1920, height:1080, checksum:"b" },
+    ];
+    const result = applyWindowFramesMeta(s, 1, relMeta);
+    expect(result.frames_meta[0].index).toBe(120); // window 1 start + 0
+    expect(result.frames_meta[1].index).toBe(121);
+    expect(result.frames_meta[0].timestamp_s).toBe(60.0); // timestamp stays absolute
+  });
+});

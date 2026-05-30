@@ -112,6 +112,10 @@ export interface VideoAnnotationState {
 
   // Editor state
   current_frame:    number;
+  // Windowing — supports long videos (up to 2h) without full video in RAM
+  current_window:   number;   // which 120-frame window is loaded
+  window_size:      number;   // frames per window (= MAX_ACTIVE_FRAMES)
+  window_count:     number;   // total windows across the whole video
   selected_track_id:string | null;
   selected_kf_id:   string | null;
   active_tool:      VideoTool;

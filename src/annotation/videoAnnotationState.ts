@@ -44,6 +44,9 @@ export function createVideoState(params: {
     shots:             [],
     frames_meta:       [],
     current_frame:     0,
+    current_window:    0,
+    window_size:       VIDEO_ANNOTATION_LIMITS.MAX_FRAMES,
+    window_count:      Math.max(1, Math.ceil(params.total_frames / VIDEO_ANNOTATION_LIMITS.MAX_FRAMES)),
     selected_track_id: null,
     selected_kf_id:    null,
     active_tool:       "bbox",
@@ -407,4 +410,84 @@ export function computeVideoStats(state: VideoAnnotationState): VideoAnnotationS
     frames_annotated: frames,
     mean_confidence:  kfs.length > 0 ? confSum / kfs.length : 0,
   };
+}
+
+// ── Windowing (long-video support) ────────────────────────────────────────────
+// frame_index is ALWAYS absolute across the whole video.
+// extractFrames returns relative indices (0-based per window) — callers must
+// convert via windowToAbsolute() before storing keyframes.
+
+export interface WindowBounds {
+  window:       number;
+  start_frame:  number;   // absolute, inclusive
+  end_frame:    number;   // absolute, exclusive
+  start_s:      number;   // for extractFrames config
+  end_s:        number;
+}
+
+// Compute the absolute frame + time bounds for a given window index.
+export function getWindowBounds(
+  state:  VideoAnnotationState,
+  window: number,
+): WindowBounds {
+  const w           = Math.max(0, Math.min(state.window_count - 1, window));
+  const start_frame = w * state.window_size;
+  const end_frame   = Math.min(start_frame + state.window_size, state.total_frames);
+  const fps         = state.fps || 25;
+  return {
+    window:      w,
+    start_frame,
+    end_frame,
+    start_s:     start_frame / fps,
+    end_s:       end_frame   / fps,
+  };
+}
+
+// Convert a relative (per-window) frame index to absolute.
+export function windowToAbsolute(
+  state:         VideoAnnotationState,
+  window:        number,
+  relativeIndex: number,
+): number {
+  return window * state.window_size + relativeIndex;
+}
+
+// Which window does an absolute frame belong to?
+export function frameToWindow(
+  state:       VideoAnnotationState,
+  absoluteIdx: number,
+): number {
+  return Math.floor(absoluteIdx / state.window_size);
+}
+
+// Switch the active window. Clamps to valid range. Resets current_frame to the
+// first frame of the new window. Does NOT touch tracks/keyframes (they persist).
+export function goToWindow(
+  state:  VideoAnnotationState,
+  window: number,
+): VideoAnnotationState {
+  const w = Math.max(0, Math.min(state.window_count - 1, window));
+  const bounds = getWindowBounds(state, w);
+  return {
+    ...state,
+    current_window: w,
+    current_frame:  bounds.start_frame,
+  };
+}
+
+// Replace frames_meta for the current window, converting relative→absolute.
+// Called after extractFrames returns a window's frames.
+export function applyWindowFramesMeta(
+  state:       VideoAnnotationState,
+  window:      number,
+  relativeMeta:{ index:number; timestamp_s:number; width:number; height:number; checksum:string|null }[],
+): VideoAnnotationState {
+  const absMeta: FrameMeta[] = relativeMeta.map(m => ({
+    index:       windowToAbsolute(state, window, m.index),
+    timestamp_s: m.timestamp_s,   // already absolute (extractFrames uses real ts)
+    width:       m.width,
+    height:      m.height,
+    checksum:    m.checksum,
+  }));
+  return { ...state, frames_meta: absMeta };
 }
