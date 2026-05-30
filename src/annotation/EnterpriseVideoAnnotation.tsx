@@ -21,6 +21,7 @@ import {
   interpolateTrack, addShot, deleteShot,
   goToFrame, setTool, setFramesMeta,
   getFrameKeyframes, computeVideoStats, normalizeBBoxV,
+  getWindowBounds, windowToAbsolute, goToWindow, applyWindowFramesMeta,
 } from "./videoAnnotationState";
 import { exportVideoAnnotations } from "./videoAnnotationExport";
 import type {
@@ -302,6 +303,7 @@ export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAn
   const drawRef    = useRef<DrawState>({ ...EMPTY_DRAW });
   const rafRef     = useRef<number>(0);
   const fileRef    = useRef<HTMLInputElement>(null);
+  const videoFileRef = useRef<File | null>(null);  // kept for window re-extraction
   const autoSaveRef= useRef<ReturnType<typeof setInterval>|null>(null);
 
   const taxonomy = COCO_TAXONOMY;
@@ -347,39 +349,60 @@ export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAn
   const handleFileLoad = useCallback(async (file: File) => {
     setLoading(true);
     setLoadPct(0);
+    videoFileRef.current = file;  // keep for window re-extraction
+
+    const FPS = 2;
+
+    // Probe video duration first to compute total_frames across the whole video.
+    const probeDuration = await new Promise<number>((resolve) => {
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.muted = true;
+      v.onloadedmetadata = () => { const d = v.duration; v.src = ""; resolve(isFinite(d)?d:0); };
+      v.onerror = () => resolve(0);
+      v.src = URL.createObjectURL(file);
+    });
+
+    const totalFrames = Math.max(1, Math.floor(probeDuration * FPS));
+
+    // Window 0 bounds
+    const startS = 0;
+    const endS   = Math.min(VIDEO_LIMITS.MAX_ACTIVE_FRAMES / FPS, probeDuration);
 
     const config: VideoExtractionConfig = {
-      fps:        2,
+      fps:        FPS,
       max_frames: VIDEO_LIMITS.MAX_ACTIVE_FRAMES,
+      start_s:    startS,
+      end_s:      endS,
     };
 
     const corrId = crypto.randomUUID();
     const result = await extractFrames(file, config, corrId);
-
     if(!result) { setLoading(false); return; }
 
-    // Convert ImageData → ImageBitmap
+    const videoId = crypto.randomUUID();
+    let state = createVideoState({
+      video_id:     videoId,
+      filename:     file.name,
+      duration_s:   probeDuration,
+      fps:          FPS,
+      width:        result.frames[0]?.width  ?? 1920,
+      height:       result.frames[0]?.height ?? 1080,
+      total_frames: totalFrames,
+    });
+
+    // Window 0: relative index == absolute index, but use helper for consistency
     const bitmapMap = new Map<number, ImageBitmap>();
     for(let i = 0; i < result.frames.length; i++) {
       const f   = result.frames[i];
+      const abs = windowToAbsolute(state, 0, f.index);
       const bmp = await createImageBitmap(f.data);
-      bitmapMap.set(f.index, bmp);
+      bitmapMap.set(abs, bmp);
       setLoadPct(Math.round(((i+1)/result.frames.length)*100));
     }
     setFrames(bitmapMap);
 
-    const videoId = crypto.randomUUID();
-    const state   = createVideoState({
-      video_id:     videoId,
-      filename:     file.name,
-      duration_s:   result.duration_s,
-      fps:          config.fps,
-      width:        result.frames[0]?.width  ?? 1920,
-      height:       result.frames[0]?.height ?? 1080,
-      total_frames: result.frames.length,
-    });
-
-    const withMeta = setFramesMeta(state, result.frames.map(f => ({
+    state = applyWindowFramesMeta(state, 0, result.frames.map(f => ({
       index:       f.index,
       timestamp_s: parseFloat(f.timestamp_s.toFixed(3)),
       width:       f.width,
@@ -387,14 +410,15 @@ export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAn
       checksum:    f.checksum,
     })));
 
-    setAnnState(withMeta);
+    setAnnState(state);
     setIsDirty(false);
     setLoading(false);
 
     emitEvent({
       event_type:"ADMIN_ACTION", event_source:"qc_workstation",
       correlation_id:corrId, severity:"info",
-      payload:{ action:"VIDEO_LOADED", filename:file.name, frames:result.frames.length },
+      payload:{ action:"VIDEO_LOADED", filename:file.name,
+        total_frames:totalFrames, window_count:state.window_count },
     });
   }, []);
 
@@ -515,6 +539,66 @@ export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAn
       setIsDirty(false);
     } finally { setIsSaving(false); }
   }, [annState, user]);
+
+  // ── Load a different window (long-video support) ────────────────────────────
+  // Saves current work, frees old frames from RAM, extracts the new window,
+  // converts relative frame indices to absolute. Tracks/keyframes persist.
+  const loadWindow = useCallback(async (targetWindow: number) => {
+    if(!annState || !videoFileRef.current) return;
+    const file = videoFileRef.current;
+
+    // 1. Persist current work before switching
+    if(isDirty) await handleSave();
+
+    setLoading(true);
+    setLoadPct(0);
+
+    // 2. Compute new window bounds
+    const bounds = getWindowBounds(annState, targetWindow);
+
+    const config: VideoExtractionConfig = {
+      fps:        annState.fps,
+      max_frames: annState.window_size,
+      start_s:    bounds.start_s,
+      end_s:      bounds.end_s,
+    };
+
+    const corrId = crypto.randomUUID();
+    const result = await extractFrames(file, config, corrId);
+    if(!result) { setLoading(false); return; }
+
+    // 3. Free old frames, build new bitmap map with ABSOLUTE indices
+    setFrames(prev => { prev.forEach(b => b.close?.()); return new Map(); });
+    const bitmapMap = new Map<number, ImageBitmap>();
+    for(let i = 0; i < result.frames.length; i++) {
+      const f   = result.frames[i];
+      const abs = windowToAbsolute(annState, bounds.window, f.index);
+      const bmp = await createImageBitmap(f.data);
+      bitmapMap.set(abs, bmp);
+      setLoadPct(Math.round(((i+1)/result.frames.length)*100));
+    }
+    setFrames(bitmapMap);
+
+    // 4. Update state: switch window + replace frames_meta (absolute)
+    let next = goToWindow(annState, bounds.window);
+    next = applyWindowFramesMeta(next, bounds.window, result.frames.map(f => ({
+      index:       f.index,
+      timestamp_s: parseFloat(f.timestamp_s.toFixed(3)),
+      width:       f.width,
+      height:      f.height,
+      checksum:    f.checksum,
+    })));
+
+    setAnnState(next);
+    setLoading(false);
+
+    emitEvent({
+      event_type:"ADMIN_ACTION", event_source:"qc_workstation",
+      correlation_id:corrId, severity:"info",
+      payload:{ action:"VIDEO_WINDOW_LOADED",
+        window:bounds.window, start_frame:bounds.start_frame, end_frame:bounds.end_frame },
+    });
+  }, [annState, isDirty, handleSave]);
 
   useEffect(() => {
     if(autoSaveRef.current) clearInterval(autoSaveRef.current);
@@ -684,6 +768,35 @@ export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAn
             {/* Frame info bar */}
             <div style={{display:"flex",alignItems:"center",gap:12,padding:"4px 12px",
               background:"#0a0f1a",borderBottom:"1px solid #1f2937",flexShrink:0,fontSize:9}}>
+              {/* Window navigation — only when video spans multiple windows */}
+              {annState.window_count > 1 && (
+                <span style={{display:"flex",alignItems:"center",gap:5}}>
+                  <button
+                    onClick={()=>loadWindow(annState.current_window - 1)}
+                    disabled={loading || annState.current_window === 0}
+                    title="Previous window"
+                    style={{padding:"2px 7px",borderRadius:4,fontSize:10,
+                      border:"1px solid #1f2937",background:"transparent",
+                      cursor:annState.current_window===0||loading?"not-allowed":"pointer",
+                      color:annState.current_window===0||loading?"#374151":"#a855f7"}}>
+                    ◄ Win
+                  </button>
+                  <span style={{color:"#a855f7",fontWeight:700}}>
+                    {annState.current_window + 1}/{annState.window_count}
+                  </span>
+                  <button
+                    onClick={()=>loadWindow(annState.current_window + 1)}
+                    disabled={loading || annState.current_window >= annState.window_count - 1}
+                    title="Next window"
+                    style={{padding:"2px 7px",borderRadius:4,fontSize:10,
+                      border:"1px solid #1f2937",background:"transparent",
+                      cursor:annState.current_window>=annState.window_count-1||loading?"not-allowed":"pointer",
+                      color:annState.current_window>=annState.window_count-1||loading?"#374151":"#a855f7"}}>
+                    Win ►
+                  </button>
+                  <span style={{width:1,height:14,background:"#1f2937"}}/>
+                </span>
+              )}
               <span style={{color:"#22d3ee"}}>
                 Frame {annState.current_frame} / {annState.total_frames-1}
               </span>
@@ -713,10 +826,12 @@ export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAn
               />
             </div>
 
-            {/* Frame scrubber */}
+            {/* Frame scrubber — bounded to the currently-loaded window */}
             <div style={{padding:"6px 12px",background:"#0a0f1a",
               borderTop:"1px solid #1f2937",flexShrink:0}}>
-              <input type="range" min={0} max={annState.total_frames-1}
+              <input type="range"
+                min={getWindowBounds(annState, annState.current_window).start_frame}
+                max={getWindowBounds(annState, annState.current_window).end_frame - 1}
                 value={annState.current_frame}
                 onChange={e=>setState(goToFrame(annState,+e.target.value))}
                 style={{width:"100%",accentColor:"#22d3ee",cursor:"pointer"}}/>
