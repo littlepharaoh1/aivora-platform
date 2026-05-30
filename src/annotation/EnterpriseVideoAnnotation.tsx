@@ -31,6 +31,8 @@ import { VIDEO_SHORTCUTS } from "./videoAnnotationTypes";
 import { COCO_TAXONOMY } from "./taxonomyEngine";
 import { emitEvent } from "../lib/telemetry/emitter";
 import { enqueueMutation } from "../lib/offline/mutationQueue";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../hooks/useAuth";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -285,6 +287,7 @@ export interface EnterpriseVideoAnnotationProps {
 }
 
 export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAnnotationProps) {
+  const { user } = useAuth();
   const [annState,   setAnnState]  = useState<VideoAnnotationState | null>(null);
   const [frames,     setFrames]    = useState<Map<number, ImageBitmap>>(new Map());
   const [loading,    setLoading]   = useState(false);
@@ -476,6 +479,34 @@ export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAn
     if(!annState) return;
     setIsSaving(true);
     try {
+      // Online: upsert essential fields to Supabase (skip heavy history/frames_meta)
+      const row = {
+        user_id:        user?.id,
+        video_id:       annState.video_id,
+        filename:       annState.filename,
+        duration_s:     annState.duration_s,
+        fps:            annState.fps,
+        width:          annState.width,
+        height:         annState.height,
+        total_frames:   annState.total_frames,
+        tracks:         annState.tracks,
+        keyframes:      annState.keyframes,
+        shots:          annState.shots,
+        track_count:    annState.tracks.length,
+        keyframe_count: annState.keyframes.length,
+      };
+
+      if(user?.id) {
+        const { error } = await supabase
+          .from("video_annotations")
+          .upsert(row, { onConflict: "user_id,video_id" });
+        if(error) throw error;
+      } else {
+        throw new Error("no_user");
+      }
+      setIsDirty(false);
+    } catch {
+      // Offline / no-auth fallback → durable mutation queue
       await enqueueMutation({
         mutation_type:  "video_evidence_insert",
         correlation_id: annState.video_id,
@@ -483,7 +514,7 @@ export default function EnterpriseVideoAnnotation({ onClose }: EnterpriseVideoAn
       });
       setIsDirty(false);
     } finally { setIsSaving(false); }
-  }, [annState]);
+  }, [annState, user]);
 
   useEffect(() => {
     if(autoSaveRef.current) clearInterval(autoSaveRef.current);
