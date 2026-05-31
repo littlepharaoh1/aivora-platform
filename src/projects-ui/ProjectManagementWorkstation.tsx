@@ -8,7 +8,8 @@
 
 import React, { useState } from "react";
 import { useProjectManagement } from "../lib/projects/useProjectManagement";
-import { ROLE_COLORS } from "../lib/projects/projectTypes";
+import { ROLE_COLORS, PROJECT_ROLES } from "../lib/projects/projectTypes";
+import type { ProjectRole } from "../lib/projects/projectTypes";
 
 type PM = ReturnType<typeof useProjectManagement>;
 
@@ -94,10 +95,24 @@ function ProjectsView({ pm }: { pm: PM }) {
 
 // ── Board View (tasks/queues) ─────────────────────────────────────────────────
 
+const NEXT_STATUS: Record<string, string|null> = {
+  pending:     "in_progress",
+  assigned:    "in_progress",
+  in_progress: "in_review",
+  in_review:   "completed",
+  completed:   null,
+};
+
 function BoardView({ pm }: { pm: PM }) {
+  const [title, setTitle]       = useState("");
+  const [priority, setPriority] = useState<"low"|"medium"|"high">("medium");
+
   if(!pm.activeProject) return <EmptyHint text="Select a project to view its task board." />;
 
-  const COLUMNS: { key: string; label: string }[] = [
+  const canAssign   = pm.can("assign_tasks");
+  const canAnnotate = pm.can("annotate");
+
+  const COLUMNS = [
     { key:"pending",     label:"Pending" },
     { key:"assigned",    label:"Assigned" },
     { key:"in_progress", label:"In Progress" },
@@ -105,30 +120,85 @@ function BoardView({ pm }: { pm: PM }) {
     { key:"completed",   label:"Completed" },
   ];
 
+  const submitTask = async () => {
+    if(!title.trim()) return;
+    await pm.actCreateTask(title.trim(), priority, null);
+    setTitle("");
+  };
+
   return (
     <div style={{padding:16}}>
-      <div style={{fontSize:11,letterSpacing:2,color:"#374151",marginBottom:12}}>
-        TASK BOARD · {pm.activeProject.name}
+      <div style={{display:"flex",alignItems:"center",marginBottom:12,gap:8}}>
+        <span style={{fontSize:11,letterSpacing:2,color:"#374151"}}>
+          TASK BOARD · {pm.activeProject.name}
+        </span>
       </div>
+
+      {canAssign && (
+        <div style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:10,
+          padding:12,marginBottom:14,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <input value={title} onChange={e=>setTitle(e.target.value)}
+            placeholder="New task title" onKeyDown={e=>e.key==="Enter"&&submitTask()}
+            style={{...inputStyle,flex:3,minWidth:160}}/>
+          <select value={priority} onChange={e=>setPriority(e.target.value as "low"|"medium"|"high")}
+            style={{...inputStyle,flex:1,minWidth:90}}>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+          <button onClick={submitTask} style={primaryBtn}>+ Create</button>
+        </div>
+      )}
+
       <div style={{display:"flex",gap:10,overflowX:"auto"}}>
         {COLUMNS.map(col=>{
           const colTasks = pm.tasks.filter(t=>t.status===col.key);
           return (
-            <div key={col.key} style={{minWidth:160,flex:1}}>
+            <div key={col.key} style={{minWidth:170,flex:1}}>
               <div style={{fontSize:9,color:"#6b7280",marginBottom:6,
                 display:"flex",justifyContent:"space-between"}}>
                 <span>{col.label}</span><span>{colTasks.length}</span>
               </div>
               <div style={{display:"grid",gap:6}}>
-                {colTasks.map(t=>(
-                  <div key={t.id} style={{background:"#0a0f1a",border:"1px solid #1f2937",
-                    borderRadius:8,padding:"7px 9px",fontSize:10}}>
-                    <div style={{color:"#e5e7eb"}}>{t.title}</div>
-                    <div style={{fontSize:8,color:"#374151",marginTop:3}}>
-                      {t.assignee_email||"unassigned"} · {t.priority}
+                {colTasks.map(t=>{
+                  const next = NEXT_STATUS[t.status];
+                  return (
+                    <div key={t.id} style={{background:"#0a0f1a",border:"1px solid #1f2937",
+                      borderRadius:8,padding:"7px 9px",fontSize:10}}>
+                      <div style={{color:"#e5e7eb"}}>{t.title}</div>
+                      <div style={{fontSize:8,color:"#374151",marginTop:3}}>
+                        {t.assignee_email||"unassigned"} · {t.priority}
+                      </div>
+
+                      {/* Assign dropdown — only for assigners, only if members exist */}
+                      {canAssign && pm.members.length > 0 && (
+                        <select
+                          value={t.assignee_id ?? ""}
+                          onChange={e=>{
+                            const m = pm.members.find(mm=>mm.user_id===e.target.value);
+                            if(m) pm.actAssignTask(t.id, m.user_id, m.email);
+                          }}
+                          style={{...inputStyle,fontSize:8,padding:"2px 4px",
+                            marginTop:5,width:"100%"}}>
+                          <option value="">assign…</option>
+                          {pm.members.map(m=>(
+                            <option key={m.id} value={m.user_id}>{m.email}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Advance status — for annotators+ */}
+                      {canAnnotate && next && (
+                        <button onClick={()=>pm.actChangeTaskStatus(t.id, next as never)}
+                          style={{marginTop:5,width:"100%",padding:"3px 0",borderRadius:5,
+                            fontSize:8,cursor:"pointer",border:"1px solid #22d3ee33",
+                            background:"#22d3ee10",color:"#22d3ee",fontFamily:"inherit"}}>
+                          → {next.replace("_"," ")}
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -141,32 +211,83 @@ function BoardView({ pm }: { pm: PM }) {
 // ── Team View (members + workload) ────────────────────────────────────────────
 
 function TeamView({ pm }: { pm: PM }) {
+  const [email, setEmail]   = useState("");
+  const [userId, setUserId] = useState("");
+  const [role, setRole]     = useState<ProjectRole>("annotator");
+
   if(!pm.activeProject) return <EmptyHint text="Select a project to view its team." />;
+
+  const canManage = pm.can("manage_project");
+
+  const submitMember = async () => {
+    if(!email.trim() || !userId.trim()) return;
+    await pm.actAddMember(userId.trim(), email.trim(), role);
+    setEmail(""); setUserId("");
+  };
+
+  // Workload lookup by user for inline stats
+  const wlByUser = new Map(pm.workloads.map(w => [w.user_id, w]));
 
   return (
     <div style={{padding:16}}>
-      <div style={{fontSize:11,letterSpacing:2,color:"#374151",marginBottom:12}}>
-        TEAM & WORKLOAD · {pm.activeProject.name}
+      <div style={{display:"flex",alignItems:"center",marginBottom:12}}>
+        <span style={{fontSize:11,letterSpacing:2,color:"#374151"}}>
+          TEAM & WORKLOAD · {pm.activeProject.name}
+        </span>
       </div>
-      {pm.workloads.length === 0 ? (
+
+      {canManage && (
+        <div style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:10,
+          padding:12,marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+          <input value={email} onChange={e=>setEmail(e.target.value)}
+            placeholder="member email" style={{...inputStyle,flex:2,minWidth:140}}/>
+          <input value={userId} onChange={e=>setUserId(e.target.value)}
+            placeholder="user id (uuid)" style={{...inputStyle,flex:2,minWidth:140}}/>
+          <select value={role} onChange={e=>setRole(e.target.value as ProjectRole)}
+            style={{...inputStyle,flex:1,minWidth:100}}>
+            {PROJECT_ROLES.map(r=><option key={r} value={r}>{r}</option>)}
+          </select>
+          <button onClick={submitMember} style={primaryBtn}>+ Add</button>
+        </div>
+      )}
+
+      {pm.members.length === 0 ? (
         <EmptyHint text="No members yet." />
       ) : (
         <div style={{display:"grid",gap:8}}>
-          {pm.workloads.map(w=>(
-            <div key={w.user_id} style={{background:"#0a0f1a",border:"1px solid #1f2937",
-              borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
-              <span style={{width:8,height:8,borderRadius:2,
-                background:ROLE_COLORS[w.role],flexShrink:0}}/>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:"#e5e7eb"}}>{w.email}</div>
-                <div style={{fontSize:9,color:ROLE_COLORS[w.role]}}>{w.role}</div>
+          {pm.members.map(m=>{
+            const w = wlByUser.get(m.user_id);
+            return (
+              <div key={m.id} style={{background:"#0a0f1a",border:"1px solid #1f2937",
+                borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+                <span style={{width:8,height:8,borderRadius:2,
+                  background:ROLE_COLORS[m.role],flexShrink:0}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:11,color:"#e5e7eb",overflow:"hidden",
+                    textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.email}</div>
+                  <div style={{fontSize:9,color:ROLE_COLORS[m.role]}}>{m.role}</div>
+                </div>
+                {w && (
+                  <div style={{display:"flex",gap:8,fontSize:9}}>
+                    <span style={{color:"#f59e0b"}}>active {w.total_active}</span>
+                    <span style={{color:"#22c55e"}}>done {w.completed}</span>
+                  </div>
+                )}
+                {canManage && (
+                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                    <select value={m.role}
+                      onChange={e=>pm.actChangeMemberRole(m.id, m.user_id, e.target.value as ProjectRole)}
+                      style={{...inputStyle,fontSize:9,padding:"2px 4px"}}>
+                      {PROJECT_ROLES.map(r=><option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <button onClick={()=>pm.actRemoveMember(m.id, m.user_id)}
+                      style={{background:"none",border:"none",color:"#ef444466",
+                        cursor:"pointer",fontSize:11,padding:"0 4px"}}>✕</button>
+                  </div>
+                )}
               </div>
-              <div style={{display:"flex",gap:10,fontSize:9}}>
-                <span style={{color:"#f59e0b"}}>active {w.total_active}</span>
-                <span style={{color:"#22c55e"}}>done {w.completed}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
