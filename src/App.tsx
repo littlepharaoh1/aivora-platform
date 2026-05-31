@@ -69,6 +69,7 @@ const MultimodalWorkstation         = React.lazy(() => import("./multimodal-ui/M
 const AIOperationsCenter            = React.lazy(() => import("./os-ui/AIOperationsCenter"));
 const ImageAnnotationWorkstation    = React.lazy(() => import("./annotation/EnterpriseImageAnnotation"));
 const ProjectManagementWorkstation  = React.lazy(() => import("./projects-ui/ProjectManagementWorkstation"));
+const WorkforceManagementWorkstation = React.lazy(() => import("./workforce-ui/WorkforceManagementWorkstation"));
 const VideoAnnotationWorkstation    = React.lazy(() => import("./annotation/EnterpriseVideoAnnotation"));
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
@@ -100,7 +101,8 @@ type Tab =
   | "ai_os"
   | "annotation"
   | "video_annotation"
-  | "project_management";
+  | "project_management"
+  | "workforce";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -132,6 +134,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   annotation:      { title:"Image Annotation",          subtitle:"PRODUCTION ANNOTATION WORKSTATION" },
   video_annotation:{ title:"Video Annotation",          subtitle:"FRAME-BY-FRAME VIDEO LABELING TIMELINE" },
   project_management:{ title:"Project Management",        subtitle:"PROJECTS · TASKS · TEAM · IMMUTABLE AUDIT" },
+  workforce:{ title:"Workforce OS",                  subtitle:"WORKERS · SKILLS · PERFORMANCE · CAPACITY · FRAUD" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
@@ -171,6 +174,7 @@ const NAV_ITEMS = [
   { id:"annotation",     icon:"qc",           label:"Image Annotator",     group:"enterprise" },
   { id:"video_annotation",icon:"qc",          label:"Video Annotator",     group:"enterprise" },
   { id:"project_management",icon:"control",   label:"Project Management",  group:"enterprise" },
+  { id:"workforce",       icon:"contributors", label:"Workforce OS",        group:"enterprise" },
 ];
 
 const GROUP_LABELS: Record<string,string> = {
@@ -588,6 +592,13 @@ function AppContent(){
             <ErrorBoundary label="ProjectManagement">
               <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontSize:12}}>Loading project management...</div>}>
                 <ProjectManagementWorkstation />
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="workforce" && (
+            <ErrorBoundary label="Workforce">
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontSize:12}}>Loading workforce OS...</div>}>
+                <WorkforceManagementWorkstation />
               </React.Suspense>
             </ErrorBoundary>
           )}
