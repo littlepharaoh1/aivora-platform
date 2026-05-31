@@ -31,6 +31,11 @@ export const INFERENCE_ROUTES: Record<ModelTask, InferenceRoute> = {
   speaker_embed: { task:"speaker_embed", preferred_runtime:"onnx_wasm",   version:"6B.4.0" },
   room_embed:    { task:"room_embed",    preferred_runtime:"onnx_wasm",   version:"6B.4.0" },
   noise_classify:{ task:"noise_classify",preferred_runtime:"onnx_wasm",   version:"6B.4.0" },
+  // Vision tasks — AI-Assisted Annotation Layer (WebGPU preferred, WASM fallback)
+  object_detect: { task:"object_detect", preferred_runtime:"onnx_webgpu", version:"18.0.0" },
+  segment:       { task:"segment",       preferred_runtime:"onnx_webgpu", version:"18.0.0" },
+  text_detect:   { task:"text_detect",   preferred_runtime:"onnx_webgpu", version:"18.0.0" },
+  image_classify:{ task:"image_classify",preferred_runtime:"onnx_webgpu", version:"18.0.0" },
 };
 
 export interface ScheduledInferenceRequest {

@@ -25,7 +25,12 @@ export type ModelTask =
   | "separate"
   | "speaker_embed"
   | "room_embed"
-  | "noise_classify";
+  | "noise_classify"
+  // Vision tasks — AI-Assisted Annotation Layer
+  | "object_detect"
+  | "segment"
+  | "text_detect"
+  | "image_classify";
 
 export type ModelQuantization =
   | "fp32"     // full precision
@@ -166,6 +171,86 @@ export const MODEL_CATALOG: ModelEntry[] = [
     preferred_tier: "DESKTOP_BALANCED",
     license:        "Apache-2.0",
     description:    "192-dim speaker embedding for verification + forensics",
+    deprecated:     false,
+  },
+  {
+    id:           "yolov8n-detect",
+    name:         "YOLOv8 Nano (Detection)",
+    version:      "8.0.0",
+    quantization: "fp32",
+    task:         "object_detect",
+    url:          "/models/yolov8n.onnx",
+    sha256:       null,   // pending — upload weights then set hash
+    capabilities: {
+      task:"object_detect", sampleRate:0, frameSize:640, channels:3,
+      inputNames:["images"], outputNames:["output0"],
+      streamingSupport:false, batchSupport:false, gpuAccelerated:true,
+    },
+    memory:         { weightsMB:12, activationsMB:64, minVRAMMB:128, recommendedMB:512 },
+    runtimes:       ["onnx_webgpu", "onnx_wasm"],
+    preferred_tier: "DESKTOP_BALANCED",
+    license:        "AGPL-3.0",
+    description:    "Object detection — 80 COCO classes, bounding boxes",
+    deprecated:     false,
+  },
+  {
+    id:           "sam2-hiera-tiny",
+    name:         "SAM2 Hiera Tiny (Segmentation)",
+    version:      "2.0.0",
+    quantization: "fp16",
+    task:         "segment",
+    url:          "/models/sam2-hiera-tiny.onnx",
+    sha256:       null,
+    capabilities: {
+      task:"segment", sampleRate:0, frameSize:1024, channels:3,
+      inputNames:["image","point_coords","point_labels"], outputNames:["masks","iou_predictions"],
+      streamingSupport:false, batchSupport:false, gpuAccelerated:true,
+    },
+    memory:         { weightsMB:150, activationsMB:256, minVRAMMB:512, recommendedMB:2048 },
+    runtimes:       ["onnx_webgpu", "onnx_wasm"],
+    preferred_tier: "DESKTOP_ULTRA",
+    license:        "Apache-2.0",
+    description:    "Segmentation masks from point/box prompts",
+    deprecated:     false,
+  },
+  {
+    id:           "grounding-dino-tiny",
+    name:         "Grounding DINO Tiny (Text-Guided)",
+    version:      "1.0.0",
+    quantization: "fp16",
+    task:         "text_detect",
+    url:          "/models/grounding-dino-tiny.onnx",
+    sha256:       null,
+    capabilities: {
+      task:"text_detect", sampleRate:0, frameSize:800, channels:3,
+      inputNames:["image","input_ids","attention_mask"], outputNames:["logits","boxes"],
+      streamingSupport:false, batchSupport:false, gpuAccelerated:true,
+    },
+    memory:         { weightsMB:700, activationsMB:512, minVRAMMB:1024, recommendedMB:4096 },
+    runtimes:       ["onnx_webgpu"],
+    preferred_tier: "DESKTOP_ULTRA",
+    license:        "Apache-2.0",
+    description:    "Text-guided open-vocabulary detection (optional, heavy)",
+    deprecated:     false,
+  },
+  {
+    id:           "clip-vit-b32",
+    name:         "CLIP ViT-B/32 (Classification)",
+    version:      "1.0.0",
+    quantization: "int8",
+    task:         "image_classify",
+    url:          "/models/clip-vit-b32.onnx",
+    sha256:       null,
+    capabilities: {
+      task:"image_classify", sampleRate:0, frameSize:224, channels:3,
+      inputNames:["pixel_values"], outputNames:["logits_per_image"],
+      streamingSupport:false, batchSupport:true, gpuAccelerated:true,
+    },
+    memory:         { weightsMB:85, activationsMB:128, minVRAMMB:256, recommendedMB:1024 },
+    runtimes:       ["onnx_webgpu", "onnx_wasm"],
+    preferred_tier: "MOBILE_SAFE",
+    license:        "MIT",
+    description:    "Zero-shot semantic classification over text labels",
     deprecated:     false,
   },
 ];
