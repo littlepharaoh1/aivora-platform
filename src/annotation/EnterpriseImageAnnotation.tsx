@@ -5,7 +5,9 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { createEnterpriseState } from "./enterpriseAnnotationState";
+import { createEnterpriseState, addAnnotation, createAnnotation } from "./enterpriseAnnotationState";
+import AIAssistPanel from "./AIAssistPanel";
+import type { Proposal } from "../lib/aiAnnotation/aiAnnotationTypes";
 import { useAnnotationCanvas } from "./useAnnotationCanvas";
 import { exportAnnotations, computeStats } from "./annotationExportService";
 import type {
@@ -74,6 +76,7 @@ export default function EnterpriseImageAnnotation({
   );
   const [tool,          setTool]         = useState<AnnotationTool>("bbox");
   const [activeClassId, setActiveClassId]= useState<number>(0);
+  const [showAI, setShowAI] = useState(false);
   const [showGrid,      setShowGrid]     = useState(false);
   const [reviewMode,    setReviewMode]   = useState(false);
   const [snapEnabled,   setSnapEnabled]  = useState(true);
@@ -105,6 +108,33 @@ export default function EnterpriseImageAnnotation({
   const setState = useCallback((s: EnterpriseAnnotationState) => {
     setAnnState(s);
     setIsDirty(true);
+  }, []);
+
+  // Convert accepted AI proposals → real annotations via the SAME path manual
+  // drawing uses (createAnnotation + addAnnotation). The manual workflow and
+  // its undo history are fully preserved.
+  const applyProposals = useCallback((proposals: Proposal[]) => {
+    setAnnState(prev => {
+      let next = prev;
+      let seq  = prev.sequence;
+      for(const p of proposals) {
+        const ann = createAnnotation({
+          type:        p.kind === "mask" ? "polygon" : "bbox",
+          class_id:    p.class_id >= 0 ? p.class_id : 0,
+          class_name:  p.class_name,
+          class_color: "#a855f7",            // AI-origin tint (editable after)
+          layer_id:    prev.active_layer ?? prev.layers[0]?.id ?? "layer_default",
+          image_id:    prev.image_id,
+          sequence:    seq++,
+          bbox:        p.bbox ?? undefined,
+          points:      p.mask_points ?? undefined,
+        });
+        next = addAnnotation(next, ann);
+      }
+      return next;
+    });
+    setIsDirty(true);
+    setShowAI(false);
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -226,6 +256,7 @@ export default function EnterpriseImageAnnotation({
         <div style={{width:1,height:16,background:"#1f2937"}}/>
         <Btn label={isSaving?"Saving…":isDirty?"⬆ Save*":"✓ Saved"} onClick={handleSave}
           color={isDirty?"#f59e0b":"#22c55e"} active={isDirty}/>
+        <Btn label="✨ AI" title="AI Assist" onClick={()=>setShowAI(v=>!v)} color="#a855f7" active={showAI}/>
         <Btn label="⌨" onClick={()=>setShowShortcuts(v=>!v)} color="#6b7280"/>
         <div style={{marginLeft:"auto",fontSize:9,color:"#374151"}}>
           {annState.annotations.length.toLocaleString()} annotations
@@ -378,6 +409,17 @@ export default function EnterpriseImageAnnotation({
           </div>
         </div>
       </div>
+
+      {/* AI ASSIST PANEL — overlay, does not alter manual workflow */}
+      {showAI && (
+        <AIAssistPanel
+          assetId={annState.image_id}
+          imgW={imgW}
+          imgH={imgH}
+          onAccept={applyProposals}
+          onClose={()=>setShowAI(false)}
+        />
+      )}
 
       {/* SHORTCUTS MODAL */}
       {showShortcuts && (
