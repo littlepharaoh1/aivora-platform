@@ -68,6 +68,7 @@ const QAIntelligenceWorkstation     = React.lazy(() => import("./qa-ui/QAIntelli
 const MultimodalWorkstation         = React.lazy(() => import("./multimodal-ui/MultimodalWorkstation"));
 const AIOperationsCenter            = React.lazy(() => import("./os-ui/AIOperationsCenter"));
 const ImageAnnotationWorkstation    = React.lazy(() => import("./annotation/EnterpriseImageAnnotation"));
+const ProjectManagementWorkstation  = React.lazy(() => import("./projects-ui/ProjectManagementWorkstation"));
 const VideoAnnotationWorkstation    = React.lazy(() => import("./annotation/EnterpriseVideoAnnotation"));
 
 // ── Tab Type ──────────────────────────────────────────────────────────────────
@@ -98,7 +99,8 @@ type Tab =
   | "multimodal"
   | "ai_os"
   | "annotation"
-  | "video_annotation";
+  | "video_annotation"
+  | "project_management";
 
 // ── Tab Meta ──────────────────────────────────────────────────────────────────
 
@@ -129,6 +131,7 @@ const TAB_META: Record<Tab,{title:string;subtitle:string}> = {
   ai_os:           { title:"AI Operating System",       subtitle:"UNIFIED ENTERPRISE AI INFRASTRUCTURE" },
   annotation:      { title:"Image Annotation",          subtitle:"PRODUCTION ANNOTATION WORKSTATION" },
   video_annotation:{ title:"Video Annotation",          subtitle:"FRAME-BY-FRAME VIDEO LABELING TIMELINE" },
+  project_management:{ title:"Project Management",        subtitle:"PROJECTS · TASKS · TEAM · IMMUTABLE AUDIT" },
 };
 
 // ── Sidebar Nav Items ─────────────────────────────────────────────────────────
@@ -167,6 +170,7 @@ const NAV_ITEMS = [
   { id:"multimodal",      icon:"dsp",          label:"Multimodal Intel",    group:"enterprise" },
   { id:"annotation",     icon:"qc",           label:"Image Annotator",     group:"enterprise" },
   { id:"video_annotation",icon:"qc",          label:"Video Annotator",     group:"enterprise" },
+  { id:"project_management",icon:"control",   label:"Project Management",  group:"enterprise" },
 ];
 
 const GROUP_LABELS: Record<string,string> = {
@@ -577,6 +581,13 @@ function AppContent(){
             <ErrorBoundary label="VideoAnnotation">
               <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontSize:12}}>Loading video annotator...</div>}>
                 <VideoAnnotationWorkstation />
+              </React.Suspense>
+            </ErrorBoundary>
+          )}
+          {tab==="project_management" && (
+            <ErrorBoundary label="ProjectManagement">
+              <React.Suspense fallback={<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh",color:"#22d3ee",fontSize:12}}>Loading project management...</div>}>
+                <ProjectManagementWorkstation />
               </React.Suspense>
             </ErrorBoundary>
           )}
