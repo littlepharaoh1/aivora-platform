@@ -38,7 +38,10 @@ export type MutationType =
   | "image_evidence_insert"
   | "video_evidence_insert"
   | "ocr_evidence_insert"
-  | "speech_transcript_insert";
+  | "speech_transcript_insert"
+  | "project_insert"
+  | "project_update"
+  | "member_insert";
 
 export type MutationStatus =
   | "pending"     // waiting for sync
