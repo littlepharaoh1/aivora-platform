@@ -77,6 +77,8 @@ export function reshapeYOLOOutput(
   meta: PreprocessResult,
 ): number[][] {
   // dims expected [1, 84, 8400] → 84 attrs, 8400 anchors
+  console.log("[AIVORA YOLO DEBUG] raw output dims:", JSON.stringify(dims),
+              "first 10 values:", Array.from(raw.slice(0, 10)));
   if(dims.length !== 3) return [];
   const attrs   = dims[1];   // 84
   const anchors = dims[2];   // 8400
