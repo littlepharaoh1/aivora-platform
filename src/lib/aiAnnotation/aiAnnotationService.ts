@@ -154,7 +154,10 @@ export async function autoAnnotate(params: AutoAnnotateParams): Promise<AutoAnno
     const backend = await onnxRuntime.initialize();
     const loaded  = await onnxRuntime.loadModel(id);
     if(!loaded) {
-      return { ...baseResult, backend, message: "Model failed to load in runtime." };
+      const rt = onnxRuntime as unknown as { getLastLoadError?: () => string };
+      const err = typeof rt.getLastLoadError === "function" ? rt.getLastLoadError() : "";
+      return { ...baseResult, backend,
+        message: `Model failed to load: ${err || "unknown reason"}` };
     }
 
     // Run real inference through onnxRuntime.runRaw (WebGPU→WASM fallback)

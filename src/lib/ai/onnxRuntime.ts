@@ -183,7 +183,9 @@ export class ONNXRuntimeOrchestrator {
 
       return true;
     } catch(e) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.warn(`[ONNXRuntime] Failed to load ${modelId}:`, e);
+      (this as any)._lastLoadError = msg.slice(0, 300);
 
       emitEvent({
         event_type:     "ADMIN_ACTION",
@@ -193,7 +195,7 @@ export class ONNXRuntimeOrchestrator {
         payload: {
           action:   "MODEL_LOAD_FAILED",
           model_id: modelId,
-          error:    e instanceof Error ? e.message.slice(0, 200) : "unknown",
+          error:    msg.slice(0, 200),
         },
       });
 
@@ -436,6 +438,10 @@ export class ONNXRuntimeOrchestrator {
       console.warn(`[ONNXRuntime] runRaw failed for ${modelId}:`, e);
       return null;
     }
+  }
+
+  getLastLoadError(): string {
+    return (this as any)._lastLoadError ?? "";
   }
 
   dispose(): void {
