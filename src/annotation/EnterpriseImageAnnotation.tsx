@@ -77,6 +77,7 @@ export default function EnterpriseImageAnnotation({
   const [tool,          setTool]         = useState<AnnotationTool>("bbox");
   const [activeClassId, setActiveClassId]= useState<number>(0);
   const [showAI, setShowAI] = useState(false);
+  const [localImageUrl, setLocalImageUrl] = useState<string | null>(null);
   const [showGrid,      setShowGrid]     = useState(false);
   const [reviewMode,    setReviewMode]   = useState(false);
   const [snapEnabled,   setSnapEnabled]  = useState(true);
@@ -196,7 +197,8 @@ export default function EnterpriseImageAnnotation({
 
   // Load image
   useEffect(() => {
-    if(!imageUrl) return;
+    const effectiveUrl = localImageUrl ?? imageUrl;
+    if(!effectiveUrl) return;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
@@ -204,8 +206,8 @@ export default function EnterpriseImageAnnotation({
       setImgW(img.naturalWidth  || width);
       setImgH(img.naturalHeight || height);
     };
-    img.src = imageUrl;
-  }, [imageUrl, width, height]);
+    img.src = effectiveUrl;
+  }, [imageUrl, localImageUrl, width, height]);
 
   // Canvas resize
   useEffect(() => {
@@ -283,11 +285,21 @@ export default function EnterpriseImageAnnotation({
 
         {/* Canvas */}
         <div style={{flex:1,position:"relative",overflow:"hidden",background:"#050508"}}>
-          {!imageUrl && (
+          {!(localImageUrl ?? imageUrl) && (
             <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
-              justifyContent:"center",flexDirection:"column",gap:10,color:"#374151"}}>
+              justifyContent:"center",flexDirection:"column",gap:12,color:"#374151"}}>
               <div style={{fontSize:28}}>🖼️</div>
               <div style={{fontSize:11}}>No image loaded</div>
+              <label style={{cursor:"pointer",padding:"7px 16px",borderRadius:8,
+                border:"1px solid #22d3ee",background:"#22d3ee18",color:"#22d3ee",
+                fontSize:11,fontFamily:"inherit"}}>
+                ⬆ Upload Image
+                <input type="file" accept="image/*" style={{display:"none"}}
+                  onChange={(e)=>{
+                    const f = e.target.files?.[0];
+                    if(f) setLocalImageUrl(URL.createObjectURL(f));
+                  }}/>
+              </label>
             </div>
           )}
           <canvas ref={canvasRef} style={{display:"block",
