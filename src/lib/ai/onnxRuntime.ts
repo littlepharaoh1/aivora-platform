@@ -391,6 +391,53 @@ export class ONNXRuntimeOrchestrator {
     this._sessions.delete(modelId);
   }
 
+  // ── Run Raw Inference ────────────────────────────────────────────────────────
+  // Direct tensor in → tensor out, for vision models (YOLO/SAM2/CLIP) whose
+  // decoding is handled by the proposalEngine. Bypasses the audio-oriented run()
+  // path. Deterministic: same input tensor → same output for a given session.
+  //
+  // input:  { data: Float32Array, dims: number[] }  (e.g. [1,3,640,640])
+  // returns: { data: Float32Array, dims: number[] } | null
+  async runRaw(
+    modelId: string,
+    input:   { data: Float32Array; dims: number[] },
+  ): Promise<{ data: Float32Array; dims: number[] } | null> {
+    if(!this._available || !this._ort) return null;
+
+    // Ensure the session is loaded
+    const ok = await this.loadModel(modelId);
+    if(!ok) return null;
+
+    const session = this._sessions.get(modelId) as any;
+    if(!session) return null;
+
+    try {
+      const ort = this._ort as any;
+      const tensor = new ort.Tensor("float32", input.data, input.dims);
+
+      // Input/output names from the loaded session (deterministic order)
+      const inputName  = session.inputNames[0];
+      const outputName = session.outputNames[0];
+
+      const feeds: Record<string, unknown> = { [inputName]: tensor };
+      const t0 = performance.now();
+      const results = await session.run(feeds);
+      this._latencies.push(performance.now() - t0);
+      this._totalInferences++;
+
+      const out = results[outputName];
+      if(!out) return null;
+
+      return {
+        data: out.data as Float32Array,
+        dims: out.dims as number[],
+      };
+    } catch(e) {
+      console.warn(`[ONNXRuntime] runRaw failed for ${modelId}:`, e);
+      return null;
+    }
+  }
+
   dispose(): void {
     this._sessions.forEach((session: any) => {
       try { session?.release?.(); } catch {}

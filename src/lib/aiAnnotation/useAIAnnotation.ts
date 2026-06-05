@@ -10,6 +10,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { autoAnnotate, modelStatus } from "./aiAnnotationService";
+import { preprocessForYOLO } from "./imagePreprocess";
 import {
   computeEffortMetrics, confidenceBand,
 } from "./aiAnnotationTypes";
@@ -45,19 +46,24 @@ export function useAIAnnotation(params: UseAIAnnotationParams) {
   // ── One-click auto-annotate ─────────────────────────────────────────────────
   const runAutoAnnotate = useCallback(async (
     model: AssistModel,
-    inputTensor: Float32Array | null,
+    imageSource: CanvasImageSource | null,
     textLabels: string[] = [],
   ) => {
     setRunning(true);
     setStatusMsg(`Running ${model.toUpperCase()}…`);
     try {
+      // Build the input tensor from the image (deterministic letterbox + normalize)
+      const preprocess = imageSource
+        ? preprocessForYOLO(imageSource, params.imgW, params.imgH)
+        : null;
+
       const result = await autoAnnotate({
         model,
         asset_id:    params.asset_id,
         asset_type:  params.asset_type,
         imgW:        params.imgW,
         imgH:        params.imgH,
-        inputTensor,
+        preprocess,
         textLabels,
         user_id:     user?.id ?? null,
       });

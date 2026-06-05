@@ -15,6 +15,8 @@ import {
   decodeYOLO, decodeCLIP, decodeSAM2Mask, proposalsChecksum,
 } from "./proposalEngine";
 import { ASSIST_MODEL_CATALOG_ID } from "./aiAnnotationTypes";
+import { reshapeYOLOOutput } from "./imagePreprocess";
+import type { PreprocessResult } from "./imagePreprocess";
 import type {
   AssistModel, AutoAnnotateResult, Proposal,
 } from "./aiAnnotationTypes";
@@ -60,35 +62,39 @@ export function modelStatus(model: AssistModel): { id: string; available: boolea
 
 // ── Decode dispatch (pure proposalEngine) ─────────────────────────────────────
 
+interface RawOutput { data: Float32Array; dims: number[]; }
+
 function decodeOutput(
-  model:   AssistModel,
-  raw:     unknown,
-  imgW:    number,
-  imgH:    number,
+  model:      AssistModel,
+  raw:        RawOutput,
+  meta:       PreprocessResult,
   textLabels: string[],
 ): Proposal[] {
   switch(model) {
     case "yolo": {
-      const rows = raw as number[][];
+      // Reshape [1,84,8400] → rows in original-image pixel coords, then decode
+      const rows = reshapeYOLOOutput(raw.data, raw.dims, meta);
       return decodeYOLO(rows, {
-        imgW, imgH, classNames: COCO_CLASSES,
+        imgW: meta.origW, imgH: meta.origH, classNames: COCO_CLASSES,
         confThreshold: 0.25, iouThreshold: 0.45,
       });
     }
     case "clip": {
-      const logits = raw as number[];
+      const logits = Array.from(raw.data);
       const labels = textLabels.length > 0 ? textLabels : COCO_CLASSES;
       return [decodeCLIP(logits, labels, 5)];
     }
     case "sam2": {
-      const { mask, w, h } = raw as { mask: number[]; w: number; h: number };
-      return [decodeSAM2Mask(mask, w, h, 0, "object", 0.9)];
+      // SAM2 mask output → polygon (dims [1,1,H,W] or [H,W])
+      const h = raw.dims[raw.dims.length - 2] ?? meta.origH;
+      const w = raw.dims[raw.dims.length - 1] ?? meta.origW;
+      return [decodeSAM2Mask(Array.from(raw.data), w, h, 0, "object", 0.9)];
     }
     case "grounding_dino": {
-      // Grounding DINO returns boxes+logits; decoded like YOLO rows when available
-      const rows = raw as number[][];
+      const rows = reshapeYOLOOutput(raw.data, raw.dims, meta);
       return decodeYOLO(rows, {
-        imgW, imgH, classNames: textLabels.length>0?textLabels:COCO_CLASSES,
+        imgW: meta.origW, imgH: meta.origH,
+        classNames: textLabels.length>0?textLabels:COCO_CLASSES,
         confThreshold: 0.3, iouThreshold: 0.5,
       });
     }
@@ -103,8 +109,9 @@ export interface AutoAnnotateParams {
   asset_type: "image" | "video_frame";
   imgW:       number;
   imgH:       number;
-  // Prepared input tensor (Float32Array) — caller builds it from the canvas.
-  inputTensor: Float32Array | null;
+  // Preprocessed input (tensor data + dims + letterbox metadata).
+  // Caller builds it from the canvas via preprocessForYOLO.
+  preprocess: PreprocessResult | null;
   textLabels: string[];        // for CLIP / Grounding DINO
   user_id:    string | null;
 }
@@ -138,8 +145,8 @@ export async function autoAnnotate(params: AutoAnnotateParams): Promise<AutoAnno
     };
   }
 
-  if(!params.inputTensor) {
-    return { ...baseResult, message: "No input tensor prepared." };
+  if(!params.preprocess) {
+    return { ...baseResult, message: "No preprocessed input prepared." };
   }
 
   try {
@@ -150,16 +157,19 @@ export async function autoAnnotate(params: AutoAnnotateParams): Promise<AutoAnno
       return { ...baseResult, backend, message: "Model failed to load in runtime." };
     }
 
-    // NOTE: actual session.run() is performed by onnxRuntime; here we receive
-    // its raw output. The runtime returns null until a real session exists.
-    const raw = await runInference(id, params.inputTensor);
+    // Run real inference through onnxRuntime.runRaw (WebGPU→WASM fallback)
+    const raw = await runInference(id, {
+      data: params.preprocess.data, dims: params.preprocess.dims,
+    });
     if(raw === null) {
       return { ...baseResult, backend,
         message: "Inference returned no output (runtime/session unavailable)." };
     }
 
-    const proposals = decodeOutput(params.model, raw, params.imgW, params.imgH, params.textLabels);
-    const inputChecksum  = await sha256(params.inputTensor.slice(0, 1024).join(","));
+    const proposals = decodeOutput(
+      params.model, raw, params.preprocess, params.textLabels,
+    );
+    const inputChecksum  = await sha256(params.preprocess.data.slice(0, 1024).join(","));
     const outputChecksum = await sha256(proposalsChecksum(proposals));
     const duration = Date.now() - started;
 
@@ -185,14 +195,17 @@ export async function autoAnnotate(params: AutoAnnotateParams): Promise<AutoAnno
 
 // Thin wrapper around the existing runtime's inference entry point. Returns the
 // raw decodable output, or null when no real session can run yet.
-async function runInference(modelId: string, input: Float32Array): Promise<unknown> {
+async function runInference(
+  modelId: string,
+  input:   { data: Float32Array; dims: number[] },
+): Promise<RawOutput | null> {
   const rt = onnxRuntime as unknown as {
-    runRaw?: (id: string, input: Float32Array) => Promise<unknown>;
+    runRaw?: (id: string, input: { data: Float32Array; dims: number[] })
+      => Promise<RawOutput | null>;
   };
   if(typeof rt.runRaw === "function") {
     return rt.runRaw(modelId, input);
   }
-  // Real session entry not present until weights hosted → signal unavailable.
   return null;
 }
 

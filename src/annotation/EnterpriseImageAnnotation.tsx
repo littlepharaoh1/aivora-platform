@@ -416,6 +416,7 @@ export default function EnterpriseImageAnnotation({
           assetId={annState.image_id}
           imgW={imgW}
           imgH={imgH}
+          imageSource={imgRef.current}
           onAccept={applyProposals}
           onClose={()=>setShowAI(false)}
         />

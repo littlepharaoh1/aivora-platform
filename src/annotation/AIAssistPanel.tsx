@@ -16,11 +16,12 @@ import {
 import type { AssistModel, Proposal } from "../lib/aiAnnotation/aiAnnotationTypes";
 
 export interface AIAssistPanelProps {
-  assetId:   string;
-  imgW:      number;
-  imgH:      number;
-  onAccept:  (proposals: Proposal[]) => void;   // hand accepted → manual addAnnotation
-  onClose:   () => void;
+  assetId:     string;
+  imgW:        number;
+  imgH:        number;
+  imageSource: CanvasImageSource | null;        // the loaded image for inference
+  onAccept:    (proposals: Proposal[]) => void; // hand accepted → manual addAnnotation
+  onClose:     () => void;
 }
 
 export default function AIAssistPanel(props: AIAssistPanelProps) {
@@ -36,7 +37,7 @@ export default function AIAssistPanel(props: AIAssistPanelProps) {
     // Input tensor is built by the runtime layer when weights are hosted.
     // Until then the service returns a clear "weights not uploaded" message.
     const labelList = labels.split(",").map(s=>s.trim()).filter(Boolean);
-    ai.runAutoAnnotate(model, null, labelList);
+    ai.runAutoAnnotate(model, props.imageSource, labelList);
   };
 
   const acceptAndApply = () => {
