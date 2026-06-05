@@ -179,8 +179,8 @@ export const MODEL_CATALOG: ModelEntry[] = [
     version:      "8.0.0",
     quantization: "fp32",
     task:         "object_detect",
-    url:          "/models/yolov8n.onnx",
-    sha256:       null,   // pending — upload weights then set hash
+    url:          "https://ausczfqaemtfqvosjyqo.supabase.co/storage/v1/object/public/Models/yolov8n.onnx",
+    sha256:       "0180037abbc2697e289ad5bdf0a31eaae4c0f9da9e44f455fccab776b1a6a185",
     capabilities: {
       task:"object_detect", sampleRate:0, frameSize:640, channels:3,
       inputNames:["images"], outputNames:["output0"],
