@@ -106,7 +106,10 @@ export class ONNXRuntimeOrchestrator {
       const backends: ONNXBackend[] = ["webgpu", "wasm", "cpu"];
       for(const backend of backends) {
         try {
-          (ort as any).env.wasm.proxy = true;
+          // WASM helper files from official CDN (Vercel doesn't serve them locally)
+          (ort as any).env.wasm.wasmPaths =
+            "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+          (ort as any).env.wasm.proxy = false;   // proxy worker causes silent load failures
           this._backend   = backend;
           this._available = true;
 
@@ -160,10 +163,27 @@ export class ONNXRuntimeOrchestrator {
     if(!this._ort || !this._available) return false;
 
     try {
-      const ort     = this._ort as any;
-      const session = await ort.InferenceSession.create(entry.url, {
-        executionProviders: [this._backend === "webgpu" ? "webgpu" : "wasm"],
-      });
+      const ort = this._ort as any;
+      // Try preferred backend, then fall back to WASM if it fails (e.g. WebGPU
+      // unsupported for this op set). This keeps the fallback chain intact.
+      let session: unknown = null;
+      const providers = this._backend === "webgpu" ? ["webgpu", "wasm"] : ["wasm"];
+      let lastErr = "";
+      for(const ep of providers) {
+        try {
+          session = await ort.InferenceSession.create(entry.url, {
+            executionProviders: [ep],
+          });
+          if(session) break;
+        } catch(epErr) {
+          lastErr = epErr instanceof Error ? epErr.message : String(epErr);
+          continue;
+        }
+      }
+      if(!session) {
+        (this as any)._lastLoadError = lastErr || "all execution providers failed";
+        return false;
+      }
 
       this._sessions.set(modelId, session);
 
