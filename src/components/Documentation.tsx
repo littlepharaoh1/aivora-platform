@@ -1,449 +1,555 @@
 // @ts-nocheck
 /**
- * Documentation.tsx — Aivora Platform Documentation
+ * Documentation.tsx — Aivora AI Platform Documentation
+ * Comprehensive reference: company, vision, every module, usage guides.
  */
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 const DOCS = [
+  // ════════════════════════════════════════════════════════════════════════
   {
-    section: "GETTING STARTED",
+    section: "WHO WE ARE",
     color: "#0EA5E9",
     items: [
       {
-        title: "Platform Overview",
-        content: `Aivora is an AI-native forensic audio infrastructure platform.
+        title: "Aivora AI — Overview",
+        content: `Aivora AI
 
-It combines professional DSP engineering with AI-powered analysis to deliver:
-- Broadcast-grade audio QA (ITU-R BS.1770-4)
-- Forensic silence repair and reconstruction
-- Verifier-backed benchmark evaluation
-- Enterprise batch processing (200+ files)
-- Real-time AudioWorklet DSP pipeline
+We build the infrastructure for trustworthy AI data — a unified, browser-native platform for producing, processing, and verifying multimodal AI training data across audio, speech, image, and video.
 
-Built for: TTS dataset teams, ASR researchers, audio QA engineers, AI companies.`
+WHAT WE DO
+Aivora AI unifies professional-grade data production, quality assurance, and a forensic-grade trust layer in a single deterministic system that runs entirely in the browser — no mandatory cloud, no hidden state.
+
+Our domain:
+- AI dataset production and preparation
+- Forensic-grade quality assurance for data
+- Annotation and review workforce management
+- Data integrity verification and auditability`
       },
       {
-        title: "Quick Start",
-        content: `HOW TO USE AIVORA — Step by Step
+        title: "Our Mission",
+        content: `OUR MISSION
 
-STEP 1: Upload your audio
-→ Every tool has a drag-and-drop area or "Upload WAV" button
-→ Supported: WAV (PCM16, PCM24, Float32), MP3, AAC
-→ Recommended: 48kHz, 32-bit float WAV
+To solve the hardest problem in the AI data industry: trust.
 
-STEP 2: Choose your tool
-→ QC Workstation     — check audio quality metrics
-→ Forensic Repair    — fix silence problems
-→ Enhancement Lab    — improve audio quality
-→ Delivery Readiness — validate before delivery
-→ Audio Bench        — benchmark & score your audio
-→ Conv. Rooms        — mix 2-speaker conversations
+The challenge isn't producing labeled data — it's proving that data is clean, consistent, and free of tampering. Most platforms optimize for speed and volume. We optimize for what is harder and rarer: provable quality.
 
-STEP 3: Process
-→ Each tool shows results immediately after upload
-→ Adjust settings if needed
-→ Click the main action button (Run / Process / Mix)
+Every operation in Aivora is:
+- Deterministic — the same input always produces the same output
+- Auditable — an immutable record of every action
+- Verifiable — checksums and full provenance tracking
 
-STEP 4: Export
-→ Download button appears after processing
-→ Output is always 32-bit float WAV at 48kHz
-→ Results are saved to Activity Monitor automatically
+We build the verification layer the industry is missing.`
+      },
+      {
+        title: "Our Vision",
+        content: `OUR VISION
 
-TIPS:
-→ Start with Delivery Readiness to check any file
-→ Use Quality Tier selector in Forensic Repair for your use case
-→ Check Activity Monitor to track all processed files`
+To become the standard trust layer for the AI data industry — the platform that data companies themselves rely on to verify and prove the quality of their output to their clients and to regulators.
+
+As regulation tightens (EU AI Act, GDPR) and proving data provenance and integrity becomes mandatory, Aivora aims to be the infrastructure that makes it possible — deterministically, transparently, and in the browser.
+
+WHERE WE ARE TODAY
+A complete technical platform spanning 12+ subsystems, built on a deterministic, offline-first, GPU-native architecture. We are building the technical foundation on which the trust layer stands.`
+      },
+      {
+        title: "Who It's For",
+        content: `WHO IT'S FOR
+
+- Data labeling companies that need to prove quality
+- ML teams building proprietary datasets that need consistency guarantees
+- Speech, TTS, and ASR teams that need precise QA
+- Researchers who need reproducible, auditable data
+- Organizations operating under regulatory data requirements
+
+Whether you produce data, review it, or depend on its integrity — Aivora gives you the tools to trust what you ship.`
       },
     ]
   },
+  // ════════════════════════════════════════════════════════════════════════
   {
-    section: "TOOLS",
-    color: "#8B5CF6",
+    section: "PLATFORM ARCHITECTURE",
+    color: "#8b5cf6",
     items: [
       {
-        title: "QC Workstation",
-        content: `HOW TO USE:
-1. Click "Upload" or drag a WAV file
-2. Wait for automatic analysis (2-5 seconds)
-3. Read the metrics:
-   → LUFS: loudness level (-23 = broadcast standard)
-   → SNR: signal-to-noise ratio (higher = cleaner)
-   → True Peak: maximum peak (-1.0 dBTP = safe limit)
-   → RT60: room reverb time (lower = cleaner room)
-   → DNSMOS: AI quality score (1-5, higher = better)
-   → Noise Class: what type of noise is detected
-   → Export Safe: green = ready to deliver, red = fix needed
+        title: "Core Principles",
+        content: `CORE ENGINEERING PRINCIPLES
 
-WHAT IT DOES:
-Professional audio quality control with 30+ DSP modules.
+1. DETERMINISM FIRST
+The same input always produces the same output, routing, and ordering. No hidden randomness. This is what makes results reproducible and auditable.
 
-Metrics computed:
-- LUFS (ITU-R BS.1770-4 integrated, short-term, momentary)
-- True Peak (4x oversampled interpolation)
-- SNR (VAD-separated spectral estimate)
-- RT60 reverb time (Schroeder backward integration)
-- DNSMOS (blind quality estimation)
-- Noise classification (HVAC/hum/hiss/AI artifacts)
-- Export safety validation (10 checks)
+2. BROWSER-NATIVE COMPUTE
+Runs on your GPU through the browser — WebGPU, with automatic fallback. No mandatory cloud inference, no data leaving your machine unless you choose.
 
-Use for: Pre-delivery QA, dataset acceptance gates, compliance checking`
+3. OFFLINE-FIRST
+Every operation has an offline fallback. Work continues without a connection; changes sync when you reconnect.
+
+4. ENTERPRISE GOVERNANCE
+Every critical operation is observable, replayable, versioned, and checksummed.`
       },
       {
-        title: "Forensic Silence Repair",
-        content: `Adobe Audition-grade silence reconstruction.
+        title: "Execution & Fallback Chain",
+        content: `EXECUTION MODEL
 
-Features:
-- Silence detection (RMS threshold + duration filter)
-- Room tone synthesis (spectral matching + noise shaping)
-- Speech protection lock (VAD + safety margin expansion)
-- Raised-cosine crossfades at all boundaries
-- Noise Intelligence panel (RT60 + noise class + quality score)
-- Batch mode (200+ files with progress tracking)
-- Export: 32-bit float WAV
+Aivora runs compute on the best available backend and falls back gracefully:
 
-Critical rule: Never uses digital mute. Always synthesizes natural room tone.`
+WebGPU → WebGL2 → WASM SIMD → CPU Workers
+
+If your device supports WebGPU, heavy work (FFT, spectrograms, model inference) runs GPU-accelerated. If not, it falls back automatically — the same operation still completes, just slower. You never hit a hard failure because a backend is missing.`
       },
       {
-        title: "Audition Workstation (Pro Editor)",
-        content: `Professional waveform + spectrogram editor.
+        title: "Technology Stack",
+        content: `TECHNOLOGY STACK
 
-Visualization:
-- HDR spectrogram (bilinear interpolation, 87.5% overlap)
-- 5 colormaps: plasma/inferno/aivora/forensic/MEL
-- 5 window functions: Hann/Hamming/Blackman/Blackman-Harris/Kaiser
-- Peak + RMS waveform with dB scale
-- Sample-level zoom (dots + zero crossings + Catmull-Rom)
-- WebGL GPU renderer (vertex + fragment shaders)
-- Minimap overview + click-to-navigate
+Frontend:    React + TypeScript + Vite
+Backend:     Supabase (PostgreSQL) with Row-Level Security everywhere
+Runtime:     WebGPU, SharedArrayBuffer, ONNX Runtime Web
+Compute:     Worker pools, shared memory, deterministic orchestration
 
-Intelligence:
-- Noise fingerprinting (HVAC/hum/hiss/AI artifacts)
-- DNSMOS MOS score
-- Timeline Engine integration (non-destructive DAG)
-- Forensic cursor inspector (SMPTE + spectral metrics)
-
-FFT sizes: 512/1024/2048/4096/8192`
-      },
-      {
-        title: "Enhancement Lab",
-        content: `Level 2 DSP audio enhancement pipeline.
-
-Processors (in order):
-1. Spectral Denoising — Wiener filter with FFT spectral subtraction
-2. Multi-band Compression — 4 bands (200Hz/1kHz/4kHz Butterworth crossovers)
-3. De-click — Adaptive median filter + cubic interpolation
-4. High-pass Filter — 2nd order Butterworth (12dB/octave)
-5. Low-pass Filter — 2nd order Butterworth
-6. Noise Gate — Envelope follower with attack/release
-7. Silence Trim — Energy threshold trimming
-8. Normalization — Peak or LUFS (ITU-R BS.1770-4)
-
-Output: 32-bit float WAV`
-      },
-      {
-        title: "Audio Bench",
-        content: `Verifier-backed forensic audio benchmark system.
-
-9 benchmark tasks:
-- ABT-001: Noisy Silence Repair (Medium)
-- ABT-002: 50Hz Hum Removal (Hard)
-- ABT-003: Speech Preservation (Expert)
-- ABT-004: ASR Dataset Readiness (Hard)
-- ABT-005: Dead Silence Detection (Easy)
-- ABT-006: Hiss Reduction (Hard)
-- ABT-007: Clipping Recovery (Expert)
-- ABT-008: Stereo Phase Repair (Medium)
-- ABT-009: TTS Quality Gate (Expert)
-
-Verifier metrics: LUFS, True Peak, SNR, Hum, Seam Risk, Speech Preservation
-Scoring: 0-100 with grade A/B/C/D/F
-Export: JSONL training data + manifest JSON`
-      },
-      {
-        title: "Delivery Readiness",
-        content: `10-check export safety gate before delivery.
-
-Checks:
-1. Format validity (sample rate, channels, length)
-2. True Peak ≤ -1.0 dBTP
-3. LUFS within -35 to -10 range
-4. Clipping ratio < 0.1%
-5. No digital mute (RMS > -90dB)
-6. No repeated texture (silence loop detection)
-7. Seam risk < 0.25
-8. Duration drift < 50ms
-9. Sample rate = 48000 Hz
-10. Speech preservation > 95%
-
-Results logged to Supabase activity database.
-Export blocked automatically on critical failures.`
-      },
-      {
-        title: "Batch Analyzer",
-        content: `Process 200+ files simultaneously.
-
-Features:
-- Parallel processing with concurrency control
-- Per-file QC scoring
-- Silence repair pipeline
-- LUFS normalization
-- Export validation gate
-- Progress tracking with ETA
-- Pause/Resume/Cancel support
-- Results saved to Supabase
-
-Output: 32-bit float WAV files + QC report`
+All data access is governed by Row-Level Security. All AI models pass through a governed registry with version and checksum tracking.`
       },
     ]
   },
+  // ════════════════════════════════════════════════════════════════════════
   {
-    section: "DSP ENGINE",
-    color: "#10B981",
+    section: "GETTING STARTED",
+    color: "#22c55e",
     items: [
       {
-        title: "Phase 1 — Professional DSP Core",
-        content: `Linkwitz-Riley 4th order crossovers (LR4):
-- Phase coherent at crossover point (-6dB)
-- No comb filtering, no phase cancellation
-- 3-way split: 200Hz / 1kHz / 4kHz
+        title: "Navigating the Platform",
+        content: `NAVIGATING AIVORA
 
-Lookahead Limiter:
-- 5ms lookahead, zero overshoot guarantee
-- Smooth release (50ms)
-- True peak safety gate
+The sidebar groups tools into sections:
 
-Adaptive Noise Floor Tracker:
-- Martin (2001) minimum statistics
-- Per-bin noise estimation
-- Adapts to slowly changing environments
+PRODUCTION — daily audio work (Dashboard, QC, Batch, Naming, Enhancement, Pipeline, Conversation Rooms)
+REPAIR — the Professional Audio Editor
+MANAGE — Contributors, Activity Monitor
+SYSTEM — DSP Management, Validation, Bench, Observability, Store, Documentation
+ENTERPRISE — the advanced suite (AI OS, Runtime, Analytics, Speech, Dataset Factory, QA Intelligence, Multimodal, Image/Video Annotation, Project Management, Workforce OS)
 
-Adaptive Wiener Filter:
-- Temporal smoothing (α=0.7)
-- Soft thresholding
-- Overlap-add reconstruction`
+Hover any sidebar icon to see its label. Click to open that workstation.`
       },
       {
-        title: "Phase 2 — Spectral Intelligence",
-        content: `Multi-Resolution FFT (simultaneous):
-- Short FFT (256) — 5ms transient precision
-- Medium FFT (1024) — 21ms speech clarity
-- Large FFT (4096) — 85ms forensic precision
+        title: "Your First Workflow",
+        content: `A TYPICAL FIRST SESSION
 
-Frequency scales: Linear, Mel, Bark, Log
-Window functions: Hann, Hamming, Blackman, Kaiser, Blackman-Harris
+1. Open QC Workstation and upload an audio file (drag-and-drop or Upload).
+2. Review the quality metrics (LUFS, SNR, clipping, silence analysis).
+3. If issues are found, send the file to Enhancement Lab or Forensic Repair.
+4. Validate with Delivery Readiness before exporting.
+5. Export in your required format.
 
-Formant Detection:
-- LPC via Levinson-Durbin recursion
-- Order: 12 (2 + sr/1000)
-- F1/F2/F3/F4 extraction
-
-24-band Bark filter bank (psychoacoustic analysis)`
-      },
-      {
-        title: "Phase 3 — Forensic Engine",
-        content: `Noise Classifier:
-- 8 classes: HVAC/50Hz hum/60Hz hum/hiss/mic noise/room/AI artifacts/clean
-- Harmonic series detector (50/60Hz + 6 harmonics)
-- AI artifact detection (comb/metallic/discontinuity)
-- Spectral slope estimation (dB/octave)
-
-RT60 Estimation:
-- Schroeder backward integration
-- T20 extrapolation to RT60
-- Early Decay Time (EDT)
-- C80 clarity metric
-
-Noise profile similarity (cosine distance)`
-      },
-      {
-        title: "Phase 4 — AI Audio Intelligence",
-        content: `Objective Metrics:
-- SI-SDR (Le Roux et al. 2019)
-- STOI approximation (Taal et al. 2011) — 19 one-third octave bands
-- PESQ proxy (ITU-T P.862 approximation)
-- DNSMOS proxy (blind quality estimation)
-- Log Spectral Distance
-
-Enhancement Agent:
-- Autonomous pipeline selection
-- Context-aware: TTS/ASR/broadcast/forensic/general
-- Speech preservation validation
-- Export safety gate
-- Rollback on TTS speech damage
-
-ONNX Runtime:
-- WebGPU/WASM/CPU auto-selection
-- DSP fallback when model unavailable
-- VAD: energy + ZCR + hangover`
-      },
-      {
-        title: "Phase 5 — Enterprise Infrastructure",
-        content: `Export Validator (10 checks):
-- True peak, LUFS, clipping, digital mute
-- Seam risk, repeated texture, duration drift
-- Sample rate, speech preservation
-- Blocks export on critical failures
-
-Batch Processor:
-- Resumable job queue (pause/resume/cancel)
-- Per-file validation gate
-- Memory-safe chunk processing
-- Progress reporting with ETA
-
-AudioWorklet:
-- Dedicated audio rendering thread
-- Zero main-thread blocking
-- Realtime RMS + peak metering
-- Lookahead limiting
-- Clip detection + ZCR`
+Every step is logged and reproducible — you can always trace what was done to a file.`
       },
     ]
   },
+  // ════════════════════════════════════════════════════════════════════════
   {
-    section: "WHATS NEW",
+    section: "AUDIO & PRODUCTION",
     color: "#22d3ee",
     items: [
       {
-        title: "Latest Updates",
-        content: "CHANGELOG",
-      }
-    ]
-  },
-  {
-    section: "STANDARDS",
-    color: "#F59E0B",
-    items: [
-      {
-        title: "Audio Standards",
-        content: `ITU-R BS.1770-4 — Loudness measurement
-- K-weighting filter (pre-filter + RLB)
-- Absolute gate: -70 LUFS
-- Relative gate: -10 LU
-- True peak: 4x oversampled interpolation
+        title: "QC Workstation",
+        content: `QC WORKSTATION
 
-EBU R128 — Broadcast loudness
-- Integrated: -23 LUFS ±1 LU
-- True Peak: ≤ -1.0 dBTP
-- Loudness Range (LRA)
+Analyze audio quality against broadcast and dataset standards.
 
-Delivery QA Standards:
-- Silence RMS: -65 to -42 dB
-- SNR: ≥ 15 dB
-- Speech preservation: > 98%
-- Duration drift: < 50ms`
+What it checks:
+- Loudness (LUFS, ITU-R BS.1770-4)
+- Signal-to-noise ratio (SNR)
+- Clipping and digital silence detection
+- Hard cuts, reverb, spectral noise
+- Voice activity (VAD)
+
+How to use:
+1. Upload a WAV/MP3/AAC file.
+2. The workstation runs all analyzers automatically.
+3. Review the metric panel — green means within spec, amber/red flags issues.
+4. Send flagged files to Enhancement Lab or Forensic Repair.`
       },
       {
-        title: "File Requirements",
-        content: `Recommended input format:
-- Sample rate: 48000 Hz
-- Bit depth: 32-bit float (or 16/24-bit PCM)
-- Channels: Mono (stereo supported)
-- Format: WAV (uncompressed)
+        title: "Batch Analyzer",
+        content: `BATCH ANALYZER
 
-Output format:
-- Always 32-bit float WAV
-- Sample rate preserved (or 48kHz normalized)
-- Channels preserved
+Process 200+ files at once with the same QC pipeline.
 
-Naming convention (Standard):
-- Sequential: S0001.wav → S0200.wav
-- With task: S0001_T01.wav
-- Speaker: SPK01_0001.wav`
+How to use:
+1. Drag a folder or multiple files into the batch area.
+2. The analyzer queues and processes them deterministically.
+3. Review the summary table — sort by any metric to find problem files.
+4. Export the batch report or send flagged files downstream.
+
+Ideal for validating an entire dataset before delivery.`
+      },
+      {
+        title: "Enhancement Lab",
+        content: `ENHANCEMENT LAB
+
+Improve audio quality with professional DSP.
+
+Available processing:
+- Noise reduction and hum removal
+- Loudness normalization
+- Multi-band EQ
+- Dynamic compression
+- Silence trimming
+
+How to use:
+1. Upload your file.
+2. Choose the enhancement chain (or apply individually).
+3. Compare before/after with the A/B preview.
+4. Export the processed result.`
+      },
+      {
+        title: "Audio Pipeline",
+        content: `AUDIO PIPELINE
+
+End-to-end processing: take raw audio through analysis, repair, enhancement, and validation in one flow.
+
+How to use:
+1. Define your pipeline stages (or use a preset).
+2. Upload input audio.
+3. The pipeline runs each stage deterministically, logging every step.
+4. Review the per-stage output and export the final result.`
+      },
+      {
+        title: "Smart Naming",
+        content: `SMART NAMING
+
+Automatically generate consistent, sequenced file names for datasets, including Arabic numeral support and German sequencing.
+
+How to use:
+1. Load your files.
+2. Choose a naming template and sequence rule.
+3. Preview the generated names.
+4. Apply and export the renamed set (with a ZIP option).`
+      },
+      {
+        title: "Conversation Rooms",
+        content: `CONVERSATION ROOMS
+
+Mix and manage 2-speaker conversation audio — useful for dialogue datasets and TTS training data.
+
+How to use:
+1. Load speaker tracks.
+2. Arrange turns on the timeline.
+3. Balance levels and validate the mix.
+4. Export the combined conversation.`
+      },
+      {
+        title: "Professional Audio Editor (Pro Editor)",
+        content: `PRO EDITOR
+
+A full professional waveform and spectral editor — Adobe Audition-style.
+
+Features:
+- Green waveform renderer with dB scale
+- Spectrogram Pro (4 colormaps, log frequency, FFT size control)
+- Forensic silence repair and reconstruction
+- 32-bit float export
+- Region editing, time-stretch, spectral repair
+
+How to use:
+1. Open a WAV file.
+2. Use the toolbar to zoom, select regions, and switch between waveform and spectrogram views.
+3. Apply repairs or edits to selected regions.
+4. Export in your required bit depth.`
+      },
+    ]
+  },
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    section: "SPEECH & ANNOTATION",
+    color: "#f59e0b",
+    items: [
+      {
+        title: "Speech Intelligence",
+        content: `SPEECH INTELLIGENCE
+
+Automatic speech recognition (ASR) and transcription across 53 languages, with right-to-left support.
+
+How to use:
+1. Upload audio.
+2. Select the language (or auto-detect).
+3. The system transcribes with word-level timestamps.
+4. Review and export the transcript.`
+      },
+      {
+        title: "Transcript Workstation Pro",
+        content: `TRANSCRIPT WORKSTATION PRO
+
+A professional transcript editor with word-level timestamps and versioning.
+
+Features:
+- Click any word to jump to that point in the audio
+- Search and replace across the transcript
+- Multiple export formats
+- Full edit history and versioning
+
+How to use:
+1. Open a transcript (or generate one from Speech Intelligence).
+2. Edit text while audio stays synced.
+3. Save versions as you go.
+4. Export in your required format.`
+      },
+      {
+        title: "Image Annotator",
+        content: `IMAGE ANNOTATOR
+
+A professional image annotation workstation with 9 annotation tools, layers, and QA flags.
+
+Features:
+- Bounding boxes, polygons, and more (9 tools)
+- Layers and a taxonomy/class system
+- Zoom (0.1x–40x) with snapping
+- Export to COCO, YOLO, Pascal VOC, JSONL, and AIVORA native formats
+- AI Assist panel for model-suggested annotations (with human approval)
+
+How to use:
+1. Upload an image.
+2. Pick a tool and class, then draw annotations.
+3. Optionally open AI Assist to get model proposals — review and accept/reject each.
+4. Export in your required format.`
+      },
+      {
+        title: "Video Annotator",
+        content: `VIDEO ANNOTATOR
+
+Annotate video with object tracking across frames.
+
+Features:
+- Tracks and keyframes with deterministic interpolation
+- Timeline scrubber
+- Handles long videos via frame windowing
+- Export to COCO Video, MOT, YOLO Video, and JSONL
+
+How to use:
+1. Load a video.
+2. Annotate objects on keyframes; the system interpolates between them.
+3. Navigate windows for long videos using Prev/Next.
+4. Export in your required tracking format.`
+      },
+      {
+        title: "AI-Assisted Annotation",
+        content: `AI-ASSISTED ANNOTATION
+
+Enhances manual annotation — it never replaces it. Models propose annotations; humans approve.
+
+Supported models:
+- YOLO — object detection (bounding boxes)
+- SAM2 — segmentation masks
+- Grounding DINO — text-guided detection
+- CLIP — semantic classification
+
+How it works:
+1. In the Image Annotator, open the AI Assist panel.
+2. Choose a model and run one-click auto-annotate.
+3. Proposals appear with confidence colors.
+4. Accept, reject, or edit each — accepted proposals become real annotations through the same path as manual drawing.
+
+Note: model weights are configured per deployment. When a model's weights are not yet hosted, the panel shows its availability status.`
+      },
+    ]
+  },
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    section: "DATA & ENTERPRISE",
+    color: "#f97316",
+    items: [
+      {
+        title: "Dataset Factory",
+        content: `DATASET FACTORY
+
+Turn annotated and processed data into clean, versioned, enterprise-ready datasets.
+
+Features:
+- Pipeline definitions with quality gates
+- Train/validation/test split visualization
+- Dataset versioning
+- Multi-format export
+
+How to use:
+1. Define a pipeline (sources, quality gates, splits).
+2. Run it — the factory reads from authoritative tables only.
+3. Review the quality gate results and split distribution.
+4. Export the versioned dataset.`
+      },
+      {
+        title: "QA Intelligence",
+        content: `QA INTELLIGENCE
+
+Workforce quality and integrity intelligence — consensus, fraud signals, routing, and review queues.
+
+Panels:
+- Consensus — multi-reviewer agreement resolution
+- Fraud Intel — advisory signals on suspicious patterns
+- Review Queue — pending review management
+- Routing — task routing logic
+- Workforce — reviewer overview
+
+How to use:
+Open QA Intelligence to monitor review quality across your workforce. All signals are advisory — they surface issues for human decision, never act automatically.`
+      },
+      {
+        title: "Workforce OS",
+        content: `WORKFORCE OS
+
+Manage your annotation and review workforce at scale (validated to 10,000 workers / 100,000 assignments).
+
+Six views:
+- Workers — identity, activity, skills overview
+- Skill Matrix — proficiency across 6 skill types
+- Performance — throughput, acceptance, QA, rework, disagreement
+- Capacity — workload, overload risk, assignment suggestions
+- Fraud — advisory integrity signals (speed, copy, repeat, agreement)
+- Analytics — rankings and trends
+
+How to use:
+Open Workforce OS to see your team's performance and capacity. Use the capacity view to balance new assignments, and the fraud view to flag workers for human review. All scoring is deterministic and advisory.`
+      },
+      {
+        title: "Project Management",
+        content: `PROJECT MANAGEMENT
+
+Organize work into projects with role-based access and an immutable audit trail.
+
+Features:
+- Projects, task board, and team views
+- Role-based permissions (mapped from platform roles)
+- Immutable audit log (insert-only, SHA-256 checksummed, tamper-detectable)
+
+How to use:
+1. Create a project and add members with roles.
+2. Assign and track tasks on the board.
+3. Every action is recorded in the audit trail — review it anytime for full accountability.`
+      },
+      {
+        title: "Analytics",
+        content: `ANALYTICS
+
+Platform-wide analytics across processing, QA, routing, and workforce.
+
+Includes charts for:
+- DSP timing
+- Forensic verdicts
+- Fraud heatmap
+- Queue/retry behavior
+- Reviewer throughput
+- Routing decisions
+
+How to use:
+Open Analytics for a live dashboard of platform activity. Use it to spot bottlenecks, quality trends, and workforce patterns.`
+      },
+      {
+        title: "Runtime Center & AI OS",
+        content: `RUNTIME CENTER & AI OS
+
+The control plane for the platform's compute runtime.
+
+Runtime Center panels:
+- GPU Operations
+- Inference Operations
+- Memory Governance
+- Worker Pool Inspector
+- Session Survivability
+
+AI OS:
+A unified operations center for AI model execution and monitoring.
+
+How to use:
+These are advanced operational tools. Open Runtime Center to monitor GPU usage, worker pools, and memory; open AI OS to oversee model inference across the platform.`
+      },
+    ]
+  },
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    section: "TRUST & DETERMINISM",
+    color: "#ef4444",
+    items: [
+      {
+        title: "Why Determinism Matters",
+        content: `WHY DETERMINISM MATTERS
+
+In most data platforms, you cannot prove how a result was produced. Aivora is built so that every result is reproducible: run the same operation on the same input, and you get an identical output — every time.
+
+This is the foundation of trust. If a dataset is questioned — by a client, an auditor, or a regulator — you can replay exactly how it was produced.`
+      },
+      {
+        title: "The Trust Layer",
+        content: `THE TRUST LAYER
+
+Aivora's strongest differentiator is its forensic-grade trust and verification layer:
+
+- Immutable audit — every critical action is logged insert-only, with SHA-256 checksums, and tamper is detectable.
+- Consensus engine — multi-reviewer agreement is resolved deterministically.
+- Fraud detection — advisory signals surface suspicious annotation patterns.
+- Provenance — full lineage tracking for data and model inference.
+
+Together, these let you not just produce data — but prove it is clean and consistent.`
       },
     ]
   },
 ];
 
 export default function Documentation() {
-  const [changelog, setChangelog] = useState<string>("Loading...");
-
-  useEffect(() => {
-    fetch("/CHANGELOG.md")
-      .then(r => r.text())
-      .then(t => setChangelog(t))
-      .catch(() => setChangelog("Documentation available soon."));
-  }, []);
-  const [activeSection, setActiveSection] = useState("GETTING STARTED");
-  const [activeItem,    setActiveItem]    = useState(0);
-  const [search,        setSearch]        = useState("");
-
-  const filtered = DOCS.map(s => ({
-    ...s,
-    items: s.items.filter(i =>
-      !search || i.title.toLowerCase().includes(search.toLowerCase()) ||
-      i.content.toLowerCase().includes(search.toLowerCase())
-    )
-  })).filter(s => s.items.length > 0);
-
-  const currentSection = filtered.find(s => s.section === activeSection) ?? filtered[0];
-  const currentItem    = currentSection?.items[activeItem] ?? currentSection?.items[0];
+  const [active, setActive] = useState(0);
+  const [openItem, setOpenItem] = useState<string | null>(null);
 
   return (
-    <div style={{ height:"100%", display:"flex", background:"#020608",
-      fontFamily:"JetBrains Mono,monospace", color:"#a0c4cc", overflow:"hidden" }}>
+    <div style={{height:"100%",display:"flex",background:"#080c14",
+      color:"#e5e7eb",fontFamily:"'JetBrains Mono',monospace",overflow:"hidden"}}>
 
-      {/* Sidebar */}
-      <div style={{ width:200, borderRight:"1px solid #0a1520", overflow:"auto",
-        flexShrink:0, padding:"12px 0" }}>
-        <div style={{ padding:"0 12px 12px", borderBottom:"1px solid #0a1520",
-          marginBottom:8 }}>
-          <input value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="Search docs..."
-            style={{ width:"100%", boxSizing:"border-box",
-              background:"#030810", border:"1px solid #1a3a5a",
-              borderRadius:6, padding:"6px 8px", color:"#E2EEF6",
-              fontSize:9, fontFamily:"inherit", outline:"none" }}/>
+      {/* Section nav */}
+      <div style={{width:240,borderRight:"1px solid #1f2937",background:"#0a0f1a",
+        overflowY:"auto",flexShrink:0,padding:"12px 0"}}>
+        <div style={{padding:"0 16px 12px",fontSize:11,fontWeight:700,
+          color:"#22d3ee",letterSpacing:1}}>
+          DOCUMENTATION
         </div>
-
-        {filtered.map(section => (
-          <div key={section.section}>
-            <div style={{ fontSize:7, color:section.color, letterSpacing:2,
-              padding:"6px 12px 4px", fontWeight:700 }}>
-              {section.section}
-            </div>
-            {section.items.map((item, i) => (
-              <div key={i} onClick={()=>{setActiveSection(section.section);setActiveItem(i);}}
-                style={{ padding:"5px 12px", cursor:"pointer", fontSize:9,
-                  color: activeSection===section.section&&activeItem===i
-                    ? section.color : "#4a6a7a",
-                  background: activeSection===section.section&&activeItem===i
-                    ? `${section.color}10` : "transparent",
-                  borderLeft: activeSection===section.section&&activeItem===i
-                    ? `2px solid ${section.color}` : "2px solid transparent",
-                }}>
-                {item.title}
-              </div>
-            ))}
-          </div>
+        {DOCS.map((s, i) => (
+          <button key={i} onClick={()=>{setActive(i);setOpenItem(null);}}
+            style={{display:"block",width:"100%",textAlign:"left",padding:"9px 16px",
+              border:"none",borderLeft:`2px solid ${active===i?s.color:"transparent"}`,
+              background:active===i?`${s.color}14`:"transparent",
+              color:active===i?s.color:"#9ca3af",cursor:"pointer",
+              fontSize:10,fontFamily:"inherit",letterSpacing:0.5}}>
+            {s.section}
+          </button>
         ))}
       </div>
 
       {/* Content */}
-      <div style={{ flex:1, overflow:"auto", padding:24 }}>
-        {currentItem ? (
-          <>
-            <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:8, color:currentSection?.color,
-                letterSpacing:2, marginBottom:4 }}>
-                {currentSection?.section}
+      <div style={{flex:1,overflowY:"auto",padding:"24px 28px"}}>
+        <div style={{fontSize:18,fontWeight:700,color:DOCS[active].color,
+          marginBottom:20,letterSpacing:0.5}}>
+          {DOCS[active].section}
+        </div>
+        <div style={{display:"grid",gap:10,maxWidth:820}}>
+          {DOCS[active].items.map((item, j) => {
+            const key = `${active}-${j}`;
+            const isOpen = openItem === key;
+            return (
+              <div key={j} style={{background:"#0a0f1a",border:"1px solid #1f2937",
+                borderRadius:10,overflow:"hidden"}}>
+                <button onClick={()=>setOpenItem(isOpen?null:key)}
+                  style={{width:"100%",textAlign:"left",padding:"13px 16px",
+                    border:"none",background:"transparent",color:"#e5e7eb",
+                    cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:"inherit",
+                    display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <span>{item.title}</span>
+                  <span style={{color:DOCS[active].color,fontSize:11}}>{isOpen?"−":"+"}</span>
+                </button>
+                {isOpen && (
+                  <div style={{padding:"0 16px 16px",fontSize:12,lineHeight:1.7,
+                    color:"#9ca3af",whiteSpace:"pre-wrap",
+                    borderTop:"1px solid #1f2937",paddingTop:14}}>
+                    {item.content}
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize:20, fontWeight:700, color:"#E2EEF6" }}>
-                {currentItem.title}
-              </div>
-            </div>
-            <div style={{ fontSize:11, color:"#64A0B8", lineHeight:1.8,
-              whiteSpace:"pre-wrap",
-              background:"#050d18", border:"1px solid #0f2030",
-              borderRadius:8, padding:20 }}>
-              {currentItem.content === "CHANGELOG" ? changelog : currentItem.content}
-            </div>
-          </>
-        ) : (
-          <div style={{ color:"#2a5a6a", fontSize:10, marginTop:40,
-            textAlign:"center" }}>
-            No results for "{search}"
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
