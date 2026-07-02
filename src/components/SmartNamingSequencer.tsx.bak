@@ -1,11 +1,13 @@
 // @ts-nocheck
 /**
- * SmartNamingSequencer.tsx — Smart Naming Sequencer (German 200 / English UK 80)
+ * SmartNamingSequencer.tsx — German Wake Word Smart Naming Sequencer
  * Aivora Platform
  */
 import React, { useState, useRef, useCallback } from "react";
-import * as German from "../lib/naming/germanSequencer";
-import * as English from "../lib/naming/englishSequencer";
+import {
+  generateSequence, validateBatch, SEQUENCE_RULES,
+  LANGUAGE_PRESETS, getSuffixForIndex,
+} from "../lib/naming/germanSequencer";
 import { buildZip, downloadZip } from "../lib/naming/zipExporter";
 import { Upload, Download, CheckCircle2, XCircle, AlertTriangle, FileText } from "lucide-react";
 
@@ -14,18 +16,10 @@ const SUFFIX_COLORS = {
   "dkws_normal":       "#10b981",
   "dkws_fast":         "#f59e0b",
   "oneshot200_normal": "#8b5cf6",
-  "oneshot200_slow":   "#22d3ee",
-  "oneshot200_fast":   "#f59e0b",
   "query_normal":      "#f97316",
 };
 
-const PROJECT_TYPES = [
-  { id: "german",  label: "German — 200 (DE-DE)",   max: 200, defaultCode: "D1065", hasLocale: true  },
-  { id: "english", label: "English UK — 80",         max: 80,  defaultCode: "G0401", hasLocale: false },
-];
-
 export default function SmartNamingSequencer() {
-  const [projectType, setProjectType] = useState("german");
   const [files,       setFiles]       = useState<File[]>([]);
   const [speakerId,   setSpeakerId]   = useState("D1065");
   const [startIndex,  setStartIndex]  = useState(1);
@@ -39,33 +33,11 @@ export default function SmartNamingSequencer() {
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveError,   setDriveError]   = useState("");
 
-  const activeProject = PROJECT_TYPES.find(p => p.id === projectType);
-  const engine = projectType === "english" ? English : German;
-  const activeRules = engine.SEQUENCE_RULES;
-  const maxSeq = activeProject.max;
-
-  function handleProjectTypeChange(newType) {
-    const proj = PROJECT_TYPES.find(p => p.id === newType);
-    setProjectType(newType);
-    setSpeakerId(proj.defaultCode);
-    setStartIndex(1);
-    setFiles([]);
-    setResults([]);
-    setValidation(null);
-    setExported(false);
-  }
-
-  function runGenerate(fileList) {
-    if (projectType === "english") {
-      return English.generateSequence(fileList, { code: speakerId, startIndex });
-    }
-    return German.generateSequence(fileList, { speakerId, startIndex, locale });
-  }
-
   async function handleDriveLink() {
     if(!driveLink.trim()) return;
     setDriveLoading(true); setDriveError("");
     try {
+      // Extract folder ID from Drive link
       const folderMatch = driveLink.match(/folders\/([a-zA-Z0-9_-]+)/);
       const fileMatch   = driveLink.match(/id=([a-zA-Z0-9_-]+)/);
       const folderId    = folderMatch?.[1] ?? fileMatch?.[1];
@@ -75,12 +47,19 @@ export default function SmartNamingSequencer() {
         setDriveLoading(false); return;
       }
 
+      // Google Drive integration temporarily disabled
+      // Reason: COEP: require-corp isolation (Phase 6A.1)
+      // External cross-origin fetches incompatible with SharedArrayBuffer isolation
+      // Future: implement via Aivora backend proxy with CORP headers
       setDriveError(
         "Google Drive integration مؤقتاً معطلة — " +
         "استخدم Upload مباشرة أو انتظر الـ backend proxy في الإصدار القادم"
       );
       setDriveLoading(false);
       return;
+
+      handleFiles(downloaded as any);
+      setDriveError("");
     } catch(e: any) {
       setDriveError(e.message ?? "خطأ في تحميل الملفات");
     }
@@ -93,18 +72,18 @@ export default function SmartNamingSequencer() {
     setFiles(wavs);
     setExported(false);
 
-    const val = engine.validateBatch(wavs, startIndex);
+    const val = validateBatch(wavs, startIndex);
     setValidation(val);
 
-    const res = runGenerate(wavs);
+    const res = generateSequence(wavs, { speakerId, startIndex, locale });
     setResults(res);
   }
 
   function regenerate() {
     if (files.length === 0) return;
-    const val = engine.validateBatch(files, startIndex);
+    const val = validateBatch(files, startIndex);
     setValidation(val);
-    const res = runGenerate(files);
+    const res = generateSequence(files, { speakerId, startIndex, locale });
     setResults(res);
     setExported(false);
   }
@@ -121,10 +100,7 @@ export default function SmartNamingSequencer() {
         }))
       );
       const blob = await buildZip(zipFiles);
-      const zipName = projectType === "english"
-        ? `${speakerId}_S${String(startIndex).padStart(4,"0")}_batch.zip`
-        : `${locale}_${speakerId}_S${String(startIndex).padStart(4,"0")}_batch.zip`;
-      downloadZip(blob, zipName);
+      downloadZip(blob, `${locale}_${speakerId}_S${String(startIndex).padStart(4,"0")}_batch.zip`);
       setExported(true);
     } catch(e) {  }
     setExporting(false);
@@ -166,42 +142,26 @@ export default function SmartNamingSequencer() {
           <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:10}}>CONFIGURATION</div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
 
-            {/* Project Type */}
+            {/* Locale */}
             <div>
-              <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4}}>PROJECT</div>
-              <select value={projectType} onChange={e=>handleProjectTypeChange(e.target.value)}
+              <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4}}>LOCALE</div>
+              <select value={locale} onChange={e=>setLocale(e.target.value)}
                 style={{background:"#050d14",border:"1px solid #0f2a3a",borderRadius:6,
                   padding:"6px 10px",color:"#a0c4cc",fontSize:11,fontFamily:"monospace"}}>
-                {PROJECT_TYPES.map(p=>(
-                  <option key={p.id} value={p.id}>{p.label}</option>
+                {LANGUAGE_PRESETS.map(p=>(
+                  <option key={p.locale} value={p.locale}>{p.locale} — {p.language}</option>
                 ))}
               </select>
             </div>
 
-            {/* Locale (German only) */}
-            {activeProject.hasLocale && (
-              <div>
-                <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4}}>LOCALE</div>
-                <select value={locale} onChange={e=>setLocale(e.target.value)}
-                  style={{background:"#050d14",border:"1px solid #0f2a3a",borderRadius:6,
-                    padding:"6px 10px",color:"#a0c4cc",fontSize:11,fontFamily:"monospace"}}>
-                  {German.LANGUAGE_PRESETS.map(p=>(
-                    <option key={p.locale} value={p.locale}>{p.locale} — {p.language}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Speaker ID / Project Code */}
+            {/* Speaker ID */}
             <div>
-              <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4}}>
-                {activeProject.hasLocale ? "SPEAKER ID" : "PROJECT CODE"}
-              </div>
+              <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4}}>SPEAKER ID</div>
               <input value={speakerId}
                 onChange={e=>setSpeakerId(e.target.value.toUpperCase())}
                 style={{background:"#050d14",border:"1px solid #0f2a3a",borderRadius:6,
                   padding:"6px 10px",color:"#22d3ee",fontSize:11,fontFamily:"monospace",width:90}}
-                placeholder={activeProject.defaultCode}/>
+                placeholder="D1065"/>
             </div>
 
             {/* Start Index */}
@@ -209,8 +169,8 @@ export default function SmartNamingSequencer() {
               <div style={{fontSize:8,color:"#4a8a9a",marginBottom:4}}>START SEQUENCE</div>
               <div style={{display:"flex",alignItems:"center",gap:4}}>
                 <span style={{fontSize:10,color:"#4a8a9a"}}>S</span>
-                <input type="number" min={1} max={maxSeq} value={startIndex}
-                  onChange={e=>setStartIndex(Math.max(1,Math.min(maxSeq,parseInt(e.target.value)||1)))}
+                <input type="number" min={1} max={200} value={startIndex}
+                  onChange={e=>setStartIndex(Math.max(1,Math.min(200,parseInt(e.target.value)||1)))}
                   style={{background:"#050d14",border:"1px solid #0f2a3a",borderRadius:6,
                     padding:"6px 10px",color:"#22d3ee",fontSize:11,fontFamily:"monospace",width:70}}/>
               </div>
@@ -272,10 +232,10 @@ export default function SmartNamingSequencer() {
         {/* Sequence Map */}
         <div style={{background:"#060e16",border:"1px solid #0f2a3a",borderRadius:12,padding:14}}>
           <div style={{fontSize:9,color:"#4a8a9a",letterSpacing:1,marginBottom:10}}>
-            OFFICIAL SEQUENCE MAP — {activeProject.label}
+            OFFICIAL SEQUENCE MAP
           </div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-            {activeRules.map((r,i)=>(
+            {SEQUENCE_RULES.map((r,i)=>(
               <div key={i} style={{background:"#050d14",border:"1px solid #0f2a3a",
                 borderRadius:6,padding:"4px 10px",fontSize:9}}>
                 <span style={{color:"#4a8a9a"}}>S{String(r.from).padStart(4,"0")}–S{String(r.to).padStart(4,"0")}</span>
