@@ -54,7 +54,7 @@ export function getRuleForIndex(index: number): SequenceRule | null {
 export function buildFileName(code: string, index: number): string {
   const suffix = getSuffixForIndex(index);
   const seq    = String(index).padStart(4, "0");
-  return `${code}_S${seq}_${suffix}.wav`;
+  return `${code}_N${seq}_${suffix}.wav`;
 }
 
 // ── Arabic Numeral Converter ──────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export function extractNumberFromFileName(fileName: string): number | null {
   const leadingNum = fileName.match(/^(\d+)[.\s_-]/);
   if (leadingNum) return parseInt(leadingNum[1], 10);
 
-  const appenFormat = fileName.match(/_S(\d{3,5})_/);
+  const appenFormat = fileName.match(/_[SN](\d{3,5})_/);
   if (appenFormat) return parseInt(appenFormat[1], 10);
 
   return null;
